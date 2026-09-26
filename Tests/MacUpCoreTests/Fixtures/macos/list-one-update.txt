@@ -1,0 +1,5 @@
+Software Update Tool
+
+Software Update found the following new or updated software:
+* Label: macOS 27.2 Beta-26B5091g
+	Title: macOS 27.2 Beta, Version: 27.2, Size: 5935245KiB, Recommended: YES, Action: restart, 

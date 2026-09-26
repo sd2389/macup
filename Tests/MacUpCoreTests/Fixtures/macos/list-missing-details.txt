@@ -1,0 +1,4 @@
+Software Update found the following new or updated software:
+* Label: Mystery Update-1.0
+* Label: macOS 27.2-26C100
+	Title: macOS 27.2, Version: 27.2, Size: 5000000KiB, Recommended: YES, Action: restart, 

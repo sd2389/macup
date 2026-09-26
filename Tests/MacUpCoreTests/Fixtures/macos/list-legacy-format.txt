@@ -1,0 +1,6 @@
+Software Update Tool
+
+Finding available software
+Software Update found the following new or updated software:
+   * macOS High Sierra 10.13.6 Supplemental Update-
+	macOS High Sierra 10.13.6 Supplemental Update ( ), 1.37G [recommended] [restart]

@@ -1,0 +1,12 @@
+Software Update Tool
+
+Finding available software
+Software Update found the following new or updated software:
+* Label: macOS Sequoia 15.4.1-24E263
+	Title: macOS Sequoia 15.4.1, Version: 15.4.1, Size: 1523748KiB, Recommended: YES, Action: restart, 
+* Label: Safari18.4.1SequoiaAuto-18.4.1
+	Title: Safari, Version: 18.4.1, Size: 197521KiB, Recommended: YES, 
+* Label: Command Line Tools for Xcode-16.3
+	Title: Command Line Tools for Xcode, Version: 16.3, Size: 883203KiB, Recommended: YES, 
+* Label: Printer Driver Update-1.0
+	Title: Printer Driver Update, Canon, Version: 1.0, Size: 1024KiB, Recommended: NO, Deferred: YES, 
