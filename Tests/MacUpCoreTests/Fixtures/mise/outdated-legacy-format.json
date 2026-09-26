@@ -1,0 +1,12 @@
+{
+  "python": {
+    "requested": "3.11",
+    "current": "3.11.0",
+    "latest": "3.11.1"
+  },
+  "terraform": {
+    "requested": "latest",
+    "current": "1.7.4",
+    "latest": "1.8.0"
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "ruby": {
+    "name": "ruby",
+    "requested": "3.3",
+    "current": "3.3.0",
+    "latest": "3.3.6",
+    "source": {
+      "type": ".tool-versions",
+      "path": "/Users/example/.tool-versions"
+    }
+  },
+  "deno": {
+    "name": "deno",
+    "requested": "2",
+    "current": "2.0.0",
+    "latest": "2.1.4",
+    "source": {
+      "type": "unknown"
+    }
+  },
+  "npm:prettier": {
+    "name": "npm:prettier",
+    "requested": "3",
+    "current": "3.3.2",
+    "latest": "3.4.2",
+    "source": {
+      "type": "mise.toml",
+      "path": "/etc/mise/config.toml"
+    }
+  }
+}

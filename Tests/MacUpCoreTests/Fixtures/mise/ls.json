@@ -1,0 +1,53 @@
+{
+  "node": [
+    {
+      "version": "24.18.0",
+      "install_path": "/Users/example/.local/share/mise/installs/node/24.18.0",
+      "installed": true,
+      "active": false
+    },
+    {
+      "version": "24.19.0",
+      "requested_version": "24.19.0",
+      "install_path": "/Users/example/.local/share/mise/installs/node/24.19.0",
+      "source": {
+        "type": "mise.toml",
+        "path": "/Users/example/.config/mise/config.toml"
+      },
+      "installed": true,
+      "active": true
+    }
+  ],
+  "python": [
+    {
+      "version": "3.12.13",
+      "install_path": "/Users/example/.local/share/mise/installs/python/3.12.13",
+      "installed": true,
+      "active": false
+    },
+    {
+      "version": "3.14.6",
+      "requested_version": "3.14.6",
+      "install_path": "/Users/example/.local/share/mise/installs/python/3.14.6",
+      "source": {
+        "type": "mise.toml",
+        "path": "/Users/example/.config/mise/config.toml"
+      },
+      "installed": true,
+      "active": true
+    }
+  ],
+  "go": [
+    {
+      "version": "1.23.4",
+      "requested_version": "1.23",
+      "install_path": "/Users/example/.local/share/mise/installs/go/1.23.4",
+      "source": {
+        "type": "mise.toml",
+        "path": "/Users/example/.config/mise/config.toml"
+      },
+      "installed": false,
+      "active": true
+    }
+  ]
+}

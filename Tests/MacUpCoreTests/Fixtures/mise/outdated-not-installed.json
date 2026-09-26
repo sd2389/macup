@@ -1,0 +1,13 @@
+{
+  "go": {
+    "name": "go",
+    "requested": "1.23",
+    "current": null,
+    "bump": null,
+    "latest": "1.23.4",
+    "source": {
+      "type": "mise.toml",
+      "path": "/Users/example/.config/mise/config.toml"
+    }
+  }
+}

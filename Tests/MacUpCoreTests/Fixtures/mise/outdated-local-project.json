@@ -1,0 +1,13 @@
+{
+  "node": {
+    "name": "node",
+    "requested": "24",
+    "current": "24.19.0",
+    "bump": null,
+    "latest": "24.21.0",
+    "source": {
+      "type": ".tool-versions",
+      "path": "/Users/example/Projects/app/.tool-versions"
+    }
+  }
+}
