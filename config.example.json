@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "global": {
+    "defaultPolicy": "ask",
+    "confirmMajorUpdates": true
+  },
+  "providers": {
+    "homebrew": {
+      "enabled": true,
+      "policy": "ask"
+    },
+    "npm": {
+      "enabled": true,
+      "policy": "ask"
+    },
+    "mise": {
+      "enabled": true,
+      "policy": "ask"
+    },
+    "macos": {
+      "enabled": true,
+      "policy": "ask"
+    }
+  },
+  "items": {
+    "npm:@anthropic-ai/claude-code": {
+      "policy": "ask"
+    },
+    "brew:postgresql": {
+      "policy": "ignore"
+    }
+  },
+  "schedule": {
+    "enabled": false,
+    "frequency": "daily",
+    "time": "23:00"
+  },
+  "privacy": {
+    "telemetry": false
+  }
+}
