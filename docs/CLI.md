@@ -4,6 +4,30 @@ This version of MacUp is **read-only**. No command installs, upgrades,
 removes, cleans, or prunes anything, and no command writes MacUp's
 configuration.
 
+## Install
+
+```bash
+git clone https://github.com/sd2389/macup.git
+cd macup
+make install                    # into ~/.local/bin
+make install PREFIX=/usr/local  # or anywhere else (may need sudo)
+make uninstall                  # remove it
+```
+
+Building needs macOS 14+ and the Xcode Command Line Tools
+(`xcode-select --install`). `make install` tells you if the install folder is
+not on your `PATH` yet.
+
+### Shell completions
+
+```bash
+mkdir -p ~/.zsh/completions
+macup --generate-completion-script zsh > ~/.zsh/completions/_macup
+# then, in ~/.zshrc before compinit:  fpath=(~/.zsh/completions $fpath)
+```
+
+`bash` and `fish` work the same way (`--generate-completion-script bash|fish`).
+
 ## Commands
 
 | Command | What it does |
@@ -15,8 +39,8 @@ configuration.
 | `macup check --provider <id>` | Checks only `homebrew`, `npm`, `mise`, or `macos`. Repeatable. |
 | `macup check --inventory` | Also lists installed items. |
 | `macup check --verbose` | Adds ownership chains, risk reasons, notes, and every command MacUp ran. |
-| `macup provider list [--json]` | Shows which providers were found and exactly which installation MacUp uses. Runs detection only. |
-| `macup config show [--json]` | Shows the configuration in effect and every problem with it. Never creates the file. |
+| `macup providers` / `macup provider list [--json]` | Shows which providers were found and exactly which installation MacUp uses. Runs detection only. |
+| `macup config` / `macup config show [--json]` | Shows the configuration in effect and every problem with it. Never creates the file. |
 | `macup config path [--json]` | Prints the configuration file and state directory locations. |
 | `macup --help`, `macup --version` | Help and version. |
 

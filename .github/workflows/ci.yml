@@ -75,3 +75,10 @@ jobs:
         run: |
           swift build -c release --product macup
           "$(swift build -c release --show-bin-path)/macup" --version
+
+      - name: make install smoke test
+        run: |
+          make install PREFIX="$RUNNER_TEMP/macup"
+          "$RUNNER_TEMP/macup/bin/macup" --version
+          make uninstall PREFIX="$RUNNER_TEMP/macup"
+          test ! -e "$RUNNER_TEMP/macup/bin/macup"

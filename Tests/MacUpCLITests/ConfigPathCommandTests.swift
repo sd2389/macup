@@ -21,6 +21,8 @@ struct ConfigPathCommandTests {
     func help() {
         let help = MacUpCommand.helpMessage()
         #expect(help.contains("USAGE: macup"))
+        #expect(help.contains("Examples:"))
+        #expect(help.contains("macup check --verbose"))
         for subcommand in ["check", "provider", "config"] {
             #expect(help.contains(subcommand))
         }

@@ -14,6 +14,9 @@ swift build
 .build/debug/macup --help
 ```
 
+The `Makefile` wraps the common tasks: `make install`, `make uninstall`,
+`make test`, and `make app`.
+
 ## Desktop app
 
 ```bash

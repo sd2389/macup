@@ -142,13 +142,13 @@ struct CheckRenderer {
 
         var lines: [String] = []
         for (index, update) in updates.enumerated() {
-            var flags = [update.versionChange.displayName, update.risk.level.displayName]
+            var flags = [update.versionChange.displayName]
             if update.signals.contains(.pinnedByProvider) { flags.append("pinned") }
             if update.signals.contains(.restartRequired) { flags.append("restart required") }
             if update.details["configScope"] == "project" { flags.append("project config") }
             lines.append("  " + TextStyle.pad(ids[index], to: idWidth) + "  "
                          + TextStyle.pad(versions[index], to: versionWidth) + "  "
-                         + style.dim(flags.joined(separator: " · ")))
+                         + style.risk(update.risk.level) + style.dim(" · " + flags.joined(separator: " · ")))
             if verbose {
                 if let ownership = update.ownership {
                     lines.append("      " + style.dim("Managed by: " + style.text(ownership.summary)))
@@ -233,6 +233,9 @@ struct CheckRenderer {
             let errors = configuration.issues.filter { $0.severity == .error }.count
             lines.append("Configuration \(style.path(configuration.path)) has \(TextStyle.plural(errors, "error")); "
                          + "automatic modifications stay disabled until it is fixed. Run `macup config show` for details.")
+        }
+        if updates > 0 && !verbose {
+            lines.append(style.dim("For details on each update, run `macup check --verbose`."))
         }
         if report.mode == .readOnly {
             let local = report.providers

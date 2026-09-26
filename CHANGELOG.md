@@ -34,6 +34,9 @@ MacUp follows Semantic Versioning once releases begin.
   Settings window, and a menu bar extra, built with `scripts/build-app.sh`.
 - Login-shell environment discovery so the app finds the same tools as the
   terminal.
+- `make install` / `make uninstall` for the CLI; `macup providers` and
+  `macup config` shortcuts; examples in `macup --help`; risk levels colored
+  on terminals.
 
 ### Security
 - Security policy with private vulnerability reporting, and the Contributor

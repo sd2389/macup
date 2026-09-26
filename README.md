@@ -21,28 +21,35 @@ Early development. **This version is read-only** (Phases 0 and 1 of the build pl
 | 3 | Safe per-item updates, verification, history | planned |
 | 4–7 | Doctor, full app controls, launchd scheduling, release hardening | planned |
 
-## Try it
+## Command-line tool
 
-Requires macOS 14+ and Xcode 16.3+ or the matching Command Line Tools.
+Install (needs macOS 14+ and the Xcode Command Line Tools: `xcode-select --install`):
 
 ```bash
-swift build
-.build/debug/macup check
+git clone https://github.com/sd2389/macup.git
+cd macup
+make install
 ```
 
-`macup check` never changes anything. Other read-only commands:
+That puts `macup` in `~/.local/bin`. Then:
 
 ```bash
-.build/debug/macup check --verbose       # ownership, risk reasons, every command run
-.build/debug/macup check --json          # versioned machine-readable report
-.build/debug/macup provider list         # which installation of each tool MacUp uses
-.build/debug/macup config show           # configuration in effect, and any problems
+macup                    # see what's outdated
+macup check --verbose    # who manages each item, why it's rated that way, every command run
+macup check --json       # machine-readable output for scripts
+macup providers          # which installation of each tool MacUp uses
+macup config             # the settings MacUp is using
 ```
 
-The desktop app shows the same information in a native window and the menu bar:
+Nothing is ever changed: this version only reports. `make uninstall` removes
+the command; `make install PREFIX=/usr/local` installs it elsewhere.
+
+## Desktop app
+
+The same information in a native window and the menu bar:
 
 ```bash
-scripts/build-app.sh && open build/MacUp.app
+make app && open build/MacUp.app
 ```
 
 `macup check --refresh` first runs `brew update` (which updates Homebrew itself and its package lists, but no installed packages) and a fresh `softwareupdate --list` scan.

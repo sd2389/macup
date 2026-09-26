@@ -4,8 +4,10 @@ import MacUpCore
 struct ProviderCommand: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "provider",
-        abstract: "Inspect providers (read-only).",
-        subcommands: [ProviderListCommand.self]
+        abstract: "Show which providers MacUp found (read-only).",
+        subcommands: [ProviderListCommand.self],
+        defaultSubcommand: ProviderListCommand.self,
+        aliases: ["providers"]
     )
 }
 
@@ -42,6 +44,7 @@ struct ProviderListCommand: AsyncParsableCommand {
 
     private func render(_ providers: [ProviderReport], style: TextStyle) -> String {
         let nameWidth = providers.map(\.displayName.count).max() ?? 0
+        let versionWidth = providers.compactMap { $0.version.map { style.safe($0).count } }.max() ?? 0
         var lines: [String] = []
         for provider in providers {
             let state: String
@@ -52,7 +55,7 @@ struct ProviderListCommand: AsyncParsableCommand {
             case .failed: state = "not usable"
             }
             var line = style.bold(TextStyle.pad(provider.displayName, to: nameWidth)) + "  " + TextStyle.pad(state, to: 10)
-            if let version = provider.version { line += "  " + TextStyle.pad(style.safe(version), to: 10) }
+            if provider.executable != nil { line += "  " + TextStyle.pad(style.safe(provider.version ?? ""), to: versionWidth) }
             if let executable = provider.executable { line += "  " + style.path(executable.path) }
             lines.append(line)
             if let executable = provider.executable, executable.canonicalPath != executable.path {

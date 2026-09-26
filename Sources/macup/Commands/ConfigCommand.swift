@@ -5,8 +5,9 @@ import MacUpCore
 struct ConfigCommand: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "config",
-        abstract: "Inspect MacUp's configuration (read-only).",
-        subcommands: [ConfigShowCommand.self, ConfigPathCommand.self]
+        abstract: "Show MacUp's configuration (read-only).",
+        subcommands: [ConfigShowCommand.self, ConfigPathCommand.self],
+        defaultSubcommand: ConfigShowCommand.self
     )
 }
 
@@ -65,8 +66,8 @@ struct ConfigShowCommand: AsyncParsableCommand {
             case .file: lines.append(loaded.hasErrors ? "The file has errors." : "The file is valid.")
             }
             lines.append(loaded.allowsAutomaticModification
-                ? "Automatic modifications: allowed by configuration (none exist in this version of MacUp)."
-                : "Automatic modifications: disabled until the errors below are fixed.")
+                ? "Automatic changes: none happen in this version of MacUp."
+                : "Automatic changes: disabled until the errors below are fixed.")
             if !loaded.issues.isEmpty {
                 lines.append("")
                 for issue in loaded.issues {

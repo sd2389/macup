@@ -37,15 +37,16 @@ struct CheckCommandTests {
         #expect(output.contains("  2 installed · 2 updates"))
         #expect(output.contains("brew:git"))
         #expect(output.contains("2.43.0 → 2.44.0"))
-        #expect(output.contains("minor · moderate risk"))
+        #expect(output.contains("moderate risk · minor"))
         #expect(output.contains("brew:mysql"))
-        #expect(output.contains("major · high risk"))
+        #expect(output.contains("high risk · major"))
         #expect(output.contains("npm · not found"))
         #expect(output.contains("mise · not found"))
         #expect(output.contains("macos:macOS 27.2 Beta-26B5091g"))
         #expect(output.contains("restart required"))
         #expect(output.contains("Review and install macOS updates in System Settings"))
         #expect(output.contains("3 updates available (Homebrew 2, macOS 1)."))
+        #expect(output.contains("For details on each update, run `macup check --verbose`."))
         #expect(output.contains("\nNothing was changed.\n"))
         #expect(!output.contains("\u{1B}"), "no ANSI when stdout is not a terminal")
         #expect(run.standardError.isEmpty)
@@ -60,13 +61,17 @@ struct CheckCommandTests {
         #expect(run.standardOutput.contains("/usr/sbin/softwareupdate --list --no-scan"))
         #expect(run.standardOutput.contains("Managed by: Homebrew"))
         #expect(run.standardOutput.contains("Risk: Major version change"))
+        #expect(!run.standardOutput.contains("For details on each update"), "no hint when details are already shown")
     }
 
     @Test("Styling only on a terminal, and never with NO_COLOR")
     func styling() async throws {
         let harness = try CLIHarness()
         harness.isTerminal = true
-        #expect(try await harness.run(["check"]).standardOutput.contains("\u{1B}[1m"))
+        let styled = try await harness.run(["check"]).standardOutput
+        #expect(styled.contains("\u{1B}[1m"))
+        #expect(styled.contains("\u{1B}[31mhigh risk\u{1B}[0m"), "risk is colored, and still spelled out")
+        #expect(styled.contains("\u{1B}[33mmoderate risk\u{1B}[0m"))
         harness.environment["NO_COLOR"] = "1"
         #expect(!(try await harness.run(["check"]).standardOutput.contains("\u{1B}")))
     }
@@ -83,10 +88,10 @@ struct CheckCommandTests {
         ]
         harness.addNpm(outdated: String(decoding: try JSONSerialization.data(withJSONObject: outdated), as: UTF8.self))
         let run = try await harness.run(["check"])
-        let text = run.standardOutput
-            .replacingOccurrences(of: "\u{1B}[1m", with: "")
-            .replacingOccurrences(of: "\u{1B}[2m", with: "")
-            .replacingOccurrences(of: "\u{1B}[0m", with: "")
+        // Remove exactly the styling codes MacUp itself emits; anything left is a leak.
+        let text = ["[0m", "[1m", "[2m", "[31m", "[32m", "[33m"].reduce(run.standardOutput) { text, code in
+            text.replacingOccurrences(of: "\u{1B}" + code, with: "")
+        }
         for line in text.split(separator: "\n") {
             #expect(!line.unicodeScalars.contains(where: TerminalText.isUnsafe), "only MacUp's own styling may be raw: \(line.debugDescription)")
         }
@@ -185,6 +190,23 @@ struct ProviderAndConfigCommandTests {
         #expect(!harness.runner.recordedRequests.contains { $0.arguments.first == "outdated" })
     }
 
+    @Test("`macup providers` and `macup provider` list providers directly")
+    func providerShortcuts() async throws {
+        for arguments in [["providers"], ["provider"]] {
+            let harness = try CLIHarness()
+            let run = try await harness.run(arguments)
+            #expect(run.exitCode == nil)
+            #expect(run.standardOutput.contains("Homebrew  found"), "\(arguments)")
+        }
+    }
+
+    @Test("`macup config` shows the configuration directly")
+    func configShortcut() async throws {
+        let harness = try CLIHarness()
+        let run = try await harness.run(["config"])
+        #expect(run.standardOutput.contains("No configuration file; using built-in defaults."))
+    }
+
     @Test("provider list --json")
     func providerListJSON() async throws {
         let harness = try CLIHarness()
@@ -212,7 +234,7 @@ struct ProviderAndConfigCommandTests {
         #expect(run.exitCode == MacUpExitCode.configurationInvalid.rawValue)
         #expect(run.standardOutput.contains("error: providers.homebew: Unknown provider 'homebew'."))
         #expect(run.standardOutput.contains("error: schedule.time:"))
-        #expect(run.standardOutput.contains("Automatic modifications: disabled until the errors below are fixed."))
+        #expect(run.standardOutput.contains("Automatic changes: disabled until the errors below are fixed."))
 
         let json = try await harness.run(["config", "show", "--json"])
         let object = try #require(try JSONSerialization.jsonObject(with: Data(json.standardOutput.utf8)) as? [String: Any])
