@@ -1,0 +1,133 @@
+{
+  "formulae": [
+    {
+      "name": "git",
+      "full_name": "git",
+      "tap": "homebrew/core",
+      "desc": "Distributed revision control system",
+      "installed": [
+        {
+          "version": "2.43.0",
+          "installed_on_request": true,
+          "installed_as_dependency": false
+        }
+      ],
+      "linked_keg": "2.43.0",
+      "pinned": false,
+      "outdated": true,
+      "keg_only": false,
+      "deprecated": false,
+      "disabled": false,
+      "versions": {
+        "stable": "2.44.0",
+        "head": "HEAD",
+        "bottle": true
+      }
+    },
+    {
+      "name": "abseil",
+      "full_name": "abseil",
+      "tap": "homebrew/core",
+      "desc": "C++ Common Libraries",
+      "installed": [
+        {
+          "version": "20260817.0",
+          "installed_on_request": false
+        }
+      ],
+      "linked_keg": "20260817.0",
+      "pinned": false,
+      "outdated": false
+    },
+    {
+      "name": "postgresql@16",
+      "full_name": "postgresql@16",
+      "tap": "homebrew/core",
+      "desc": "Object-relational database system",
+      "installed": [
+        {
+          "version": "16.1",
+          "installed_on_request": true
+        }
+      ],
+      "linked_keg": null,
+      "pinned": true,
+      "keg_only": true,
+      "outdated": true
+    },
+    {
+      "name": "widget",
+      "full_name": "example-org/tools/widget",
+      "tap": "example-org/tools",
+      "desc": "Unicode description \u2014 emoji \ud83d\ude80",
+      "installed": [
+        {
+          "version": "1.0.0",
+          "installed_on_request": true
+        }
+      ],
+      "linked_keg": "1.0.0",
+      "pinned": false,
+      "deprecated": true
+    }
+  ],
+  "casks": [
+    {
+      "token": "firefox",
+      "full_token": "firefox",
+      "tap": "homebrew/cask",
+      "name": [
+        "Mozilla Firefox"
+      ],
+      "desc": "Web browser",
+      "installed": "123.0",
+      "version": "124.0.1",
+      "outdated": true,
+      "auto_updates": true,
+      "pinned": false,
+      "artifacts": [
+        {
+          "app": [
+            "Firefox.app"
+          ]
+        },
+        {
+          "zap": [
+            {
+              "trash": [
+                "~/Library/Caches/Firefox"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "token": "zoom",
+      "full_token": "zoom",
+      "tap": "homebrew/cask",
+      "name": [
+        "Zoom"
+      ],
+      "desc": "Video communication and virtual meeting platform",
+      "installed": "6.0.0",
+      "version": "6.0.2",
+      "outdated": true,
+      "auto_updates": true,
+      "artifacts": [
+        {
+          "pkg": [
+            "zoomusInstallerFull.pkg"
+          ]
+        },
+        {
+          "uninstall": [
+            {
+              "launchctl": "us.zoom.ZoomDaemon"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

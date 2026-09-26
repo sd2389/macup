@@ -1,0 +1,28 @@
+{
+  "formulae": [
+    {
+      "name": "git"
+    },
+    {
+      "installed_versions": [
+        "1.0"
+      ],
+      "current_version": "1.1"
+    },
+    {
+      "name": "jq",
+      "installed_versions": [],
+      "current_version": "1.7.1"
+    },
+    {
+      "name": "ripgrep",
+      "installed_versions": [
+        "14.1.0"
+      ],
+      "current_version": "14.1.1",
+      "pinned": false,
+      "pinned_version": null
+    }
+  ],
+  "casks": []
+}

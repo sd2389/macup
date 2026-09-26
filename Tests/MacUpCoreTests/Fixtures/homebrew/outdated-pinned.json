@@ -1,0 +1,24 @@
+{
+  "formulae": [
+    {
+      "name": "postgresql@16",
+      "installed_versions": [
+        "16.1"
+      ],
+      "current_version": "16.2",
+      "pinned": true,
+      "pinned_version": "16.1"
+    }
+  ],
+  "casks": [
+    {
+      "name": "docker-desktop",
+      "installed_versions": [
+        "4.28.0,139021"
+      ],
+      "current_version": "4.29.0,145265",
+      "pinned": true,
+      "pinned_version": "4.28.0,139021"
+    }
+  ]
+}

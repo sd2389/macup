@@ -1,0 +1,95 @@
+{
+  "formulae": [
+    {
+      "name": "libsigc++",
+      "installed_versions": [
+        "3.4.0"
+      ],
+      "current_version": "3.6.0",
+      "pinned": false,
+      "pinned_version": null
+    },
+    {
+      "name": "gtk+3",
+      "installed_versions": [
+        "3.24.38"
+      ],
+      "current_version": "3.24.41",
+      "pinned": false,
+      "pinned_version": null
+    },
+    {
+      "name": "tool-\u00fcn\u00efc\u00f8d\u00e9",
+      "installed_versions": [
+        "1.0"
+      ],
+      "current_version": "1.1",
+      "pinned": false,
+      "pinned_version": null
+    },
+    {
+      "name": "name; rm -rf ~",
+      "installed_versions": [
+        "1.0"
+      ],
+      "current_version": "1.1",
+      "pinned": false,
+      "pinned_version": null
+    },
+    {
+      "name": "$(touch /tmp/macup-pwned)",
+      "installed_versions": [
+        "1.0"
+      ],
+      "current_version": "1.1",
+      "pinned": false,
+      "pinned_version": null
+    },
+    {
+      "name": "`id`",
+      "installed_versions": [
+        "1.0"
+      ],
+      "current_version": "1.1",
+      "pinned": false,
+      "pinned_version": null
+    },
+    {
+      "name": "--force",
+      "installed_versions": [
+        "1.0"
+      ],
+      "current_version": "1.1",
+      "pinned": false,
+      "pinned_version": null
+    },
+    {
+      "name": "evil\u001b[31m",
+      "installed_versions": [
+        "1.0"
+      ],
+      "current_version": "1.1",
+      "pinned": false,
+      "pinned_version": null
+    },
+    {
+      "name": "line\nbreak",
+      "installed_versions": [
+        "1.0"
+      ],
+      "current_version": "1.1",
+      "pinned": false,
+      "pinned_version": null
+    },
+    {
+      "name": "rtl\u202etxt",
+      "installed_versions": [
+        "1.0"
+      ],
+      "current_version": "1.1",
+      "pinned": false,
+      "pinned_version": null
+    }
+  ],
+  "casks": []
+}

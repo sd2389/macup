@@ -1,0 +1,51 @@
+{
+  "formulae": [
+    {
+      "name": "node@20",
+      "installed_versions": [
+        "20.11.0"
+      ],
+      "current_version": "20.12.1",
+      "pinned": false,
+      "pinned_version": null
+    },
+    {
+      "name": "python@3.12",
+      "installed_versions": [
+        "3.12.1"
+      ],
+      "current_version": "3.12.2_1",
+      "pinned": false,
+      "pinned_version": null
+    },
+    {
+      "name": "example-org/tools/widget",
+      "installed_versions": [
+        "1.0.0"
+      ],
+      "current_version": "1.1.0",
+      "pinned": false,
+      "pinned_version": null
+    },
+    {
+      "name": "mise",
+      "installed_versions": [
+        "2026.7.3"
+      ],
+      "current_version": "2026.9.14",
+      "pinned": false,
+      "pinned_version": null
+    }
+  ],
+  "casks": [
+    {
+      "name": "codex",
+      "installed_versions": [
+        "0.157.0"
+      ],
+      "current_version": "0.158.0",
+      "pinned": false,
+      "pinned_version": null
+    }
+  ]
+}
