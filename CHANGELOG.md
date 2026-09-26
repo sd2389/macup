@@ -6,6 +6,15 @@ MacUp follows Semantic Versioning once releases begin.
 
 ## [Unreleased]
 
+### Added
+- Homebrew tap: `brew install sd2389/macup/macup` builds MacUp from the
+  tagged source.
+
+### Fixed
+- CI and the development guide find the built `macup` through SwiftPM
+  (`swift build --show-bin-path`, `swift run`) instead of assuming
+  `.build/debug`, which newer toolchains no longer use.
+
 ## [0.1.0] - 2026-09-26
 
 Read-only alpha: MacUp reports what is outdated and never changes anything.

@@ -23,7 +23,14 @@ Early development. **This version is read-only** (Phases 0 and 1 of the build pl
 
 ## Command-line tool
 
-Install (needs macOS 14+ and the Xcode Command Line Tools: `xcode-select --install`):
+Install with Homebrew (needs macOS 14+ and the Xcode Command Line Tools:
+`xcode-select --install`; the formula builds MacUp from source):
+
+```bash
+brew install sd2389/macup/macup
+```
+
+Or build it from a clone, which puts `macup` in `~/.local/bin`:
 
 ```bash
 git clone https://github.com/sd2389/macup.git
@@ -31,7 +38,7 @@ cd macup
 make install
 ```
 
-That puts `macup` in `~/.local/bin`. Then:
+Then:
 
 ```bash
 macup                    # see what's outdated
@@ -41,8 +48,9 @@ macup providers          # which installation of each tool MacUp uses
 macup config             # the settings MacUp is using
 ```
 
-Nothing is ever changed: this version only reports. `make uninstall` removes
-the command; `make install PREFIX=/usr/local` installs it elsewhere.
+Nothing is ever changed: this version only reports. Remove the command with
+`brew uninstall macup` or, for a clone install, `make uninstall`;
+`make install PREFIX=/usr/local` installs it elsewhere.
 
 ## Desktop app
 

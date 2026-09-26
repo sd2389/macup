@@ -7,6 +7,12 @@ configuration.
 ## Install
 
 ```bash
+brew install sd2389/macup/macup  # builds from source; brew uninstall macup removes it
+```
+
+Or from a clone:
+
+```bash
 git clone https://github.com/sd2389/macup.git
 cd macup
 make install                    # into ~/.local/bin
@@ -19,6 +25,9 @@ Building needs macOS 14+ and the Xcode Command Line Tools
 not on your `PATH` yet.
 
 ### Shell completions
+
+The Homebrew formula installs bash, zsh, and fish completions. For a clone
+install:
 
 ```bash
 mkdir -p ~/.zsh/completions

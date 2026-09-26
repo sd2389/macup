@@ -47,12 +47,15 @@ jobs:
       - name: Package.resolved is unchanged
         run: git diff --exit-code -- Package.resolved
 
+      # The build output layout differs between toolchains; ask SwiftPM.
       - name: CLI smoke test
         run: |
-          .build/debug/macup --help
-          .build/debug/macup --version
-          .build/debug/macup config path --json
-          .build/debug/macup config show
+          macup="$(swift build --show-bin-path)/macup"
+          echo "MACUP=$macup" >> "$GITHUB_ENV"
+          "$macup" --help
+          "$macup" --version
+          "$macup" config path --json
+          "$macup" config show
 
       # A real, read-only check on the disposable runner. Exit status 2
       # (a provider failed, for example a registry hiccup) is tolerated; the
@@ -61,7 +64,7 @@ jobs:
       - name: Read-only check on the runner
         run: |
           set +e
-          .build/debug/macup check --json > "$RUNNER_TEMP/check.json"
+          "$MACUP" check --json > "$RUNNER_TEMP/check.json"
           status=$?
           set -e
           echo "macup check exited with status $status"
@@ -74,7 +77,7 @@ jobs:
           print(json.dumps(report["summary"], indent=2))
           EOF
           if [ "$status" -ne 0 ] && [ "$status" -ne 2 ]; then exit "$status"; fi
-          .build/debug/macup check --verbose || true
+          "$MACUP" check --verbose || true
 
       - name: Release build smoke test
         run: |

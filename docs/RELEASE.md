@@ -9,17 +9,20 @@
 
 ## CLI distribution
 
-Initial:
-- GitHub Releases
+- GitHub Releases: the tagged source (`vX.Y.Z`).
+- Homebrew tap [`sd2389/homebrew-macup`](https://github.com/sd2389/homebrew-macup):
+  a formula that builds the tagged source, with dependency downloads in its
+  `fetch` phase and an offline build.
 
-Then:
-- Homebrew tap/formula
-
-Desired user experience:
 ```bash
-brew install <tap>/macup
+brew install sd2389/macup/macup
 macup check
 ```
+
+To publish a release to the tap, set `url` in `Formula/macup.rb` to the new
+tag's tarball and `sha256` to that tarball's `shasum -a 256`, then run
+`brew reinstall sd2389/macup/macup` and `brew test sd2389/macup/macup`
+before pushing the tap.
 
 ## App distribution
 

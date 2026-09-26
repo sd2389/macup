@@ -10,8 +10,7 @@
 ## Build and run
 
 ```bash
-swift build
-.build/debug/macup --help
+swift run macup --help
 ```
 
 The `Makefile` wraps the common tasks: `make install`, `make uninstall`,
