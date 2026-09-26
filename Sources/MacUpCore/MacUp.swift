@@ -1,7 +1,7 @@
 /// Facts about MacUp itself.
 public enum MacUp {
-    /// The MacUp version. Pre-release until v0.1.0 ships.
-    public static let version = "0.1.0-dev"
+    /// The MacUp version.
+    public static let version = "0.1.0"
 
     /// Reverse-DNS prefix used for OSLog subsystems.
     /// Placeholder until a release bundle identifier is chosen.

@@ -6,6 +6,10 @@ MacUp follows Semantic Versioning once releases begin.
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-09-26
+
+Read-only alpha: MacUp reports what is outdated and never changes anything.
+
 ### Added
 - Project documentation materialized from `MACUP_MASTER_BUILD_SPEC.md`.
 - Apache-2.0 license.
@@ -49,3 +53,6 @@ MacUp follows Semantic Versioning once releases begin.
 ### Provider compatibility
 - Verified against Homebrew 7.0.6, npm 10.9.8/11.17.0, mise 2026.7.3, and
   `softwareupdate` on macOS 27.0; parsers accept older output shapes.
+
+[Unreleased]: https://github.com/sd2389/macup/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/sd2389/macup/releases/tag/v0.1.0
