@@ -25,7 +25,7 @@ public enum NodeManager: String, Sendable, Hashable, Codable, CaseIterable {
         case .asdf: "asdf"
         case .nodenv: "nodenv"
         case .n: "n"
-        case .unknown: "an unrecognized installation"
+        case .unknown: "unrecognized"
         }
     }
 

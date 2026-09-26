@@ -20,7 +20,8 @@ public enum TerminalText {
         return result
     }
 
-    static func isUnsafe(_ scalar: Unicode.Scalar) -> Bool {
+    /// Whether printing `scalar` could control the terminal or disguise text.
+    public static func isUnsafe(_ scalar: Unicode.Scalar) -> Bool {
         switch scalar.value {
         case 0x00...0x1F, 0x7F...0x9F:
             // C0 controls (including ESC, newline, tab), DEL, and C1 controls.

@@ -34,6 +34,7 @@ public struct NpmProvider: UpdateProvider {
 
     enum FactKey {
         static let nodePath = "nodePath"
+        static let nodeTarget = "nodeTarget"
         static let nodeVersion = "nodeVersion"
         static let nodeManager = "nodeManager"
         static let globalPrefix = "globalPrefix"
@@ -95,10 +96,13 @@ public struct NpmProvider: UpdateProvider {
             miseDataDirectory: NodeManager.miseDataDirectory(environment: context.environment, homeDirectory: home)
         )
         var facts = [ProviderFact(key: FactKey.nodePath, label: "Node", value: node.path)]
+        if node.canonicalPath != node.path {
+            facts.append(ProviderFact(key: FactKey.nodeTarget, label: "Node resolves to", value: node.canonicalPath))
+        }
         if let result = results.1, result.succeeded, let version = ProviderSupport.firstLine(result.standardOutputText) {
             facts.append(ProviderFact(key: FactKey.nodeVersion, label: "Node version", value: version))
         }
-        facts.append(ProviderFact(key: FactKey.nodeManager, label: "Node installed by", value: manager.displayName))
+        facts.append(ProviderFact(key: FactKey.nodeManager, label: "Node managed by", value: manager.displayName))
         if let result = results.2, result.succeeded, let value = ProviderSupport.firstLine(result.standardOutputText), value.hasPrefix("/") {
             facts.append(ProviderFact(key: FactKey.globalPrefix, label: "Global prefix", value: value))
         }

@@ -1,11 +1,12 @@
 import ArgumentParser
+import Foundation
 import MacUpCore
 
 struct ConfigCommand: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "config",
         abstract: "Inspect MacUp's configuration (read-only).",
-        subcommands: [ConfigPathCommand.self]
+        subcommands: [ConfigShowCommand.self, ConfigPathCommand.self]
     )
 }
 
@@ -15,19 +16,12 @@ struct ConfigPathCommand: AsyncParsableCommand {
         abstract: "Print where MacUp reads configuration and keeps state."
     )
 
-    @Flag(name: .long, help: "Print machine-readable JSON.")
+    @Flag(name: .long, help: "Print machine-readable JSON (schema version 1).")
     var json = false
 
     func run() async throws {
         let context = CLIContext.current
-        let paths: MacUpPaths
-        do {
-            paths = try MacUpPaths.resolve(homeDirectory: context.homeDirectory, environment: context.environment)
-        } catch let error as MacUpError {
-            context.printError("error: \(TerminalText.sanitize(error.message))")
-            throw MacUpExitCode.configurationInvalid.exitCode
-        }
-
+        let paths = try context.resolvePaths()
         if json {
             context.print(try JSONOutput.encode(ConfigPathsDocument(paths: paths)))
             return
@@ -38,6 +32,54 @@ struct ConfigPathCommand: AsyncParsableCommand {
 
     private func sourceNote(_ source: MacUpPaths.Source, _ variable: String) -> String {
         source == .environment ? " (from \(variable))" : ""
+    }
+}
+
+struct ConfigShowCommand: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "show",
+        abstract: "Show the configuration in effect and any problems with it.",
+        discussion: """
+            Reading never creates or changes the file. If the file is missing, MacUp uses \
+            conservative defaults: every provider enabled, everything Ask First, no \
+            scheduling, no telemetry. Any error disables automatic modifications until it \
+            is fixed (exit status 3).
+            """
+    )
+
+    @Flag(name: .long, help: "Print machine-readable JSON (schema version 1).")
+    var json = false
+
+    func run() async throws {
+        let context = CLIContext.current
+        let paths = try context.resolvePaths()
+        let loaded = ConfigurationStore(paths: paths).load()
+
+        if json {
+            context.print(try JSONOutput.encode(ConfigurationDocument(loaded)))
+        } else {
+            let style = TextStyle(enabled: context.allowsStyling, homeDirectory: context.homeDirectory)
+            var lines = [style.bold("Configuration") + " " + style.path(loaded.path)]
+            switch loaded.source {
+            case .defaults: lines.append("No configuration file; using built-in defaults.")
+            case .file: lines.append(loaded.hasErrors ? "The file has errors." : "The file is valid.")
+            }
+            lines.append(loaded.allowsAutomaticModification
+                ? "Automatic modifications: allowed by configuration (none exist in this version of MacUp)."
+                : "Automatic modifications: disabled until the errors below are fixed.")
+            if !loaded.issues.isEmpty {
+                lines.append("")
+                for issue in loaded.issues {
+                    let location = issue.path.isEmpty ? "" : style.safe(issue.path) + ": "
+                    lines.append("  \(issue.severity.rawValue): \(location)\(style.text(issue.message))")
+                }
+            }
+            lines.append("")
+            lines.append(loaded.hasErrors && loaded.source == .file ? "Settings in effect for read-only commands:" : "Settings in effect:")
+            lines.append(try JSONOutput.encode(loaded.configuration))
+            context.print(lines.joined(separator: "\n"))
+        }
+        if loaded.hasErrors { throw MacUpExitCode.configurationInvalid.exitCode }
     }
 }
 
@@ -56,5 +98,25 @@ struct ConfigPathsDocument: Encodable {
         stateDirectory = paths.stateDirectory
         configDirectorySource = paths.configDirectorySource
         stateDirectorySource = paths.stateDirectorySource
+    }
+}
+
+struct ConfigurationDocument: Encodable {
+    let schemaVersion = 1
+    let kind = "configuration"
+    let path: String
+    let source: LoadedConfiguration.Source
+    let valid: Bool
+    let automaticModificationsAllowed: Bool
+    let issues: [ConfigurationIssue]
+    let configuration: MacUpConfiguration
+
+    init(_ loaded: LoadedConfiguration) {
+        path = loaded.path
+        source = loaded.source
+        valid = !loaded.hasErrors
+        automaticModificationsAllowed = loaded.allowsAutomaticModification
+        issues = loaded.issues
+        configuration = loaded.configuration
     }
 }

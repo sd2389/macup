@@ -17,17 +17,20 @@ struct ConfigPathCommandTests {
         }
     }
 
-    @Test("--help describes the tool")
+    @Test("--help describes the tool and its commands")
     func help() {
         let help = MacUpCommand.helpMessage()
         #expect(help.contains("USAGE: macup"))
-        #expect(help.contains("config"))
+        for subcommand in ["check", "provider", "config"] {
+            #expect(help.contains(subcommand))
+        }
     }
 
     @Test("config path prints the canonical locations")
     func humanOutput() async throws {
-        let (context, stdout, stderr) = CLIContext.testing()
-        let run = try await runCLI(["config", "path"], context: context, stdout: stdout, stderr: stderr)
+        let harness = try CLIHarness()
+        harness.environment.removeValue(forKey: "MACUP_CONFIG_DIR")
+        let run = try await harness.run(["config", "path"])
         #expect(run.exitCode == nil)
         #expect(run.standardOutput == """
             Configuration file: /Users/example/.config/macup/config.json
@@ -38,8 +41,10 @@ struct ConfigPathCommandTests {
 
     @Test("config path --json is versioned and machine-readable")
     func jsonOutput() async throws {
-        let (context, stdout, stderr) = CLIContext.testing(environment: ["MACUP_STATE_DIR": "/tmp/state"])
-        let run = try await runCLI(["config", "path", "--json"], context: context, stdout: stdout, stderr: stderr)
+        let harness = try CLIHarness()
+        harness.environment.removeValue(forKey: "MACUP_CONFIG_DIR")
+        harness.environment["MACUP_STATE_DIR"] = "/tmp/state"
+        let run = try await harness.run(["config", "path", "--json"])
         let object = try #require(
             JSONSerialization.jsonObject(with: Data(run.standardOutput.utf8)) as? [String: Any]
         )
@@ -52,8 +57,9 @@ struct ConfigPathCommandTests {
 
     @Test("A relative MACUP_CONFIG_DIR is an invalid configuration (exit 3)")
     func relativeOverride() async throws {
-        let (context, stdout, stderr) = CLIContext.testing(environment: ["MACUP_CONFIG_DIR": "relative"])
-        let run = try await runCLI(["config", "path"], context: context, stdout: stdout, stderr: stderr)
+        let harness = try CLIHarness()
+        harness.environment["MACUP_CONFIG_DIR"] = "relative"
+        let run = try await harness.run(["config", "path"])
         #expect(run.exitCode == MacUpExitCode.configurationInvalid.rawValue)
         #expect(run.standardError.contains("MACUP_CONFIG_DIR must be an absolute path"))
         #expect(run.standardOutput.isEmpty)
