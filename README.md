@@ -84,7 +84,7 @@ Nothing was changed.
 - Providers get an allowlisted environment; secrets are redacted from anything displayed.
 - No account, no cloud, no telemetry.
 
-See [docs/TRUST_AND_SECURITY.md](docs/TRUST_AND_SECURITY.md).
+See [docs/TRUST_AND_SECURITY.md](docs/TRUST_AND_SECURITY.md). To report a vulnerability, please use private reporting as described in [SECURITY.md](SECURITY.md).
 
 ## Documentation
 
@@ -98,6 +98,10 @@ See [docs/TRUST_AND_SECURITY.md](docs/TRUST_AND_SECURITY.md).
 - [docs/IMPLEMENTATION_CHECKLIST.md](docs/IMPLEMENTATION_CHECKLIST.md) — phase checklists
 
 `MACUP_MASTER_BUILD_SPEC.md` is the single-file specification these documents were extracted from.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) and the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## License
 

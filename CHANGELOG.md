@@ -36,6 +36,9 @@ MacUp follows Semantic Versioning once releases begin.
   terminal.
 
 ### Security
+- Security policy with private vulnerability reporting, and the Contributor
+  Covenant 2.1 as the Code of Conduct.
+- Dependabot updates for GitHub Actions and Swift packages.
 - Provider output is treated as untrusted: names with control characters,
   bidirectional overrides, or leading dashes are skipped; everything printed
   is sanitized for the terminal; errors are redacted.

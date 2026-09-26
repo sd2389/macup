@@ -33,3 +33,13 @@ Explain:
 - trust/security impact
 - tests
 - manual verification
+
+## Security issues
+
+Do not report vulnerabilities in public issues or pull requests. See
+[SECURITY.md](SECURITY.md) for private reporting.
+
+## Code of conduct
+
+Everyone taking part in MacUp is expected to follow the
+[Code of Conduct](CODE_OF_CONDUCT.md).

@@ -1,0 +1,4 @@
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/sd2389/macup/security/advisories/new
+    about: Please report vulnerabilities privately, not as public issues.
