@@ -80,7 +80,7 @@ struct CheckRenderer {
             lines.append("  " + counts(provider))
         }
 
-        let updates = report.updates.filter { $0.provider == provider.provider }
+        let updates = report.updates(for: provider.provider)
         lines += updateTable(updates)
 
         if provider.provider == .macos && !updates.isEmpty {
@@ -214,7 +214,7 @@ struct CheckRenderer {
     private func summary() -> [String] {
         var lines: [String] = []
         let counts = report.providers.compactMap { provider -> String? in
-            let count = report.updates.filter { $0.provider == provider.provider }.count
+            let count = report.updates(for: provider.provider).count
             return count > 0 ? "\(provider.displayName) \(count)" : nil
         }
         let updates = report.summary.updatesAvailable

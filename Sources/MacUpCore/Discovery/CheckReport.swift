@@ -156,4 +156,13 @@ public struct CheckReport: Sendable, Hashable, Codable {
     }
 
     public var hasProviderErrors: Bool { providers.contains(where: \.hasErrors) }
+
+    public func updates(for provider: ProviderID) -> [UpdateCandidate] {
+        updates.filter { $0.provider == provider }
+    }
+
+    /// Updates the provider itself holds back (for example `brew pin`).
+    public var pinnedCount: Int {
+        updates.filter { $0.signals.contains(.pinnedByProvider) }.count
+    }
 }
