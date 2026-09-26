@@ -24,6 +24,14 @@ let package = Package(
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
             ]
         ),
+        // The SwiftUI desktop app. Built with scripts/build-app.sh until the
+        // Xcode project (Apps/MacUpApp/MacUpApp.xcodeproj) wraps the same sources.
+        .executableTarget(
+            name: "MacUpApp",
+            dependencies: ["MacUpCore"],
+            path: "Apps/MacUpApp/MacUpApp",
+            exclude: ["Resources"]
+        ),
         // Fakes shared by the test targets. Never linked into shipping products.
         .target(
             name: "MacUpTestSupport",

@@ -3,6 +3,9 @@
 
 # Swift Package Manager
 /.build/
+
+# App bundles from scripts/build-app.sh
+/build/
 /.swiftpm/
 /Packages/
 .netrc
