@@ -1,0 +1,23 @@
+{
+  "typescript": {
+    "current": "6.0.0-beta",
+    "wanted": "6.0.0-beta",
+    "latest": "5.9.3",
+    "dependent": "global",
+    "location": "/Users/example/.local/share/mise/installs/node/24.19.0/lib/node_modules/typescript"
+  },
+  "eslint": {
+    "current": "10.1.0",
+    "wanted": "10.1.0",
+    "latest": "9.39.0",
+    "dependent": "global",
+    "location": "/Users/example/.local/share/mise/installs/node/24.19.0/lib/node_modules/eslint"
+  },
+  "prettier": {
+    "current": "3.3.2",
+    "wanted": "3.4.2",
+    "latest": "3.4.2",
+    "dependent": "global",
+    "location": "/Users/example/.local/share/mise/installs/node/24.19.0/lib/node_modules/prettier"
+  }
+}

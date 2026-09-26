@@ -1,0 +1,2 @@
+npm WARN config global `--global`, `--local` are deprecated.
+{"typescript": {

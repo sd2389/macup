@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": "EACCES",
+    "summary": "EACCES: permission denied, open '/usr/local/lib/node_modules/.package-lock.json'",
+    "detail": "The operation was rejected by your operating system."
+  }
+}

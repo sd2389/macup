@@ -1,0 +1,23 @@
+{
+  "@anthropic-ai/claude-code": {
+    "current": "2.1.282",
+    "wanted": "2.1.283",
+    "latest": "2.1.283",
+    "dependent": "global",
+    "location": "/Users/example/.local/share/mise/installs/node/24.19.0/lib/node_modules/@anthropic-ai/claude-code"
+  },
+  "corepack": {
+    "current": "0.35.0",
+    "wanted": "0.36.0",
+    "latest": "0.36.0",
+    "dependent": "global",
+    "location": "/Users/example/.local/share/mise/installs/node/24.19.0/lib/node_modules/corepack"
+  },
+  "npm": {
+    "current": "11.17.0",
+    "wanted": "12.1.0",
+    "latest": "12.1.0",
+    "dependent": "global",
+    "location": "/Users/example/.local/share/mise/installs/node/24.19.0/lib/node_modules/npm"
+  }
+}

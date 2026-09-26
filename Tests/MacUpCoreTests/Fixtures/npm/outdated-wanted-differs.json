@@ -1,0 +1,9 @@
+{
+  "@scope/tool": {
+    "current": "1.2.0",
+    "wanted": "1.9.0",
+    "latest": "2.0.0",
+    "dependent": "global",
+    "location": "/Users/example/.local/share/mise/installs/node/24.19.0/lib/node_modules/@scope/tool"
+  }
+}

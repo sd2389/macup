@@ -1,0 +1,19 @@
+{
+  "name": "lib",
+  "problems": [
+    "missing: typescript@5.4.2, required by lib@"
+  ],
+  "dependencies": {
+    "typescript": {
+      "required": "5.4.2",
+      "missing": true,
+      "problems": [
+        "missing: typescript@5.4.2, required by lib@"
+      ]
+    },
+    "pnpm": {
+      "version": "9.1.0",
+      "overridden": false
+    }
+  }
+}
