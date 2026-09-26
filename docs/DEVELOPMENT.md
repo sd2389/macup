@@ -43,10 +43,12 @@ every push and pull request.
 ```text
 Sources/MacUpCore/        Core library shared by the CLI and (later) the app
   Configuration/          Paths, config schema, validation, atomic storage
+  Discovery/              Concurrent check engine and the check report
   Execution/              CommandRunner, environment allowlist, executable
-                          resolution, read-only guard, command recording
+                          resolution, read-only guard and allowlist, recording
   Models/                 Domain models (IDs, versions, candidates, plans…)
-  Utilities/              Redaction, terminal-safe text, file-system access
+  Providers/              Homebrew, npm, mise, macOS adapters and parsers
+  Utilities/              Redaction, terminal-safe text, JSON, file system
 Sources/macup/            The `macup` CLI (argument parsing and output only)
 Tests/MacUpCoreTests/     Core tests; Fixtures/ holds provider output samples
 Tests/MacUpCLITests/      CLI parsing, output, and exit-code tests
@@ -62,4 +64,9 @@ scripts/                  Test and CI helpers
 - `ProcessCommandRunner` tests launch only harmless system tools (`printf`,
   `echo`, `env`, `sleep`, `dd`, `pwd`, `cat`) and throwaway scripts in a
   temporary directory.
+- `Tests/MacUpCoreTests/Integration` runs the real runner against stub
+  executables generated in a temporary directory; standard locations are
+  overridden so the real tools can never be picked up.
+- CLI tests use a temporary `MACUP_CONFIG_DIR`, so they never read your
+  real configuration.
 - A passing test suite must not alter the host development environment.

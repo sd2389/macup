@@ -43,34 +43,52 @@ tests or an explicit manual verification step.
 
 ## Phase 1 — read-only engine
 
-- [ ] Domain models: ProviderID, PackageID, ManagedItem, InstalledVersion,
+- [x] Domain models: ProviderID, PackageID, ManagedItem, InstalledVersion,
       AvailableVersion, UpdateCandidate, UpdateRisk, UpdatePolicy,
       ExecutionPlan, ExecutionStep, ExecutionResult, VerificationResult,
       ProviderCapability, ProviderStatus, DiagnosticFinding, HistoryEntry
-- [ ] Typed error categories (`MacUpError.Kind`)
-- [ ] Version comparison that never assumes SemVer; opaque fallback
-- [ ] Risk assessment from version change + provider signals; unknown stays unknown
-- [ ] Versioned configuration: load, validate, fail closed, atomic write,
+- [x] Typed error categories (`MacUpError.Kind`)
+- [x] Version comparison that never assumes SemVer; opaque fallback
+- [x] Risk assessment from version change + provider signals; unknown stays unknown
+- [x] Versioned configuration: load, validate, fail closed, atomic write,
       backup-before-migration, migration framework, permission checks
-- [ ] Read-only command guard: `check` can only run allowlisted read-only
+- [x] Read-only command guard: `check` can only run allowlisted read-only
       invocations (plus explicit metadata refresh with `--refresh`)
-- [ ] Homebrew: detection (exact path, version, prefix, multiple installs),
+- [x] Homebrew: detection (exact path, version, prefix, multiple installs),
       `brew outdated --json=v2`, `brew info --json=v2 --installed`,
       `HOMEBREW_NO_AUTO_UPDATE=1` on every read-only call, pins reflected
-- [ ] npm global: exact npm/node/prefix/root, ownership hints, `npm ls -g`,
+- [x] npm global: exact npm/node/prefix/root, ownership hints, `npm ls -g`,
       `npm outdated -g` (non-zero exit + valid JSON), scoped names, npm itself,
       installed-newer-than-latest
-- [ ] mise: exact binary/version, `mise ls --json`, `mise outdated --json`
+- [x] mise: exact binary/version, `mise ls --json`, `mise outdated --json`
       (no `--bump`), requested range preserved, global vs project scope,
       lockfile presence, inactive versions
-- [ ] macOS: `softwareupdate --list --no-scan` (scan only with `--refresh`),
+- [x] macOS: `softwareupdate --list --no-scan` (scan only with `--refresh`),
       restart detection, ambiguity → finding, never install
-- [ ] Concurrent check engine (bounded structured concurrency)
-- [ ] CLI: `macup` (default = check), `macup check [--refresh] [--json]`,
+- [x] Concurrent check engine (bounded structured concurrency)
+- [x] CLI: `macup` (default = check), `macup check [--refresh] [--json]`,
       `macup provider list`, `macup config path`, `macup config show`
-- [ ] Versioned JSON output schema, no ANSI when not a TTY, terminal-safe output
-- [ ] Ctrl+C cancellation handled cleanly
-- [ ] Fixture tests for every parser; hostile-name tests; provider absence and
+- [x] Versioned JSON output schema, no ANSI when not a TTY, terminal-safe output
+- [x] Ctrl+C cancellation handled cleanly
+- [x] Fixture tests for every parser; hostile-name tests; provider absence and
       failure tests; integration test with stub executables
-- [ ] Exit criteria: `macup check` modifies no packages; fixtures cover parsers;
+- [x] Exit criteria: `macup check` modifies no packages; fixtures cover parsers;
       absent providers handled cleanly
+
+### Verification (Phase 1)
+
+- `scripts/test.sh`: 194 tests (171 core, 23 CLI), all passing; no test runs
+  a real provider binary.
+- `scripts/check-trust-invariants.sh`: passing.
+- Manual, read-only on the development Mac: `macup check`, `--verbose`,
+  `--json`, `macup provider list`, `macup config show`. Every command run was
+  on the allowlist with effect `readOnly`; `--refresh` was not run.
+
+### Carried into later phases
+
+- Policy precedence and evaluation (stored and validated now) — Phase 2.
+- Execution plans, per-item updates, verification, history — Phases 2–3.
+- Process-group termination for modifying commands — Phase 3.
+- Cross-provider diagnostics (for example mise-managed Node on PATH while
+  npm runs a different Node) and binary-architecture checks — Phase 4 Doctor.
+- Login-shell PATH discovery for the app — Phase 5.
