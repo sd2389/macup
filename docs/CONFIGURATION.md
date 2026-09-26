@@ -78,15 +78,21 @@ error disables automatic modification until it is fixed
   or `inherit` as the global default), malformed schedule times;
 - an `executablePath` that is relative or not named after the tool;
 - a file or directory that is owned by another user or writable by group
-  or others.
+  or others. For a symlinked file, the directory holding the file it points
+  to is checked as well. The checks and the read use the same open file, so
+  a file swapped in between is never trusted.
 
 Warnings do not disable anything: `auto` for macOS (macOS is always Ask
 First in v0.1), `telemetry: true` (there is no telemetry), and a
 configuration file that is a symlink (readable; MacUp will not replace it).
 
-If the file is structurally valid but has errors, read-only commands still
-honor its `enabled` flags; if it cannot be decoded at all, they use the
-defaults. Either way automatic modification stays off.
+A file that other users could change is **ignored entirely**: built-in
+defaults are in effect until it is fixed, so it can neither choose which
+executables MacUp runs nor turn providers off. Otherwise, if the file is
+structurally valid but has errors, read-only commands still honor its
+`enabled` flags and any `executablePath` that passes the rules above; if it
+cannot be decoded at all, they use the defaults. Either way automatic
+modification stays off.
 
 ## Writing (used by later phases)
 

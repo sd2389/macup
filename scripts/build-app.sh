@@ -1,13 +1,14 @@
 #!/bin/bash
 # Builds build/MacUp.app from the SwiftPM target, for local use until the
 # Xcode project exists. The bundle is ad-hoc signed, so it runs on this Mac only.
+# Release by default; `debug` adds developer tooling such as --snapshot-dir.
 #
-#   scripts/build-app.sh [debug|release]
+#   scripts/build-app.sh [release|debug]
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-configuration="${1:-debug}"
-swift build -c "$configuration" --product MacUpApp
+configuration="${1:-release}"
+swift build -c "$configuration" --product MacUpApp --force-resolved-versions
 binary="$(swift build -c "$configuration" --show-bin-path)/MacUpApp"
 
 app="build/MacUp.app"

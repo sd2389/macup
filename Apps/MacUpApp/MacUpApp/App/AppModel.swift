@@ -26,6 +26,11 @@ final class AppModel {
 
     var updateCount: Int { report?.summary.updatesAvailable ?? 0 }
 
+    /// The glanceable summary: never "up to date" unless the check is complete.
+    var status: CheckStatus {
+        CheckStatus(report: report, isChecking: isChecking, environmentProblem: environmentProblem)
+    }
+
     /// Errors and warnings worth a look in Doctor.
     var attentionCount: Int {
         let providers = report?.providers ?? []
@@ -58,16 +63,26 @@ final class AppModel {
     /// Reads the configuration file. Reading never creates or changes it.
     @discardableResult
     func loadConfiguration() -> LoadedConfiguration {
-        let paths = (try? MacUpPaths.resolve(homeDirectory: home, environment: ProcessInfo.processInfo.environment))
-            ?? MacUpPaths(configDirectory: home + "/.config/macup", stateDirectory: home + "/.local/state/macup")
-        let loaded = ConfigurationStore(paths: paths).load()
+        let paths: MacUpPaths
+        var pathProblem: ConfigurationIssue?
+        do {
+            paths = try MacUpPaths.resolve(homeDirectory: home, environment: ProcessInfo.processInfo.environment)
+        } catch {
+            // Match the CLI's refusal visibly: say why the default location is in use.
+            let message = (error as? MacUpError)?.message ?? "The configuration location could not be resolved."
+            pathProblem = ConfigurationIssue(.error, "", message + " MacUp is using the default location instead.")
+            paths = MacUpPaths(configDirectory: home + "/.config/macup", stateDirectory: home + "/.local/state/macup")
+        }
+        var loaded = ConfigurationStore(paths: paths).load()
+        if let pathProblem { loaded.issues.insert(pathProblem, at: 0) }
         configuration = loaded
         return loaded
     }
 
     /// The environment of the user's login shell, read once per launch. An
     /// app started from Finder does not inherit it, and without it MacUp would
-    /// miss tools installed outside the standard locations.
+    /// miss tools installed outside the standard locations. A failed read is
+    /// retried on the next check rather than cached.
     private func loadEnvironment() async -> [String: String] {
         if let environment { return environment }
         let shell = LoginShellEnvironment.userLoginShell()
@@ -81,12 +96,12 @@ final class AppModel {
                 baseEnvironment: ProcessInfo.processInfo.environment
             )
             environmentProblem = nil
+            environment = result
         } catch let error as MacUpError {
             environmentProblem = error.message
         } catch {
             environmentProblem = "MacUp could not read your shell's environment."
         }
-        environment = result
         return result
     }
 }

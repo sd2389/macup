@@ -135,6 +135,31 @@ struct CheckCommandTests {
         #expect(run.standardOutput.contains("1 provider reported errors; results are incomplete."))
     }
 
+    @Test("Updates MacUp could not read make the check incomplete, never \"up to date\"")
+    func unreadableUpdatesAreIncomplete() async throws {
+        let harness = try CLIHarness()
+        harness.runner.register("brew", ["outdated", "--json=v2"], .success(#"{"formulae": [], "casks": []}"#))
+        harness.runner.register("softwareupdate", ["--list", "--no-scan"], .success("""
+            Software Update found the following new or updated software:
+            * Label: Mystery Update-1.0
+            * Label: macOS 27.2-26C100
+            \tTitle: macOS 27.2, Version: 27.2, Size: 5000000KiB, Recommended: YES, Action: restart,
+
+            """))
+        let run = try await harness.run(["check"])
+        #expect(run.exitCode == MacUpExitCode.providerErrors.rawValue)
+        #expect(run.standardOutput.contains("1 update · 1 more could not be read"))
+        #expect(run.standardOutput.contains("1 provider left some updates out; results are incomplete."))
+
+        harness.runner.register("softwareupdate", ["--list", "--no-scan"], .success(
+            "Software Update found the following new or updated software:\n* Label: Mystery Update-1.0\n"
+        ))
+        let onlyUnreadable = try await harness.run(["check", "--provider", "macos"])
+        #expect(onlyUnreadable.exitCode == MacUpExitCode.providerErrors.rawValue)
+        #expect(!onlyUnreadable.standardOutput.contains("up to date"))
+        #expect(onlyUnreadable.standardOutput.contains("listed none MacUp could read"))
+    }
+
     @Test("An invalid configuration still checks, disables automatic modification, and exits 3")
     func invalidConfiguration() async throws {
         let harness = try CLIHarness()

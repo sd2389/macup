@@ -5,8 +5,10 @@ BINDIR := $(PREFIX)/bin
 
 .PHONY: build install uninstall test app
 
+# --force-resolved-versions builds exactly the dependency revisions pinned in
+# Package.resolved and fails instead of re-resolving from mutable tags.
 build:
-	swift build -c release --product macup
+	swift build -c release --product macup --force-resolved-versions
 
 install: build
 	install -d "$(BINDIR)"

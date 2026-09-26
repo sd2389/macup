@@ -1,3 +1,4 @@
+import Foundation
 import MacUpTestSupport
 import Testing
 
@@ -94,11 +95,12 @@ struct ExecutableResolverTests {
 
     @Test(
         "An unusable configured path fails closed instead of falling back",
-        arguments: ["relative/brew", "/custom/bin/not-brew", "/missing/bin/brew"]
+        arguments: ["relative/brew", "/custom/bin/not-brew", "/missing/bin/brew", " /custom/bin/brew", "/custom/bin/brew ", "", "   "]
     )
     func invalidConfiguredPathFailsClosed(configuredPath: String) {
         let fileSystem = FakeFileSystem()
             .addExecutable("/opt/homebrew/bin/brew")
+            .addExecutable("/custom/bin/brew")
             .addExecutable("/custom/bin/not-brew")
         let resolver = ExecutableResolver(fileSystem: fileSystem)
         let result = resolver.resolve(ExecutableSearch(
@@ -111,6 +113,41 @@ struct ExecutableResolverTests {
             return
         }
         #expect(path == configuredPath)
+    }
+
+    @Test(
+        "A standard location someone else could modify is not run implicitly",
+        arguments: [
+            ("/opt/homebrew/bin/brew", FileOwnership(uid: getuid() &+ 1, gid: 20, mode: 0o755)),
+            ("/opt/homebrew/bin", FileOwnership(uid: getuid(), gid: 20, mode: 0o775)),
+            ("/opt/homebrew", FileOwnership(uid: 0, gid: 0, mode: 0o777)),
+        ]
+    )
+    func untrustedStandardLocation(path: String, ownership: FileOwnership) {
+        let fileSystem = FakeFileSystem().addExecutable("/opt/homebrew/bin/brew").setOwnership(path, ownership)
+        let resolver = ExecutableResolver(fileSystem: fileSystem)
+        let result = resolver.resolve(ExecutableSearch(name: "brew", searchPath: ["/usr/bin"], standardLocations: ["/opt/homebrew/bin/brew"]))
+        guard case .untrustedLocation(let found, let reason) = result else {
+            Issue.record("Expected untrustedLocation, got \(result)")
+            return
+        }
+        #expect(found == "/opt/homebrew/bin/brew")
+        #expect(reason.contains(path))
+    }
+
+    @Test("Standard locations owned by root or the user, or group-writable only by admin, are used; PATH is never second-guessed")
+    func trustedLocations() {
+        let fileSystem = FakeFileSystem()
+            .addExecutable("/opt/homebrew/bin/brew")
+            .setOwnership("/opt/homebrew/bin", FileOwnership(uid: getuid(), gid: 80, mode: 0o775))
+            .setOwnership("/opt/homebrew", FileOwnership(uid: 0, gid: 0, mode: 0o755))
+            .addExecutable("/shared/bin/mise")
+            .setOwnership("/shared/bin", FileOwnership(uid: getuid() &+ 1, gid: 20, mode: 0o777))
+        let resolver = ExecutableResolver(fileSystem: fileSystem)
+        let brew = resolver.resolve(ExecutableSearch(name: "brew", searchPath: ["/usr/bin"], standardLocations: ["/opt/homebrew/bin/brew"]))
+        #expect(brew == .found(ResolvedExecutable(path: "/opt/homebrew/bin/brew", canonicalPath: "/opt/homebrew/bin/brew", source: .standardLocation)))
+        let mise = resolver.resolve(ExecutableSearch(name: "mise", searchPath: ["/shared/bin"]))
+        #expect(mise == .found(ResolvedExecutable(path: "/shared/bin/mise", canonicalPath: "/shared/bin/mise", source: .searchPath)))
     }
 
     @Test("Not found lists what was searched")

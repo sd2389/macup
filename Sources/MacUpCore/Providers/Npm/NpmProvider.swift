@@ -224,7 +224,15 @@ public struct NpmProvider: UpdateProvider {
             guard let data = context.fileSystem.contents(atPath: file, maximumBytes: 256 * 1024) else { return }
             names.formUnion(Self.referencedVariables(in: String(decoding: data, as: UTF8.self)))
         }
-        return Self.basePolicy.adding(names: names)
+        return Self.basePolicy.adding(names: names.filter { !Self.altersExecution($0) })
+    }
+
+    /// Variables an npmrc reference must never pull into npm's environment,
+    /// because they change what code runs (docs/COMMAND_EXECUTION.md).
+    static func altersExecution(_ name: String) -> Bool {
+        let upper = name.uppercased()
+        return ["NODE_OPTIONS", "NODE_PATH", "BASH_ENV", "ENV", "RUBYOPT", "PERL5OPT", "PYTHONPATH", "PYTHONSTARTUP"].contains(upper)
+            || upper.hasPrefix("DYLD_") || upper.hasPrefix("LD_")
     }
 
     /// Names referenced as `${NAME}` or `${NAME?}` in npmrc text.

@@ -6,7 +6,8 @@ enum MacUpExitCode: Int32, CaseIterable {
     case success = 0
     /// An unexpected internal error.
     case failure = 1
-    /// A check completed, but at least one provider failed; results are partial.
+    /// A check completed, but at least one provider failed or left updates out;
+    /// results are partial.
     case providerErrors = 2
     /// The configuration is invalid. Read-only commands still ran; automatic
     /// modifications stay disabled until it is fixed.

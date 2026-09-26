@@ -36,11 +36,16 @@ jobs:
       - name: Trust invariants
         run: scripts/check-trust-invariants.sh
 
+      # --force-resolved-versions builds exactly the revisions pinned in
+      # Package.resolved; the next step fails if anything re-resolved them.
       - name: Build
-        run: swift build --build-tests
+        run: swift build --build-tests --force-resolved-versions
 
       - name: Test
-        run: swift test
+        run: swift test --force-resolved-versions
+
+      - name: Package.resolved is unchanged
+        run: git diff --exit-code -- Package.resolved
 
       - name: CLI smoke test
         run: |
@@ -56,13 +61,13 @@ jobs:
       - name: Read-only check on the runner
         run: |
           set +e
-          .build/debug/macup check --json > check.json
+          .build/debug/macup check --json > "$RUNNER_TEMP/check.json"
           status=$?
           set -e
           echo "macup check exited with status $status"
           python3 - <<'EOF'
-          import json
-          report = json.load(open("check.json"))
+          import json, os
+          report = json.load(open(os.environ["RUNNER_TEMP"] + "/check.json"))
           assert report["schemaVersion"] == 1 and report["kind"] == "check"
           assert report["mode"] == "readOnly"
           assert all(command["effect"] == "readOnly" for command in report["commands"])
@@ -73,7 +78,7 @@ jobs:
 
       - name: Release build smoke test
         run: |
-          swift build -c release --product macup
+          swift build -c release --product macup --force-resolved-versions
           "$(swift build -c release --show-bin-path)/macup" --version
 
       - name: make install smoke test

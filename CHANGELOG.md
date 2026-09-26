@@ -47,8 +47,31 @@ Read-only alpha: MacUp reports what is outdated and never changes anything.
   Covenant 2.1 as the Code of Conduct.
 - Dependabot updates for GitHub Actions and Swift packages.
 - Provider output is treated as untrusted: names with control characters,
-  bidirectional overrides, or leading dashes are skipped; everything printed
-  is sanitized for the terminal; errors are redacted.
+  bidirectional overrides, or leading dashes are skipped; human output is
+  sanitized for the terminal, and JSON output escapes the same characters;
+  errors are redacted.
+- Hardening from a pre-release security audit:
+  - A configuration file (or its directory, or a symlinked file's target
+    directory) that other users could change is ignored entirely, so it cannot
+    choose which executables MacUp runs. The ownership checks and the read now
+    use one open file.
+  - A configured `executablePath` is checked exactly as written; empty or
+    padded values fail instead of falling back to `PATH`.
+  - Standard install locations (`/opt/homebrew/bin`, `/usr/local/bin`) are used
+    only when root or the user controls the file and every directory above it.
+  - Redaction covers more credential shapes (multi-word and unterminated
+    values, `KEY`/`PASS`/`DSN` names, JSON keys, token-only URL userinfo,
+    Stripe and Google keys).
+  - Checks that failed, were cancelled, skipped unreadable updates, or got
+    incomplete results from mise are reported as incomplete (exit status 2 in
+    the CLI; a warning instead of a checkmark in the app), never as "up to date".
+  - Truncated provider output is an error; npmrc files can no longer forward
+    `NODE_OPTIONS`, `DYLD_*`, or similar variables; the fresh `softwareupdate`
+    scan is guarded as a metadata refresh; MacUp refuses to run as root.
+  - Builds use the dependency revisions pinned in `Package.resolved`
+    (`--force-resolved-versions`), and CI fails if they change.
+  - `make app` builds a release app; the debug-only snapshot mode writes only
+    into a private directory.
 
 ### Provider compatibility
 - Verified against Homebrew 7.0.6, npm 10.9.8/11.17.0, mise 2026.7.3, and

@@ -15,3 +15,13 @@ DerivedData/
 xcuserdata/
 *.xcscmblueprint
 *.xccheckout
+
+# Never commit signing material or local secrets.
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.p8
+*.cer
+*.mobileprovision

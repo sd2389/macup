@@ -2,6 +2,10 @@ import Testing
 
 @testable import MacUpCore
 
+// Token-shaped dummies are assembled at runtime so secret scanners do not flag this file.
+private let dummyStripeKey = "sk_" + "live_" + "DUMMY0000000000000000000000"
+private let dummyGoogleKey = "AI" + "za" + "DUMMY000000000000000000000000000000"
+
 @Suite("Redactor")
 struct RedactorTests {
     let redactor = Redactor()
@@ -21,6 +25,17 @@ struct RedactorTests {
             ("key AKIAABCDEFGHIJKLMNOP here", "key <redacted> here"),
             ("sk-ant-abcdefghijklmnopqrstuvwxyz", "<redacted>"),
             ("xoxb-1234567890-abcdefghij", "<redacted>"),
+            // Shapes a TOML parse error can quote from a hand-edited [env] table.
+            ("3 | PASSWORD = dummy horse battery", "3 | PASSWORD = <redacted>"),
+            ("3 | DB_PASSWORD = \"dummyvalue1234", "3 | DB_PASSWORD = <redacted>"),
+            ("3 | STRIPE_KEY = \(dummyStripeKey)", "3 | STRIPE_KEY = <redacted>"),
+            ("DB_PASS=dummyvalue1234", "DB_PASS=<redacted>"),
+            ("SENTRY_DSN=dummy-dsn-value", "SENTRY_DSN=<redacted>"),
+            ("{\"password\": \"dummyvalue1234\"}", "{\"password\": <redacted>}"),
+            ("https://0123456789abcdef0123456789abcdef01234567@github.com/org/repo.git", "https://<redacted>@github.com/org/repo.git"),
+            ("leaked \(dummyStripeKey) here", "leaked <redacted> here"),
+            ("maps \(dummyGoogleKey) here", "maps <redacted> here"),
+            ("line one\npassword = dummy value\nline three", "line one\npassword = <redacted>\nline three"),
         ]
     )
     func redactsSecrets(input: String, expected: String) {

@@ -121,6 +121,8 @@ struct JSONSchemaTests {
               ],
               "installedCount" : 1,
               "provider" : "homebrew",
+              "resultsIncomplete" : false,
+              "unreadableUpdates" : 0,
               "updateCount" : 1,
               "version" : "7.0.6"
             }
@@ -130,6 +132,7 @@ struct JSONSchemaTests {
           "summary" : {
             "providersChecked" : 1,
             "providersDisabled" : 0,
+            "providersIncomplete" : 0,
             "providersUnavailable" : 0,
             "providersWithErrors" : 0,
             "updatesAvailable" : 1
@@ -174,6 +177,15 @@ struct JSONSchemaTests {
     func goldenCheckReport() throws {
         let encoded = try JSONOutput.encode(try Self.sampleReport())
         #expect(encoded == Self.golden)
+    }
+
+    @Test("Terminal controls inside strings are escaped, losslessly")
+    func escapesTerminalControls() throws {
+        let value = ["k": "a\u{7F}b\u{9B}c\u{202E}d\u{2028}e"]
+        let encoded = try JSONOutput.encode(value)
+        #expect(encoded.unicodeScalars.allSatisfy { !($0.value >= 0x20 && TerminalText.isUnsafe($0)) })
+        #expect(encoded.contains(#"a\u007fb\u009bc\u202ed\u2028e"#))
+        #expect(try JSONDecoder().decode([String: String].self, from: Data(encoded.utf8)) == value)
     }
 
     @Test("The golden document decodes back to the same report")

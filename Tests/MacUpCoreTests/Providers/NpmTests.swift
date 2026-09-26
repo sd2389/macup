@@ -239,7 +239,12 @@ struct NpmProviderTests {
         harness.environment["NPM_CONFIG_REGISTRY"] = "https://registry.example.com/"
         harness.environment["NPM_TOKEN"] = "npm_abcdefghijklmnopqrstuvwxyz0123456789"
         harness.environment["UNRELATED_SECRET"] = "hidden"
-        harness.fileSystem.addFile("/Users/example/.npmrc", contents: "//registry.example.com/:_authToken=${NPM_TOKEN}\n")
+        harness.environment["NODE_OPTIONS"] = "--require /tmp/dummy.js"
+        harness.environment["DYLD_INSERT_LIBRARIES"] = "/tmp/dummy.dylib"
+        harness.fileSystem.addFile(
+            "/Users/example/.npmrc",
+            contents: "//registry.example.com/:_authToken=${NPM_TOKEN}\nnode-options=${NODE_OPTIONS}\nx=${DYLD_INSERT_LIBRARIES}\n"
+        )
         let context = try await harness.detectedContext(provider)
         _ = try await provider.outdated(context: context)
 
@@ -250,7 +255,8 @@ struct NpmProviderTests {
         #expect(request.environment["NPM_CONFIG_REGISTRY"] == "https://registry.example.com/")
         #expect(request.environment["NPM_TOKEN"] != nil, "referenced by ~/.npmrc")
         #expect(request.environment["UNRELATED_SECRET"] == nil)
-        #expect(request.environment["NODE_OPTIONS"] == nil)
+        #expect(request.environment["NODE_OPTIONS"] == nil, "never forwarded, even when an npmrc references it")
+        #expect(request.environment["DYLD_INSERT_LIBRARIES"] == nil)
         #expect(request.environment["GITHUB_TOKEN"] == nil)
         #expect(request.workingDirectory?.path == "/Users/example")
     }

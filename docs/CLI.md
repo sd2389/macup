@@ -70,15 +70,21 @@ Human output is plain text. ANSI styling is used only when stdout is a
 terminal, and never when `NO_COLOR` is set or `TERM=dumb`. Every state is
 also stated in words; color is decoration. All provider-supplied text is
 sanitized so control characters and bidirectional overrides are shown as
-visible `\u{…}` escapes instead of reaching the terminal.
+visible `\u{…}` escapes instead of reaching the terminal. In JSON output
+the same characters are written as `\uXXXX` escapes, which JSON readers
+decode back to the original text.
+
+A check says "up to date" only when it is complete. If a provider failed,
+listed updates MacUp could not read, or reported lookups it could not
+finish, the output says so and the check exits with status 2.
 
 ## Exit status
 
 | Code | Meaning |
 | --- | --- |
 | 0 | The command completed. For `check`, every enabled provider was checked or is simply not installed. Updates being available is not an error. |
-| 2 | `check` completed but at least one provider failed; results are partial. |
-| 3 | The configuration is invalid (or `MACUP_CONFIG_DIR`/`MACUP_STATE_DIR` is not absolute). Read-only commands still ran; automatic modifications stay disabled. |
+| 2 | `check` completed but at least one provider failed or left updates out (listed updates MacUp could not read, or lookups the provider could not finish); results are partial. |
+| 3 | The configuration is invalid. Read-only commands still ran (a file other users could change is ignored, so defaults were used); automatic modifications stay disabled. When `MACUP_CONFIG_DIR`/`MACUP_STATE_DIR` is not absolute, nothing runs. |
 | 64 | Invalid command-line usage. |
 | 130 | Interrupted with Ctrl+C. |
 | 1 | Unexpected internal error. |
@@ -108,14 +114,16 @@ Dates are ISO 8601 (UTC); durations are seconds.
 | `configuration` | `path`, `source` (`defaults`/`file`), `valid`, `automaticModificationsAllowed`, `issues[]` |
 | `providers[]` | One entry per checked provider, below |
 | `updates[]` | Every available update in provider order, below |
-| `summary` | `updatesAvailable`, `providersChecked`, `providersUnavailable`, `providersDisabled`, `providersWithErrors` |
+| `summary` | `updatesAvailable`, `providersChecked`, `providersUnavailable`, `providersDisabled`, `providersWithErrors`, `providersIncomplete` (finished without errors but left updates out) |
 | `commands[]` | Every command run or refused: `command` (display form, redacted), `effect`, `outcome` (`exited`, `signaled`, `timedOut`, `cancelled`, `refused`, `failedToLaunch`), `exitStatus`, `startedAt`, `durationSeconds` |
 
 Provider entries: `provider`, `displayName`, `availability` (`available`,
 `unavailable`, `disabled`, `failed`), `capabilities[]`, `executable`
 (`path`, `canonicalPath`, `source`), `version`, `facts[]` (`key`, `label`,
 `value`), `installedCount` (null when unknown), `updateCount` (null when
-the check failed), `items[]` (only with `--inventory`), `findings[]`,
+the check failed), `unreadableUpdates` (listed updates MacUp could not read,
+not counted in `updateCount`), `resultsIncomplete` (the results are known
+to be missing something), `items[]` (only with `--inventory`), `findings[]`,
 `errors[]` (`operation`, `error`), `durationSeconds`.
 
 Update entries: `id` (for example `brew:git`, `npm:@scope/name`,

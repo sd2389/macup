@@ -42,11 +42,11 @@ enum MiseParsers {
             do {
                 id = try PackageID(.mise, tool)
             } catch let error as PackageID.ValidationError {
-                listing.findings.append(ProviderSupport.skippedName(tool, reason: error, provider: .mise))
+                listing.skip(ProviderSupport.skippedName(tool, reason: error, provider: .mise))
                 continue
             }
             guard entry.objectValue != nil else {
-                listing.findings.append(ProviderSupport.skippedEntry(tool, provider: .mise, reason: "The entry is not an object."))
+                listing.skip(ProviderSupport.skippedEntry(tool, provider: .mise, reason: "The entry is not an object."))
                 continue
             }
             let requested = entry["requested"]?.stringValue
@@ -61,7 +61,7 @@ enum MiseParsers {
                 continue
             }
             guard let latest = entry["latest"]?.stringValue, !latest.isEmpty else {
-                listing.findings.append(ProviderSupport.skippedEntry(tool, provider: .mise, reason: "mise did not report a latest version."))
+                listing.skip(ProviderSupport.skippedEntry(tool, provider: .mise, reason: "mise did not report a latest version."))
                 continue
             }
             if latest == current { continue }

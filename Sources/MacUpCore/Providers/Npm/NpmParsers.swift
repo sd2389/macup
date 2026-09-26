@@ -85,11 +85,11 @@ enum NpmParsers {
             do {
                 id = try PackageID(.npm, name)
             } catch let error as PackageID.ValidationError {
-                listing.findings.append(ProviderSupport.skippedName(name, reason: error, provider: .npm))
+                listing.skip(ProviderSupport.skippedName(name, reason: error, provider: .npm))
                 continue
             }
             guard entry.objectValue != nil else {
-                listing.findings.append(ProviderSupport.skippedEntry(name, provider: .npm, reason: "The entry is not an object."))
+                listing.skip(ProviderSupport.skippedEntry(name, provider: .npm, reason: "The entry is not an object."))
                 continue
             }
             guard let current = entry["current"]?.stringValue else {
@@ -103,12 +103,12 @@ enum NpmParsers {
                 continue
             }
             guard let latest = entry["latest"]?.stringValue else {
-                listing.findings.append(ProviderSupport.skippedEntry(name, provider: .npm, reason: "npm did not report a latest version."))
+                listing.skip(ProviderSupport.skippedEntry(name, provider: .npm, reason: "npm did not report a latest version."))
                 continue
             }
             let location = entry["location"]?.stringValue
             if let location, let root = context.globalRoot, !isInside(location, root) {
-                listing.findings.append(DiagnosticFinding(
+                listing.skip(DiagnosticFinding(
                     id: "npm.ambiguousOwnership",
                     severity: .warning,
                     provider: .npm,

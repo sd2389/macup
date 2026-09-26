@@ -42,11 +42,14 @@ enum SoftwareUpdateParser {
     static let foundHeader = "Software Update found the following new or updated software:"
     static let noUpdates = "No new software available."
 
-    static func parse(standardOutput: String, standardError: String) throws -> (entries: [SoftwareUpdateEntry], findings: [DiagnosticFinding]) {
+    static func parse(
+        standardOutput: String,
+        standardError: String
+    ) throws -> (entries: [SoftwareUpdateEntry], findings: [DiagnosticFinding], skipped: Int, partial: Bool) {
         let lines = (standardOutput + "\n" + standardError).components(separatedBy: .newlines)
         guard let header = lines.firstIndex(where: { $0.trimmingCharacters(in: .whitespaces) == foundHeader }) else {
             if lines.contains(where: { $0.trimmingCharacters(in: .whitespaces) == noUpdates }) {
-                return ([], [])
+                return ([], [], 0, false)
             }
             throw MacUpError.parseFailed(
                 "softwareupdate printed output MacUp does not recognize.",
@@ -58,9 +61,11 @@ enum SoftwareUpdateParser {
         var findings: [DiagnosticFinding] = []
         var unrecognized: [String] = []
         var pendingLabel: String?
+        var skipped = 0
 
         func finishPendingWithoutDetails() {
             if let label = pendingLabel {
+                skipped += 1
                 findings.append(DiagnosticFinding(
                     id: "macos.unreadableUpdate",
                     severity: .warning,
@@ -109,10 +114,16 @@ enum SoftwareUpdateParser {
                 recommendation: "Review available updates in System Settings → General → Software Update."
             ))
         }
-        if entries.isEmpty && findings.isEmpty {
-            throw MacUpError.parseFailed("softwareupdate said updates were available but listed none MacUp could read.")
+        // Updates were listed but none could be read: fail closed rather than
+        // report "up to date", whatever findings were recorded along the way.
+        if entries.isEmpty {
+            let details = findings.compactMap(\.detail).joined(separator: "\n")
+            throw MacUpError.parseFailed(
+                "softwareupdate said updates were available but listed none MacUp could read.",
+                detail: details.isEmpty ? nil : details
+            )
         }
-        return (entries, findings)
+        return (entries, findings, skipped, !unrecognized.isEmpty)
     }
 
     /// Parses `Title: …, Version: …, Size: …KiB, Recommended: YES, Action: restart,`.

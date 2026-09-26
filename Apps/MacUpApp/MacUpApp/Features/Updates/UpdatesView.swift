@@ -12,6 +12,15 @@ struct UpdatesView: View {
         Group {
             if let report, !updates.isEmpty {
                 List(selection: $selection) {
+                    if !model.status.reasons.isEmpty {
+                        Section {
+                            ForEach(model.status.reasons, id: \.self) { reason in
+                                Label(reason, systemImage: "exclamationmark.triangle")
+                            }
+                        } header: {
+                            Text("These results are incomplete")
+                        }
+                    }
                     ForEach(report.providers.filter { !report.updates(for: $0.provider).isEmpty }, id: \.provider) { provider in
                         Section(provider.displayName) {
                             ForEach(report.updates(for: provider.provider)) { update in
@@ -21,10 +30,16 @@ struct UpdatesView: View {
                     }
                 }
                 .onAppear { if selection == nil { selection = updates.first?.id } }
+            } else if report != nil, !model.status.reasons.isEmpty {
+                ContentUnavailableView(
+                    "Check Incomplete",
+                    systemImage: model.status.symbolName,
+                    description: Text(model.status.reasons.joined(separator: "\n") + "\nSee Doctor for details.")
+                )
             } else {
                 ContentUnavailableView(
                     "No Updates",
-                    systemImage: "checkmark.circle",
+                    systemImage: report == nil ? "circle.dashed" : "checkmark.circle",
                     description: Text(report == nil ? "Run a check to see available updates." : "Everything MacUp checks is up to date.")
                 )
             }

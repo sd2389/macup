@@ -25,6 +25,27 @@ struct ReadOnlyCommandGuardTests {
         #expect(fake.recordedRequests.count == 1)
     }
 
+    @Test("A fresh softwareupdate scan is a metadata refresh and needs --refresh")
+    func softwareUpdateScanNeedsRefresh() async throws {
+        let fake = FakeCommandRunner()
+        fake.register("softwareupdate", ["--list"], .success(""))
+        fake.register("softwareupdate", ["--list", "--no-scan"], .success(""))
+        let scan = { (effect: CommandEffect) in
+            CommandRequest(executable: URL(fileURLWithPath: "/usr/sbin/softwareupdate"), arguments: ["--list"], effect: effect)
+        }
+        let readOnly = ReadOnlyCommandGuard(base: fake, rules: CommandAllowlist.readOnlyCheck)
+        await #expect(throws: MacUpError.self) { try await readOnly.run(scan(.readOnly)) }
+        await #expect(throws: MacUpError.self) { try await readOnly.run(scan(.metadataRefresh)) }
+        _ = try await readOnly.run(CommandRequest(
+            executable: URL(fileURLWithPath: "/usr/sbin/softwareupdate"),
+            arguments: ["--list", "--no-scan"],
+            effect: .readOnly
+        ))
+        let refreshing = ReadOnlyCommandGuard(base: fake, rules: CommandAllowlist.readOnlyCheck, allowsMetadataRefresh: true)
+        _ = try await refreshing.run(scan(.metadataRefresh))
+        #expect(fake.recordedRequests.map(\.arguments) == [["--list", "--no-scan"], ["--list"]])
+    }
+
     @Test("Modifying commands are refused and never reach the runner")
     func refusesModifyingEffect() async throws {
         let fake = FakeCommandRunner()

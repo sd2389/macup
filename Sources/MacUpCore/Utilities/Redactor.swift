@@ -47,18 +47,21 @@ public struct Redactor: Sendable, Hashable {
     }
 
     private static let secretName =
-        "(?:token|secret|passw(?:or)?d|pwd|api[_-]?key|access[_-]?key|private[_-]?key|client[_-]?secret|_auth|auth[_-]?token|credentials?)"
+        "(?:token|secret|passw(?:or)?d|passphrase|pass|pwd|api[_-]?key|access[_-]?key|private[_-]?key|client[_-]?secret|_auth|auth[_-]?token|credentials?|dsn|key)"
 
     private static let rules: [Rule] = [
-        // user:password@ in URLs (proxies, registries, git remotes).
-        Rule(#"([A-Za-z][A-Za-z0-9+.\-]*://)[^\s/:@]+:[^\s/@]+@"#, template: "$1\(placeholder)@"),
+        // Any userinfo in URLs (user:password@, or a bare token@) for proxies, registries, git remotes.
+        Rule(#"([A-Za-z][A-Za-z0-9+.\-]*://)[^\s/@]+@"#, template: "$1\(placeholder)@"),
         // HTTP authorization headers.
         Rule(#"(authorization\s*[:=]\s*)(?:(?:bearer|basic|token)\s+)?[^\s'"]+"#, template: "$1\(placeholder)", options: [.caseInsensitive]),
         // Bearer tokens anywhere.
         Rule(#"\b(bearer\s+)[A-Za-z0-9._~+/=\-]{8,}"#, template: "$1\(placeholder)", options: [.caseInsensitive]),
-        // NAME=value / NAME: value where NAME looks secret (npm `_authToken=`, `GITHUB_TOKEN=`...).
+        // NAME=value / NAME: value / "NAME": value where NAME looks secret (npm `_authToken=`,
+        // `GITHUB_TOKEN=`, a TOML `PASSWORD = …` line quoted in a parse error). A value in quotes
+        // closed on the same line is replaced; otherwise everything to the end of the line is,
+        // because an unquoted or unterminated value may contain spaces.
         Rule(
-            #"([A-Za-z0-9_.\-/:]*"# + secretName + #"[A-Za-z0-9_.\-]*\s*[=:]\s*)("[^"]*"|'[^']*'|[^\s"',;]+)"#,
+            #"([A-Za-z0-9_.\-/:]*"# + secretName + #"[A-Za-z0-9_.\-]*"?\s*[=:]\s*)("[^"\n]*"|'[^'\n]*'|[^\n]+)"#,
             template: "$1\(placeholder)",
             options: [.caseInsensitive]
         ),
@@ -70,6 +73,8 @@ public struct Redactor: Sendable, Hashable {
         Rule(#"\bAKIA[0-9A-Z]{16}\b"#, template: placeholder),
         Rule(#"\bxox[abprs]-[A-Za-z0-9\-]{10,}\b"#, template: placeholder),
         Rule(#"\bsk-[A-Za-z0-9_\-]{20,}\b"#, template: placeholder),
+        Rule(#"\b[rs]k_(?:live|test)_[A-Za-z0-9]{16,}\b"#, template: placeholder),
+        Rule(#"\bAIza[0-9A-Za-z_\-]{35}\b"#, template: placeholder),
     ]
 }
 

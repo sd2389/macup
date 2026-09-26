@@ -54,6 +54,7 @@ public struct MacOSProvider: UpdateProvider {
         let result = try await ProviderSupport.run(
             installation.executable.path,
             arguments,
+            effect: context.refreshMetadata ? .metadataRefresh : .readOnly,
             policy: EnvironmentPolicy.base,
             searchPath: SearchPath.system,
             context: context,
@@ -68,13 +69,13 @@ public struct MacOSProvider: UpdateProvider {
             standardError: result.standardErrorText
         )
 
-        var listing = ProviderListing<UpdateCandidate>(findings: parsed.findings)
+        var listing = ProviderListing<UpdateCandidate>(findings: parsed.findings, skipped: parsed.skipped, partial: parsed.partial)
         for entry in parsed.entries {
             let id: PackageID
             do {
                 id = try PackageID(.macos, entry.label)
             } catch let error as PackageID.ValidationError {
-                listing.findings.append(ProviderSupport.skippedName(entry.label, reason: error, provider: .macos))
+                listing.skip(ProviderSupport.skippedName(entry.label, reason: error, provider: .macos))
                 continue
             }
             var signals: Set<RiskSignal> = []

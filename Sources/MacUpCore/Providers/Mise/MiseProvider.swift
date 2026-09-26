@@ -102,9 +102,35 @@ public struct MiseProvider: UpdateProvider {
         guard result.succeeded else {
             throw MacUpError.commandFailed(result, "`mise outdated` failed.")
         }
-        return try MiseParsers.parseOutdated(
+        var listing = try MiseParsers.parseOutdated(
             result.standardOutput,
             context: parserContext(installation, context: context, command: result.invocation.displayString)
+        )
+        // mise can exit 0 after a version lookup failed, omitting that tool and
+        // saying so only on stderr; results are then incomplete, not up to date.
+        if let problems = Self.lookupProblems(in: result.standardErrorText) {
+            listing.partial = true
+            listing.findings.append(problems)
+        }
+        return listing
+    }
+
+    /// What `mise outdated` printed on stderr while still succeeding, minus the
+    /// self-update notice, or `nil` when there is nothing else.
+    static func lookupProblems(in standardError: String) -> DiagnosticFinding? {
+        let lines = standardError.split(whereSeparator: \.isNewline).map(String.init).filter { line in
+            let lower = line.lowercased()
+            let isUpdateNotice = lower.contains("mise version") && lower.contains("available")
+            return !line.trimmingCharacters(in: .whitespaces).isEmpty && !isUpdateNotice
+        }
+        guard !lines.isEmpty else { return nil }
+        return DiagnosticFinding(
+            id: "mise.outdatedWarnings",
+            severity: .warning,
+            provider: .mise,
+            title: "mise reported problems while checking for updates",
+            detail: TextExcerpt.tail(of: lines.joined(separator: "\n"), maxLines: 6),
+            recommendation: "Some tools may be missing from these results. Run `mise outdated` to see what mise could not check."
         )
     }
 

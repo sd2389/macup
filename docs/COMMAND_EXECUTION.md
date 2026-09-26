@@ -17,7 +17,9 @@ shell.
   request; nothing is inherited implicitly.
 - **No interactive prompts.** stdin is `/dev/null`.
 - **Bounded output.** stdout and stderr are captured separately, capped at
-  32 MiB each by default (truncation is reported), and can be streamed.
+  32 MiB each by default, and can be streamed. A provider command whose
+  output was cut off is an error: a truncated listing is never parsed as
+  if it were complete.
 - **Timeouts and cancellation.** On timeout or task cancellation the
   process gets SIGTERM, then SIGKILL after a grace period (3 s). If a
   grandchild keeps an output pipe open, MacUp stops waiting after 2 s and
@@ -41,12 +43,14 @@ Every provider starts from a base allowlist and adds only what it needs:
 | --- | --- | --- |
 | Base | `HOME`, `USER`, `LOGNAME`, `SHELL`, `TMPDIR`, `LANG`, `LC_*` (common), `__CF_USER_TEXT_ENCODING`, `XDG_*_HOME`, proxy variables | `NO_COLOR=1` |
 | Homebrew | base + `HOMEBREW_*`, `SSH_AUTH_SOCK` | `HOMEBREW_NO_AUTO_UPDATE=1`, `HOMEBREW_NO_ENV_HINTS=1`, `HOMEBREW_NO_COLOR=1` |
-| npm | base + `npm_config_*` (any case), `NODE_EXTRA_CA_CERTS`, `PREFIX`, and any variable referenced as `${NAME}` in `~/.npmrc` or the Node installation's global `etc/npmrc` (npm refuses to start when such a variable is missing) | `npm_config_update_notifier=false`, `npm_config_fund=false`, `npm_config_audit=false` |
+| npm | base + `npm_config_*` (any case), `NODE_EXTRA_CA_CERTS`, `PREFIX`, and any variable referenced as `${NAME}` in `~/.npmrc` or the Node installation's global `etc/npmrc` (npm refuses to start when such a variable is missing), except the execution-altering names below | `npm_config_update_notifier=false`, `npm_config_fund=false`, `npm_config_audit=false` |
 | mise | base + `MISE_*`, `GITHUB_TOKEN`, `GITHUB_API_TOKEN` (mise uses them to avoid GitHub rate limits) | — |
 | macOS | base | — |
 
 Everything else — `TERM`, `NODE_OPTIONS`, `DYLD_*`, `RUBYOPT`, unrelated
-tokens — is withheld. `PATH` is always constructed explicitly (below).
+tokens — is withheld. `NODE_OPTIONS`, `NODE_PATH`, `DYLD_*`, `LD_*`,
+`BASH_ENV`, `ENV`, `RUBYOPT`, `PERL5OPT`, `PYTHONPATH`, and `PYTHONSTARTUP`
+are withheld even when an npmrc file references them. `PATH` is always constructed explicitly (below).
 Values are passed to the provider but never logged; logged and displayed
 text passes through `Redactor`.
 
@@ -54,16 +58,25 @@ text passes through `Redactor`.
 
 `ExecutableResolver` implements ARCHITECTURE.md "Binary resolution":
 
-1. **Configured path** (`providers.<id>.executablePath`). If it is set but
-   unusable (relative, missing, or not named after the tool), the provider
-   is reported as failed. MacUp never falls back to another copy: that
-   could run a binary the user did not choose.
+1. **Configured path** (`providers.<id>.executablePath`), checked exactly
+   as written with the same rules as configuration validation. If it is set
+   but unusable (empty, relative, padded with spaces, containing control
+   characters, missing, or not named after the tool), the provider is
+   reported as failed. MacUp never falls back to another copy: that could
+   run a binary the user did not choose. A configuration file that other
+   users could change is ignored entirely (docs/CONFIGURATION.md), so its
+   `executablePath` is never used.
 2. **The user's search path.** For the CLI this is the `PATH` MacUp was
    started with — the user's login-shell `PATH`. The app, which inherits
    launchd's minimal `PATH` when launched from Finder, gets it from
    `LoginShellEnvironment` (below).
 3. **Standard locations**: `/opt/homebrew/bin/…`, `/usr/local/bin/…`, and
-   `~/.local/bin/mise`.
+   `~/.local/bin/mise` — but only when the file (after resolving symlinks)
+   and every directory above it belong to root or the user and nobody else
+   can write them (group write is tolerated for `wheel` and `admin`, whose
+   members can already become root). Otherwise the provider is reported as
+   failed with the reason, and MacUp suggests adding the directory to
+   `PATH` or setting `executablePath` if the user trusts it.
 
 The chosen path and its symlink-resolved canonical path are recorded and
 shown (`macup provider list`). Multiple distinct Homebrew installations
@@ -106,6 +119,9 @@ own environment plus standard locations and says so in Doctor.
 - Child processes get a constructed `PATH`: the provider's own directory
   first, then the sanitized user search path (npm, mise), then system
   directories. Homebrew gets only its own directory and system directories.
+- Standard locations are not on every user's `PATH` (`/opt/homebrew/bin` is
+  added by each user's shell profile), so MacUp only runs a copy there when
+  root or the user controls it; see rule 3 above.
 - Remaining risk: a malicious executable placed earlier in the user's own
   `PATH` (for example a writable `~/.local/bin`) would be used, exactly as
   the user's shell would use it. MacUp shows the path it chose; Doctor

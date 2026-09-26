@@ -11,6 +11,10 @@ public final class FakeFileSystem: FileSystem, @unchecked Sendable {
 
     private let lock = NSLock()
     private var entries: [String: Entry] = [:]
+    private var owners: [String: FileOwnership] = [:]
+
+    /// Every path belongs to the current user with mode 0755 unless ``setOwnership(_:_:)`` says otherwise.
+    public static let defaultOwnership = FileOwnership(uid: getuid(), gid: 20, mode: 0o755)
 
     public init() {}
 
@@ -33,6 +37,13 @@ public final class FakeFileSystem: FileSystem, @unchecked Sendable {
     @discardableResult
     public func addSymlink(_ path: String, to target: String) -> Self {
         set(path, .symlink(to: target))
+    }
+
+    /// Overrides the owner and permission bits reported for `path` (after symlinks are resolved).
+    @discardableResult
+    public func setOwnership(_ path: String, _ ownership: FileOwnership) -> Self {
+        lock.withLock { owners[path] = ownership }
+        return self
     }
 
     private func set(_ path: String, _ entry: Entry) -> Self {
@@ -69,6 +80,11 @@ public final class FakeFileSystem: FileSystem, @unchecked Sendable {
 
     public func canonicalPath(ofPath path: String) -> String? {
         resolvedEntry(path)?.path
+    }
+
+    public func ownership(ofPath path: String) -> FileOwnership? {
+        let resolved = resolvedEntry(path)?.path ?? path
+        return lock.withLock { owners[resolved] ?? Self.defaultOwnership }
     }
 
     public func contents(atPath path: String, maximumBytes: Int) -> Data? {

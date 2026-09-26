@@ -43,20 +43,20 @@ enum HomebrewOutdatedParser {
     ) {
         let label = kind == .formula ? "formula" : "cask"
         guard let name = entry["name"]?.stringValue else {
-            listing.findings.append(ProviderSupport.skippedEntry("(unnamed \(label))", provider: .homebrew, reason: "The entry has no name."))
+            listing.skip(ProviderSupport.skippedEntry("(unnamed \(label))", provider: .homebrew, reason: "The entry has no name."))
             return
         }
         guard let installedVersions = entry["installed_versions"]?.stringList, !installedVersions.isEmpty,
               let current = entry["current_version"]?.stringValue, !current.isEmpty
         else {
-            listing.findings.append(ProviderSupport.skippedEntry(name, provider: .homebrew, reason: "The entry is missing version information."))
+            listing.skip(ProviderSupport.skippedEntry(name, provider: .homebrew, reason: "The entry is missing version information."))
             return
         }
         let id: PackageID
         do {
             id = try PackageID(namespace, name)
         } catch let error as PackageID.ValidationError {
-            listing.findings.append(ProviderSupport.skippedName(name, reason: error, provider: .homebrew))
+            listing.skip(ProviderSupport.skippedName(name, reason: error, provider: .homebrew))
             return
         } catch {
             return

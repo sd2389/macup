@@ -6,8 +6,20 @@ import Testing
 
 @Suite("softwareupdate parser")
 struct SoftwareUpdateParserTests {
-    private func parse(_ stdout: String, _ stderr: String = "") throws -> (entries: [SoftwareUpdateEntry], findings: [DiagnosticFinding]) {
+    private func parse(
+        _ stdout: String,
+        _ stderr: String = ""
+    ) throws -> (entries: [SoftwareUpdateEntry], findings: [DiagnosticFinding], skipped: Int, partial: Bool) {
         try SoftwareUpdateParser.parse(standardOutput: stdout, standardError: stderr)
+    }
+
+    @Test("Updates listed with nothing readable fail closed instead of reading as up to date")
+    func onlyUnreadableUpdatesFailClosed() {
+        let error = #expect(throws: MacUpError.self) {
+            try parse("Software Update found the following new or updated software:\n* Label: Mystery Update-1.0\n")
+        }
+        #expect(error?.kind == .parseFailed)
+        #expect(error?.detail?.contains("Mystery Update-1.0") == true)
     }
 
     @Test("Real output from macOS 27, with and without a fresh scan", arguments: [
@@ -60,6 +72,7 @@ struct SoftwareUpdateParserTests {
     @Test("An entry without details becomes a finding; the rest still parse")
     func missingDetails() throws {
         let result = try parse(try Fixture.text("macos/list-missing-details.txt"))
+        #expect(result.skipped == 1)
         #expect(result.entries.map(\.label) == ["macOS 27.2-26C100"])
         #expect(result.findings.map(\.id) == ["macos.unreadableUpdate"])
     }
@@ -110,7 +123,8 @@ struct MacOSProviderTests {
         harness.refreshMetadata = true
         _ = try await provider.outdated(context: harness.detectedContext(provider))
         #expect(harness.arguments(for: "softwareupdate") == [["--list", "--no-scan"], ["--list"]])
-        #expect(harness.requests.allSatisfy { $0.workingDirectory?.path == "/" && $0.effect == .readOnly })
+        #expect(harness.requests.allSatisfy { $0.workingDirectory?.path == "/" })
+        #expect(harness.requests.map(\.effect) == [.readOnly, .metadataRefresh], "the fresh scan is a metadata refresh")
     }
 
     @Test("OS updates are high risk, need a restart, and are review-only")

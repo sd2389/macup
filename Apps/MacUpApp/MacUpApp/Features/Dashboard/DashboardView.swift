@@ -9,7 +9,7 @@ struct DashboardView: View {
             Form {
                 Section {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text(headline(report))
+                        Text(model.status.headline)
                             .font(.largeTitle.weight(.semibold))
                         Text(statusLine(report))
                             .foregroundStyle(.secondary)
@@ -49,14 +49,6 @@ struct DashboardView: View {
             } actions: {
                 Button("Check Now") { Task { await model.checkNow() } }
             }
-        }
-    }
-
-    private func headline(_ report: CheckReport) -> String {
-        switch report.summary.updatesAvailable {
-        case 0: "Everything is up to date"
-        case 1: "1 update available"
-        case let count: "\(count) updates available"
         }
     }
 

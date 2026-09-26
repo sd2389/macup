@@ -75,11 +75,10 @@ Avoid concurrent modifications by default. Checks may run concurrently; upgrades
 
 Do not blindly trust GUI PATH.
 
-Resolve provider binaries using:
-1. configured explicit path if valid
-2. login-shell discovery strategy designed and tested for GUI context
-3. standard package-manager locations
-4. PATH
+Resolve provider binaries using (docs/COMMAND_EXECUTION.md has the details):
+1. configured explicit path if valid — and nothing else when one is set
+2. the user's `PATH` (the CLI's own; for the GUI, discovered from the login shell)
+3. standard package-manager locations, only when root or the user controls them
 
 Record and display the chosen path.
 

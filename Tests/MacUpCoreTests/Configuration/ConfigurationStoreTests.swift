@@ -180,6 +180,67 @@ struct ConfigurationStoreTests {
         #expect(loaded.issues.contains { $0.message.hasPrefix("The configuration directory is writable") })
     }
 
+    @Test(
+        "A file other users could change is ignored entirely, so it cannot choose executables",
+        arguments: [(fileMode: 0o666, directoryMode: 0o700), (fileMode: 0o600, directoryMode: 0o775)]
+    )
+    func untrustedFileIsIgnored(fileMode: Int, directoryMode: Int) throws {
+        let directory = try TemporaryDirectory()
+        let store = try store(
+            #"{"schemaVersion":1,"providers":{"homebrew":{"executablePath":"/elsewhere/bin/brew"},"macos":{"enabled":false}}}"#,
+            in: directory
+        )
+        try FileManager.default.setAttributes([.posixPermissions: fileMode], ofItemAtPath: store.fileURL.path)
+        try FileManager.default.setAttributes([.posixPermissions: directoryMode], ofItemAtPath: directory.path)
+        let loaded = store.load()
+        #expect(loaded.hasErrors)
+        #expect(loaded.configuration == .defaults)
+        #expect(loaded.configuration.settings(for: .homebrew).executablePath == nil)
+        #expect(loaded.configuration.settings(for: .macos).enabled)
+        #expect(loaded.issues.contains { $0.message.hasPrefix("MacUp ignored this file") })
+    }
+
+    @Test("A symlinked file is checked against the directory holding its target")
+    func symlinkTargetDirectoryIsChecked() throws {
+        let directory = try TemporaryDirectory()
+        let privateDirectory = directory.appending("private")
+        let shared = directory.appending("shared")
+        try FileManager.default.createDirectory(at: privateDirectory, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
+        try FileManager.default.createDirectory(at: shared, withIntermediateDirectories: false)
+        let target = shared.appendingPathComponent("real.json")
+        try #"{"schemaVersion":1,"providers":{"mise":{"enabled":false}}}"#.write(to: target, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: target.path)
+        let link = privateDirectory.appendingPathComponent("config.json")
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: target)
+
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: shared.path)
+        let trusted = ConfigurationStore(fileURL: link).load()
+        #expect(!trusted.hasErrors, "\(trusted.issues)")
+        #expect(trusted.configuration.settings(for: .mise).enabled == false)
+
+        try FileManager.default.setAttributes([.posixPermissions: 0o777], ofItemAtPath: shared.path)
+        let untrusted = ConfigurationStore(fileURL: link).load()
+        #expect(untrusted.hasErrors)
+        #expect(untrusted.configuration == .defaults)
+        #expect(untrusted.issues.contains {
+            $0.message.hasPrefix("The directory holding the configuration file's target is writable") && $0.message.contains(shared.path)
+        })
+    }
+
+    @Test("Special files and dangling symlinks are errors, never read")
+    func specialFilesAreRefused() throws {
+        let directory = try TemporaryDirectory()
+        let fifo = directory.appending("config.json")
+        #expect(mkfifo(fifo.path, 0o600) == 0)
+        #expect(ConfigurationStore(fileURL: fifo).load().issues.first?.message == "The configuration path is not a regular file.")
+
+        let dangling = directory.appending("dangling.json")
+        try FileManager.default.createSymbolicLink(at: dangling, withDestinationURL: directory.appending("missing.json"))
+        let loaded = ConfigurationStore(fileURL: dangling).load()
+        #expect(loaded.source == .file)
+        #expect(loaded.issues.contains { $0.message == "The configuration path is not a regular file." })
+    }
+
     @Test("Oversized files are refused")
     func oversizedFile() throws {
         let directory = try TemporaryDirectory()

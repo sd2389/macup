@@ -250,6 +250,8 @@ public struct CheckEngine: Sendable {
         case .success(let listing?):
             candidates = provider.refine(listing.elements, using: items ?? [])
             report.updateCount = candidates.count
+            report.unreadableUpdates = listing.skipped
+            report.resultsIncomplete = listing.isIncomplete
             report.findings += listing.findings
         case .success(nil):
             break

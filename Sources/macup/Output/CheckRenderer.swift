@@ -124,9 +124,21 @@ struct CheckRenderer {
             parts.append("\(installed) installed")
         }
         switch provider.updateCount {
-        case 0?: parts.append("up to date")
-        case let count?: parts.append(TextStyle.plural(count, "update"))
-        case nil: parts.append("updates unknown (see error)")
+        case 0? where provider.unreadableUpdates > 0:
+            parts.append(TextStyle.plural(provider.unreadableUpdates, "listed update") + " could not be read")
+        case 0? where provider.resultsIncomplete:
+            parts.append("no updates found; results may be incomplete (see warning)")
+        case 0?:
+            parts.append("up to date")
+        case let count?:
+            parts.append(TextStyle.plural(count, "update"))
+            if provider.unreadableUpdates > 0 {
+                parts.append("\(provider.unreadableUpdates) more could not be read")
+            } else if provider.resultsIncomplete {
+                parts.append("results may be incomplete (see warning)")
+            }
+        case nil:
+            parts.append("updates unknown (see error)")
         }
         return parts.joined(separator: " · ")
     }
@@ -219,14 +231,19 @@ struct CheckRenderer {
         }
         let updates = report.summary.updatesAvailable
         if updates == 0 {
-            lines.append(style.bold("No updates available."))
+            lines.append(style.bold(report.isComplete ? "No updates available." : "No updates found."))
         } else {
             lines.append(style.bold(TextStyle.plural(updates, "update") + " available") + " (\(counts.joined(separator: ", "))).")
         }
-        lines.append("Nothing was changed.")
+        lines.append(report.mode == .readOnly
+            ? "Nothing was changed."
+            : "Only package metadata was refreshed; no packages were installed or upgraded.")
 
         if report.summary.providersWithErrors > 0 {
             lines.append("\(TextStyle.plural(report.summary.providersWithErrors, "provider")) reported errors; results are incomplete.")
+        }
+        if report.summary.providersIncomplete > 0 {
+            lines.append("\(TextStyle.plural(report.summary.providersIncomplete, "provider")) left some updates out; results are incomplete.")
         }
         let configuration = report.configuration
         if !configuration.valid {

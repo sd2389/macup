@@ -28,8 +28,9 @@ public enum CommandAllowlist {
         CommandRule("mise", ["ls"], options: ["--json"]),
         CommandRule("mise", ["outdated"], options: ["--json"]),
 
-        // macOS: listing only. `--no-scan` reads the last scan; without it the
-        // list comes from a fresh scan (used for --refresh).
-        CommandRule("softwareupdate", ["--list"], options: ["--no-scan"]),
+        // macOS: listing only. `--no-scan` reads the last scan. Without it the
+        // list comes from a fresh scan, which only `macup check --refresh` may run.
+        CommandRule("softwareupdate", ["--list", "--no-scan"]),
+        CommandRule("softwareupdate", ["--list"], effect: .metadataRefresh),
     ]
 }

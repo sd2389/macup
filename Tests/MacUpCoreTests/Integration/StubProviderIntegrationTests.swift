@@ -148,7 +148,8 @@ struct StubProviderIntegrationTests {
         let failure = try #require(report.providers[0].errors.first)
         #expect(failure.operation == .outdated)
         #expect(failure.error.exitStatus == 1)
-        #expect(failure.error.detail == "Error: GITHUB_TOKEN=<redacted> rejected")
+        // An unquoted value after a secret-looking name is redacted to the end of the line.
+        #expect(failure.error.detail == "Error: GITHUB_TOKEN=<redacted>")
         #expect(report.providers[1].updateCount == 0)
         #expect(report.providers[1].errors.isEmpty)
     }

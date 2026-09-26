@@ -32,6 +32,12 @@ public struct ProviderReport: Sendable, Hashable, Codable {
     public var installedCount: Int?
     /// Number of updates found, or `nil` when the outdated check did not complete.
     public var updateCount: Int?
+    /// Updates the provider listed that MacUp could not read or identify; not
+    /// counted in ``updateCount``.
+    public var unreadableUpdates: Int
+    /// Whether the update results are known to be missing something: unreadable
+    /// entries, or a provider that reported lookups it could not finish.
+    public var resultsIncomplete: Bool
     /// Installed items; included only when requested.
     public var items: [ManagedItem]?
     public var findings: [DiagnosticFinding]
@@ -48,6 +54,8 @@ public struct ProviderReport: Sendable, Hashable, Codable {
         facts: [ProviderFact] = [],
         installedCount: Int? = nil,
         updateCount: Int? = nil,
+        unreadableUpdates: Int = 0,
+        resultsIncomplete: Bool = false,
         items: [ManagedItem]? = nil,
         findings: [DiagnosticFinding] = [],
         errors: [ProviderOperationError] = [],
@@ -62,6 +70,8 @@ public struct ProviderReport: Sendable, Hashable, Codable {
         self.facts = facts
         self.installedCount = installedCount
         self.updateCount = updateCount
+        self.unreadableUpdates = unreadableUpdates
+        self.resultsIncomplete = resultsIncomplete
         self.items = items
         self.findings = findings
         self.errors = errors
@@ -108,6 +118,8 @@ public struct CheckReport: Sendable, Hashable, Codable {
         public var providersUnavailable: Int
         public var providersDisabled: Int
         public var providersWithErrors: Int
+        /// Providers that finished without errors but left some updates out.
+        public var providersIncomplete: Int
     }
 
     public var schemaVersion: Int
@@ -151,11 +163,18 @@ public struct CheckReport: Sendable, Hashable, Codable {
             providersChecked: providers.filter { $0.availability == .available }.count,
             providersUnavailable: providers.filter { $0.availability == .unavailable }.count,
             providersDisabled: providers.filter { $0.availability == .disabled }.count,
-            providersWithErrors: providers.filter { $0.hasErrors }.count
+            providersWithErrors: providers.filter { $0.hasErrors }.count,
+            providersIncomplete: providers.filter { !$0.hasErrors && $0.resultsIncomplete }.count
         )
     }
 
     public var hasProviderErrors: Bool { providers.contains(where: \.hasErrors) }
+
+    /// Finished, every checked provider succeeded, and none left updates out.
+    /// Only a complete check may be summarized as "up to date".
+    public var isComplete: Bool {
+        !cancelled && summary.providersWithErrors == 0 && summary.providersIncomplete == 0
+    }
 
     public func updates(for provider: ProviderID) -> [UpdateCandidate] {
         updates.filter { $0.provider == provider }

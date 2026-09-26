@@ -10,9 +10,10 @@ public struct LoadedConfiguration: Sendable, Hashable {
         case file
     }
 
-    /// The configuration in effect. When the file could not be decoded this
-    /// is ``MacUpConfiguration/defaults``; read-only operations use it, and
-    /// automatic modification stays disabled while ``hasErrors`` is true.
+    /// The configuration in effect. When the file could not be decoded, or
+    /// other users could change it, this is ``MacUpConfiguration/defaults``;
+    /// read-only operations use it, and automatic modification stays disabled
+    /// while ``hasErrors`` is true.
     public var configuration: MacUpConfiguration
     public var source: Source
     public var path: String
@@ -105,7 +106,10 @@ public struct ConfigurationStore: Sendable {
         var issues: [ConfigurationIssue] = []
 
         func fallback(_ issue: ConfigurationIssue) -> LoadedConfiguration {
-            LoadedConfiguration(configuration: .defaults, source: .file, path: path, issues: issues + [issue])
+            fallback([issue])
+        }
+        func fallback(_ extra: [ConfigurationIssue]) -> LoadedConfiguration {
+            LoadedConfiguration(configuration: .defaults, source: .file, path: path, issues: issues + extra)
         }
 
         var linkInfo = stat()
@@ -127,21 +131,58 @@ public struct ConfigurationStore: Sendable {
         guard stat(path, &info) == 0, (info.st_mode & S_IFMT) == S_IFREG else {
             return fallback(ConfigurationIssue(.error, "", "The configuration path is not a regular file."))
         }
-        issues += Self.ownershipIssues(info, subject: "The configuration file", path: path)
-        let directory = fileURL.deletingLastPathComponent().path
-        var directoryInfo = stat()
-        if stat(directory, &directoryInfo) == 0 {
-            issues += Self.ownershipIssues(directoryInfo, subject: "The configuration directory", path: directory)
+
+        // Check and read one open file, so the checks describe the bytes that are parsed.
+        let descriptor = open(path, O_RDONLY | O_NONBLOCK | O_CLOEXEC | O_NOCTTY)
+        guard descriptor >= 0 else {
+            return fallback(ConfigurationIssue(.error, "", "The configuration file could not be read: \(String(cString: strerror(errno)))."))
         }
-        guard Int(info.st_size) <= Self.maximumFileSize else {
-            return fallback(ConfigurationIssue(.error, "", "The configuration file is larger than 1 MiB."))
+        defer { close(descriptor) }
+        var opened = stat()
+        guard fstat(descriptor, &opened) == 0, (opened.st_mode & S_IFMT) == S_IFREG,
+              opened.st_dev == info.st_dev, opened.st_ino == info.st_ino
+        else {
+            return fallback(Self.changedWhileLoading)
         }
 
-        let data: Data
-        do {
-            data = try Data(contentsOf: fileURL)
-        } catch {
-            return fallback(ConfigurationIssue(.error, "", "The configuration file could not be read: \(error.localizedDescription)"))
+        var ownership = Self.ownershipIssues(opened, subject: "The configuration file", path: path)
+        guard let directories = Self.directoriesControlling(fileURL, opened: opened) else {
+            return fallback(Self.changedWhileLoading)
+        }
+        for (directory, subject) in directories {
+            var directoryInfo = stat()
+            guard stat(directory, &directoryInfo) == 0 else {
+                ownership.append(ConfigurationIssue(.error, "", "\(subject) could not be inspected: \(String(cString: strerror(errno)))."))
+                continue
+            }
+            ownership += Self.ownershipIssues(directoryInfo, subject: subject, path: directory)
+        }
+        // A file other users can change must not decide anything, including
+        // which executables read-only commands run: ignore it entirely.
+        if !ownership.isEmpty {
+            return fallback(ownership + [ConfigurationIssue(
+                .error,
+                "",
+                "MacUp ignored this file because other users could change it; built-in defaults are in effect until it is fixed."
+            )])
+        }
+
+        guard Int(opened.st_size) <= Self.maximumFileSize else {
+            return fallback(ConfigurationIssue(.error, "", "The configuration file is larger than 1 MiB."))
+        }
+        var data = Data()
+        var buffer = [UInt8](repeating: 0, count: 64 * 1024)
+        while data.count <= Self.maximumFileSize {
+            let count = read(descriptor, &buffer, min(buffer.count, Self.maximumFileSize + 1 - data.count))
+            if count < 0 {
+                if errno == EINTR { continue }
+                return fallback(ConfigurationIssue(.error, "", "The configuration file could not be read: \(String(cString: strerror(errno)))."))
+            }
+            if count == 0 { break }
+            data.append(contentsOf: buffer[0..<count])
+        }
+        guard data.count <= Self.maximumFileSize else {
+            return fallback(ConfigurationIssue(.error, "", "The configuration file is larger than 1 MiB."))
         }
 
         guard var document = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else {
@@ -301,6 +342,36 @@ public struct ConfigurationStore: Sendable {
             unlink(path)
             throw MacUpError(.configurationInvalid, "Could not write \(path): \(String(cString: strerror(failure))).")
         }
+    }
+
+    private static let changedWhileLoading = ConfigurationIssue(.error, "", "The configuration file changed while MacUp was reading it.")
+
+    /// The directories whose owners could replace the opened file: the one
+    /// holding the configured path and, for a symlink, the one holding the file
+    /// it resolves to. `nil` when the path no longer resolves to the opened file.
+    ///
+    /// ponytail: intermediate links of a multi-hop symlink chain are not checked;
+    /// walk each hop if chained configuration links ever become common.
+    private static func directoriesControlling(_ fileURL: URL, opened: stat) -> [(path: String, subject: String)]? {
+        let lexical = fileURL.deletingLastPathComponent().path
+        guard let resolved = realpath(fileURL.path, nil) else { return nil }
+        let resolvedPath = String(cString: resolved)
+        free(resolved)
+        var resolvedInfo = stat()
+        guard lstat(resolvedPath, &resolvedInfo) == 0,
+              resolvedInfo.st_dev == opened.st_dev, resolvedInfo.st_ino == opened.st_ino
+        else { return nil }
+
+        var directories = [(lexical, "The configuration directory")]
+        let target = (resolvedPath as NSString).deletingLastPathComponent
+        let lexicalCanonical = realpath(lexical, nil).map { pointer in
+            defer { free(pointer) }
+            return String(cString: pointer)
+        } ?? lexical
+        if target != lexicalCanonical {
+            directories.append((target, "The directory holding the configuration file's target"))
+        }
+        return directories
     }
 
     /// Files that decide what MacUp may change must belong to the user and

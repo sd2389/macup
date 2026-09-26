@@ -15,4 +15,4 @@ if [[ "$developer_dir" == *CommandLineTools* ]]; then
     fi
 fi
 
-exec swift test ${extra_flags[@]+"${extra_flags[@]}"} "$@"
+exec swift test --force-resolved-versions ${extra_flags[@]+"${extra_flags[@]}"} "$@"

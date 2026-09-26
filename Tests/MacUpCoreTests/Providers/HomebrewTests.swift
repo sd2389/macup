@@ -247,6 +247,15 @@ struct HomebrewProviderTests {
         #expect(!harness.arguments(for: "brew").contains { $0.contains("upgrade") || $0 == ["update"] })
     }
 
+    @Test("Output cut off at the runner's limit is an error, never parsed as complete")
+    func truncatedOutput() async throws {
+        let harness = harnessWithBrew()
+        harness.runner.register("brew", ["outdated", "--json=v2"], FakeCommandRunner.Response(standardOutput: #"{"formulae": []"#, truncated: true))
+        let context = try await harness.detectedContext(provider)
+        let error = await #expect(throws: MacUpError.self) { try await provider.outdated(context: context) }
+        #expect(error?.message.contains("more output than MacUp accepts") == true)
+    }
+
     @Test("A failed outdated check surfaces a redacted error")
     func failedCommand() async throws {
         let harness = harnessWithBrew()

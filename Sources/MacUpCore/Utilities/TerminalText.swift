@@ -37,6 +37,8 @@ public enum TerminalText {
 
 /// Short, display-safe excerpts of command output for error messages.
 public enum TextExcerpt {
+    static let maxLineCharacters = 1_000
+
     /// Returns the last `maxLines` non-empty lines of `text`, redacted and
     /// capped at `maxCharacters`, or `nil` when there is nothing to show.
     public static func tail(
@@ -45,10 +47,13 @@ public enum TextExcerpt {
         maxCharacters: Int = 2_000,
         redactor: Redactor = Redactor()
     ) -> String? {
+        // Over-long lines are cut before redaction, which keeps the regular
+        // expressions' cost bounded; the dropped tail is never shown.
         let lines = text
             .split(whereSeparator: \.isNewline)
             .map { $0.trimmingTrailingWhitespace() }
             .filter { !$0.isEmpty }
+            .map { $0.count > maxLineCharacters ? String($0.prefix(maxLineCharacters)) + "…" : $0 }
         guard !lines.isEmpty else { return nil }
         var excerpt = lines.suffix(maxLines).joined(separator: "\n")
         excerpt = redactor.redact(excerpt)

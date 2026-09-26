@@ -162,7 +162,8 @@ struct CheckEngineTests {
         let update = try #require(brew.firstIndex(of: ["update"]))
         let outdated = try #require(brew.firstIndex(of: ["outdated", "--json=v2"]))
         #expect(update < outdated)
-        #expect(report.commands.filter { $0.effect == .metadataRefresh }.map(\.command) == ["/opt/homebrew/bin/brew update"])
+        #expect(Set(report.commands.filter { $0.effect == .metadataRefresh }.map(\.command))
+            == ["/opt/homebrew/bin/brew update", "/usr/sbin/softwareupdate --list"])
         #expect(mac.runner.recordedRequests.contains { $0.arguments == ["--list"] })
     }
 

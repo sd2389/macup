@@ -20,7 +20,7 @@ The `Makefile` wraps the common tasks: `make install`, `make uninstall`,
 ## Desktop app
 
 ```bash
-scripts/build-app.sh          # builds build/MacUp.app (debug); pass "release" for a release build
+scripts/build-app.sh          # builds build/MacUp.app (release); pass "debug" for developer tooling
 open build/MacUp.app
 ```
 
@@ -30,10 +30,14 @@ on this Mac only. The Xcode project will compile the same folder.
 
 To review the UI from a script (no Screen Recording permission needed),
 debug builds accept `--snapshot-dir`: the app runs a check, renders every
-screen in light and dark mode plus Settings to PNG files, and quits.
+screen in light and dark mode plus Settings to PNG files, and quits. The
+directory must be private to you (created owner-only if missing); a shared
+location such as `/tmp/macup-shots` is refused, because another local user
+could read the screenshots or plant symlinks there.
 
 ```bash
-open -n build/MacUp.app --args --snapshot-dir /tmp/macup-shots
+scripts/build-app.sh debug
+open -n build/MacUp.app --args --snapshot-dir "$(mktemp -d)"
 ```
 
 ## Test

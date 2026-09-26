@@ -196,4 +196,22 @@ struct MiseProviderTests {
         #expect(error?.kind == .commandFailed)
         #expect(error?.detail?.contains("not trusted") == true)
     }
+
+    @Test("Lookup problems on stderr of a successful check mark results incomplete; the update notice does not")
+    func lookupProblemsOnSuccess() async throws {
+        let harness = try harness()
+        harness.runner.register("mise", ["outdated", "--json"], .success(
+            "{}",
+            standardError: "mise WARN  mise version 2026.9.14 available\nmise WARN  Error getting latest version for node: dummy lookup failure\n"
+        ))
+        let listing = try await provider.outdated(context: try await harness.detectedContext(provider))
+        #expect(listing.elements.isEmpty)
+        #expect(listing.partial)
+        let finding = try #require(listing.findings.first { $0.id == "mise.outdatedWarnings" })
+        #expect(finding.detail?.contains("dummy lookup failure") == true)
+        #expect(finding.detail?.contains("available") == false)
+
+        #expect(MiseProvider.lookupProblems(in: "mise WARN  mise version 2026.9.14 available\n") == nil)
+        #expect(MiseProvider.lookupProblems(in: "") == nil)
+    }
 }

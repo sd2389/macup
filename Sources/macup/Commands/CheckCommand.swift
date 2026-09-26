@@ -70,7 +70,7 @@ struct CheckCommand: AsyncParsableCommand {
         }
 
         if report.cancelled { throw MacUpExitCode.cancelled.exitCode }
-        if report.hasProviderErrors { throw MacUpExitCode.providerErrors.exitCode }
+        if report.hasProviderErrors || report.summary.providersIncomplete > 0 { throw MacUpExitCode.providerErrors.exitCode }
         if !report.configuration.valid { throw MacUpExitCode.configurationInvalid.exitCode }
     }
 }

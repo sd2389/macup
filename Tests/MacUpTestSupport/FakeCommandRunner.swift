@@ -13,19 +13,23 @@ public final class FakeCommandRunner: CommandRunning, @unchecked Sendable {
         public var standardError: String
         public var error: MacUpError?
         public var delay: Duration?
+        /// Report the output as cut off at the runner's limit.
+        public var truncated: Bool
 
         public init(
             exitStatus: Int32 = 0,
             standardOutput: String = "",
             standardError: String = "",
             error: MacUpError? = nil,
-            delay: Duration? = nil
+            delay: Duration? = nil,
+            truncated: Bool = false
         ) {
             self.exitStatus = exitStatus
             self.standardOutput = standardOutput
             self.standardError = standardError
             self.error = error
             self.delay = delay
+            self.truncated = truncated
         }
 
         public static func success(_ standardOutput: String = "", standardError: String = "") -> Response {
@@ -106,6 +110,7 @@ public final class FakeCommandRunner: CommandRunning, @unchecked Sendable {
             termination: .exited(response.exitStatus),
             standardOutput: stdout,
             standardError: stderr,
+            outputTruncated: response.truncated,
             startedAt: startedAt,
             finishedAt: Date()
         )

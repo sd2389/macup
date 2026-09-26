@@ -95,7 +95,7 @@ noted below. Fixtures live in `Tests/MacUpCoreTests/Fixtures/`.
 | --- | --- |
 | Detect | none — the OS version and build come from `sysctl` |
 | Candidates | `/usr/sbin/softwareupdate --list --no-scan` |
-| Candidates with `--refresh` | `/usr/sbin/softwareupdate --list` |
+| Candidates with `--refresh` | `/usr/sbin/softwareupdate --list` (a fresh scan; the read-only guard treats it as a metadata refresh) |
 
 - Detection only in v0.1: never `--install`, `--download`, `--background`,
   or anything requiring a password.
@@ -104,7 +104,9 @@ noted below. Fixtures live in `Tests/MacUpCoreTests/Fixtures/`.
   Fields are split only at `, Key: ` boundaries so titles containing commas
   survive. "No new software available." arrives on stderr and is handled.
 - Unrecognized or legacy output is a parse error; an entry without details
-  is a finding. Ambiguity never becomes fabricated state.
+  is a finding, and the result is marked incomplete (never "up to date").
+  If updates are listed but none can be read, that is a parse error.
+  Ambiguity never becomes fabricated state.
 - IDs are `macos:<label>` — the label is the identifier `softwareupdate`
   itself uses.
 - OS updates carry `operatingSystemUpdate` (high risk) and, when the action

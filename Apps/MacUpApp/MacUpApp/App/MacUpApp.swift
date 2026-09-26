@@ -30,8 +30,8 @@ struct MacUpApp: App {
             MenuBarContent()
                 .environment(model)
         } label: {
-            Image(systemName: model.updateCount > 0 ? "arrow.down.circle" : "checkmark.circle")
-                .accessibilityLabel(model.updateCount > 0 ? "MacUp, \(model.updateCount) updates available" : "MacUp")
+            Image(systemName: model.status.symbolName)
+                .accessibilityLabel("MacUp, \(model.status.headline)")
         }
     }
 }
@@ -84,7 +84,7 @@ struct ContentView: View {
             }
         }
         .task {
-            if model.report == nil { await model.checkNow() }
+            if model.report == nil || model.report?.cancelled == true { await model.checkNow() }
             #if DEBUG
             if let directory = Snapshots.directory {
                 await Snapshots.capture(model: model, openSettings: { openSettings() }, into: directory)
@@ -105,7 +105,10 @@ struct MenuBarContent: View {
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
-        Text(status)
+        Text(model.status.headline)
+        ForEach(model.status.reasons, id: \.self) { reason in
+            Text(reason)
+        }
         if let report = model.report {
             Text("Last checked at \(report.finishedAt.formatted(date: .omitted, time: .shortened))")
         }
@@ -120,16 +123,6 @@ struct MenuBarContent: View {
         Divider()
         Button("Quit MacUp") { NSApp.terminate(nil) }
             .keyboardShortcut("q")
-    }
-
-    private var status: String {
-        if model.isChecking { return "Checking…" }
-        guard model.report != nil else { return "Not checked yet" }
-        switch model.updateCount {
-        case 0: return "Everything is up to date"
-        case 1: return "1 update available"
-        case let count: return "\(count) updates available"
-        }
     }
 
     private func show(_ section: AppModel.Section) {

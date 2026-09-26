@@ -48,10 +48,25 @@ public struct ProviderContext: Sendable {
 public struct ProviderListing<Element: Sendable & Hashable>: Sendable, Hashable {
     public var elements: [Element]
     public var findings: [DiagnosticFinding]
+    /// Entries the provider listed that MacUp could not read or identify.
+    public var skipped: Int
+    /// The provider signaled that results may be missing (for example lookups it could not finish).
+    public var partial: Bool
 
-    public init(_ elements: [Element] = [], findings: [DiagnosticFinding] = []) {
+    public init(_ elements: [Element] = [], findings: [DiagnosticFinding] = [], skipped: Int = 0, partial: Bool = false) {
         self.elements = elements
         self.findings = findings
+        self.skipped = skipped
+        self.partial = partial
+    }
+
+    /// Whether the listing is known to be missing something.
+    public var isIncomplete: Bool { skipped > 0 || partial }
+
+    /// Records an entry MacUp saw but will not use, with the finding that explains it.
+    mutating func skip(_ finding: DiagnosticFinding) {
+        findings.append(finding)
+        skipped += 1
     }
 }
 
@@ -146,7 +161,16 @@ enum ProviderSupport {
             timeout: timeout,
             effect: effect
         )
-        return try await context.runner.run(request)
+        let result = try await context.runner.run(request)
+        // Parsing a cut-off listing could silently drop entries: fail instead.
+        guard !result.outputTruncated else {
+            throw MacUpError(
+                .commandFailed,
+                "`\((executable as NSString).lastPathComponent) \(arguments.joined(separator: " "))` printed more output than MacUp accepts, so its results would be incomplete.",
+                command: Redactor().redact(result.invocation.displayString)
+            )
+        }
+        return result
     }
 
     /// The error for a provider whose executable could not be resolved.
@@ -178,6 +202,16 @@ enum ProviderSupport {
                     "The configured \(provider.displayName) path cannot be used: \(reason)",
                     detail: "Configured path: \(path)",
                     recoverySuggestion: "Fix or remove providers.\(provider.rawValue).executablePath in the MacUp configuration."
+                )
+            )
+        case .untrustedLocation(let path, let reason):
+            return ProviderStatus(
+                provider: provider,
+                availability: .failed,
+                error: MacUpError(
+                    .ambiguousOwnership,
+                    "\(provider.displayName) was found only at \(path), which MacUp does not run on its own: \(reason)",
+                    recoverySuggestion: "If you trust it, add its directory to your PATH or set providers.\(provider.rawValue).executablePath in the MacUp configuration."
                 )
             )
         }
