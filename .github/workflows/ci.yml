@@ -47,6 +47,29 @@ jobs:
           .build/debug/macup --help
           .build/debug/macup --version
           .build/debug/macup config path --json
+          .build/debug/macup config show
+
+      # A real, read-only check on the disposable runner. Exit status 2
+      # (a provider failed, for example a registry hiccup) is tolerated; the
+      # report must still be valid schema-1 JSON containing only read-only
+      # commands.
+      - name: Read-only check on the runner
+        run: |
+          set +e
+          .build/debug/macup check --json > check.json
+          status=$?
+          set -e
+          echo "macup check exited with status $status"
+          python3 - <<'EOF'
+          import json
+          report = json.load(open("check.json"))
+          assert report["schemaVersion"] == 1 and report["kind"] == "check"
+          assert report["mode"] == "readOnly"
+          assert all(command["effect"] == "readOnly" for command in report["commands"])
+          print(json.dumps(report["summary"], indent=2))
+          EOF
+          if [ "$status" -ne 0 ] && [ "$status" -ne 2 ]; then exit "$status"; fi
+          .build/debug/macup check --verbose || true
 
       - name: Release build smoke test
         run: |
