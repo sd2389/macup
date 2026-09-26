@@ -14,6 +14,25 @@ swift build
 .build/debug/macup --help
 ```
 
+## Desktop app
+
+```bash
+scripts/build-app.sh          # builds build/MacUp.app (debug); pass "release" for a release build
+open build/MacUp.app
+```
+
+Until Xcode is installed, the app is a SwiftPM executable target
+(`Apps/MacUpApp/MacUpApp`) wrapped into an ad-hoc signed bundle that runs
+on this Mac only. The Xcode project will compile the same folder.
+
+To review the UI from a script (no Screen Recording permission needed),
+debug builds accept `--snapshot-dir`: the app runs a check, renders every
+screen in light and dark mode plus Settings to PNG files, and quits.
+
+```bash
+open -n build/MacUp.app --args --snapshot-dir /tmp/macup-shots
+```
+
 ## Test
 
 ```bash
@@ -50,6 +69,7 @@ Sources/MacUpCore/        Core library shared by the CLI and (later) the app
   Providers/              Homebrew, npm, mise, macOS adapters and parsers
   Utilities/              Redaction, terminal-safe text, JSON, file system
 Sources/macup/            The `macup` CLI (argument parsing and output only)
+Apps/MacUpApp/MacUpApp/   The SwiftUI desktop app (uses MacUpCore only)
 Tests/MacUpCoreTests/     Core tests; Fixtures/ holds provider output samples
 Tests/MacUpCLITests/      CLI parsing, output, and exit-code tests
 Tests/MacUpTestSupport/   Fakes shared by the test targets

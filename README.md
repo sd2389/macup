@@ -16,9 +16,10 @@ Early development. **This version is read-only** (Phases 0 and 1 of the build pl
 | --- | --- | --- |
 | 0 | Package, command runner, config paths, CI | done |
 | 1 | Read-only engine: Homebrew, npm, mise, macOS; `macup check` | done |
+| 5a | Read-only desktop app (pulled forward) | done |
 | 2 | Policies and dry-run planning | next |
 | 3 | Safe per-item updates, verification, history | planned |
-| 4–7 | Doctor, SwiftUI app, launchd scheduling, release hardening | planned |
+| 4–7 | Doctor, full app controls, launchd scheduling, release hardening | planned |
 
 ## Try it
 
@@ -36,6 +37,12 @@ swift build
 .build/debug/macup check --json          # versioned machine-readable report
 .build/debug/macup provider list         # which installation of each tool MacUp uses
 .build/debug/macup config show           # configuration in effect, and any problems
+```
+
+The desktop app shows the same information in a native window and the menu bar:
+
+```bash
+scripts/build-app.sh && open build/MacUp.app
 ```
 
 `macup check --refresh` first runs `brew update` (which updates Homebrew itself and its package lists, but no installed packages) and a fresh `softwareupdate --list` scan.

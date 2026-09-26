@@ -59,8 +59,9 @@ text passes through `Redactor`.
    is reported as failed. MacUp never falls back to another copy: that
    could run a binary the user did not choose.
 2. **The user's search path.** For the CLI this is the `PATH` MacUp was
-   started with — the user's login-shell `PATH`. (The app, in Phase 5, will
-   need login-shell discovery here, then its own process `PATH` last.)
+   started with — the user's login-shell `PATH`. The app, which inherits
+   launchd's minimal `PATH` when launched from Finder, gets it from
+   `LoginShellEnvironment` (below).
 3. **Standard locations**: `/opt/homebrew/bin/…`, `/usr/local/bin/…`, and
    `~/.local/bin/mise`.
 
@@ -77,6 +78,24 @@ Special cases:
   symlink target, then on the search path, and records the choice. The
   child `PATH` puts that node's directory first so `/usr/bin/env node`
   finds the same one. A node found elsewhere is flagged.
+
+## Login-shell environment (desktop app)
+
+`LoginShellEnvironment` reads the environment a terminal would have: it runs
+the user's login shell (from the account database, and only if listed in
+`/etc/shells`; otherwise `/bin/zsh`) as `-l -i -c <fixed script>` in the home
+directory, with the base allowlisted environment, `TERM=dumb`, and
+`MACUP_RESOLVING_ENVIRONMENT=1` (so dotfiles can skip slow work). The script
+runs the shell's prompt hooks first — zsh `precmd_functions`, bash
+`PROMPT_COMMAND`, fish `fish_prompt` handlers — because tools such as mise
+update `PATH` there, then prints `env -0` between markers built from a
+per-run nonce. Startup-file noise around the markers is ignored.
+
+This is the only shell `-c` in MacUp (the trust-invariants check enforces
+that): nothing but the nonce is inserted, the output is parsed and never
+executed, and the captured environment is never logged. It runs once per
+app launch with a 10 second timeout; if it fails, the app falls back to its
+own environment plus standard locations and says so in Doctor.
 
 ## PATH hijacking considerations
 

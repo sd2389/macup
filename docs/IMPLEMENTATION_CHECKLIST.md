@@ -92,3 +92,21 @@ tests or an explicit manual verification step.
 - Cross-provider diagnostics (for example mise-managed Node on PATH while
   npm runs a different Node) and binary-architecture checks — Phase 4 Doctor.
 - Login-shell PATH discovery for the app — Phase 5.
+
+## Phase 5a — read-only desktop app (pulled forward at the owner's request)
+
+Built on the Phase 1 engine before Phases 2–4; update and policy controls
+come later.
+
+- [x] Login-shell environment discovery so a Finder-launched app finds the
+      same tools as the terminal (prompt hooks included)
+- [x] App target in `Apps/MacUpApp/MacUpApp`, MacUpCore only, no new dependencies
+- [x] Dashboard, Updates (with inspector), Doctor, History (empty state)
+- [x] Settings window (read-only) and MenuBarExtra (no update-everything)
+- [x] Status in words plus symbols, never color alone; light and dark checked
+- [x] Loading, empty, and error states
+- [x] `scripts/build-app.sh` and a DEBUG snapshot mode for UI review
+- [ ] Xcode project wrapping the same sources (waiting on Xcode)
+- [ ] App icon and asset catalog (needs Xcode)
+- [ ] SwiftUI previews (the preview macros ship with Xcode)
+- [ ] View-model tests once the app gains its own logic (Phase 2 actions)

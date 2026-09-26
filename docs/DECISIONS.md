@@ -75,3 +75,28 @@ identity `softwareupdate` itself uses, and it distinguishes non-OS updates
 Tests use Swift Testing. With only the Command Line Tools installed, SwiftPM
 does not locate the testing macro plugin, so `scripts/test.sh` passes its
 path; Xcode and CI need nothing extra.
+
+## ADR-018 — A read-only desktop app before Phases 2–4
+At the owner's request, the SwiftUI app was built on the Phase 1 engine
+ahead of the spec's phase order. It only reports; update and policy
+controls land with Phases 2–3, and the app gains them without changing its
+structure because all behavior stays in MacUpCore.
+
+## ADR-019 — App sources in Apps/MacUpApp, built by SwiftPM until Xcode
+The app lives in the spec's `Apps/MacUpApp/MacUpApp` layout and is a
+SwiftPM executable target, so it builds and runs with only the Command Line
+Tools (and compiles in CI). When Xcode is installed, an Xcode project wraps
+the same folder for icons, previews, signing, and notarization.
+
+## ADR-020 — Login-shell environment discovery is the one sanctioned shell `-c`
+The app runs the user's login shell (from the account database, listed in
+`/etc/shells`) interactively with a fixed script and captures `env -0`.
+Only a MacUp-generated nonce is inserted into the script; output is parsed,
+never executed, never logged. `scripts/check-trust-invariants.sh` allows it
+in that one file.
+
+## ADR-021 — Settings is a standard macOS Settings window
+The spec lists Settings in primary navigation; macOS convention (and the
+spec's "standard macOS conventions first") puts it in the Settings window
+(⌘,), reachable from the app menu and the menu bar. The sidebar holds
+Dashboard, Updates, Doctor, and History.

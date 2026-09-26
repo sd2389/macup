@@ -30,6 +30,10 @@ MacUp follows Semantic Versioning once releases begin.
   `--provider`, `--inventory`, and `--verbose`; `macup provider list`;
   `macup config show`.
 - Read-only command allowlist enforced for every check.
+- Read-only SwiftUI desktop app: Dashboard, Updates, Doctor, History,
+  Settings window, and a menu bar extra, built with `scripts/build-app.sh`.
+- Login-shell environment discovery so the app finds the same tools as the
+  terminal.
 
 ### Security
 - Provider output is treated as untrusted: names with control characters,
