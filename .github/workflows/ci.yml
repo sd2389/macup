@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Build and test
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - name: Check out
+        # Pinned to a commit for supply-chain safety.
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Select the newest stable Xcode
+        run: |
+          xcode="$(ls -d /Applications/Xcode_*.app | grep -viE 'beta|release_candidate|_rc' | sort -V | tail -1)"
+          sudo xcode-select --switch "$xcode"
+          sw_vers
+          xcodebuild -version
+          swift --version
+
+      - name: Trust invariants
+        run: scripts/check-trust-invariants.sh
+
+      - name: Build
+        run: swift build --build-tests
+
+      - name: Test
+        run: swift test
+
+      - name: CLI smoke test
+        run: |
+          .build/debug/macup --help
+          .build/debug/macup --version
+          .build/debug/macup config path --json
+
+      - name: Release build smoke test
+        run: |
+          swift build -c release --product macup
+          "$(swift build -c release --show-bin-path)/macup" --version

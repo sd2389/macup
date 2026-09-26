@@ -1,0 +1,67 @@
+/// Makes untrusted text safe to print to a terminal.
+///
+/// Provider output (package names, versions, descriptions, error messages) is
+/// untrusted input. Printed verbatim, escape sequences could rewrite the
+/// user's terminal and bidirectional-override characters could make text read
+/// differently than it is. Every such character is replaced by a visible
+/// `\u{…}` escape so nothing is hidden.
+public enum TerminalText {
+    public static func sanitize(_ text: String) -> String {
+        guard text.unicodeScalars.contains(where: isUnsafe) else { return text }
+        var result = ""
+        result.reserveCapacity(text.utf8.count)
+        for scalar in text.unicodeScalars {
+            if isUnsafe(scalar) {
+                result += "\\u{" + String(scalar.value, radix: 16, uppercase: true) + "}"
+            } else {
+                result.unicodeScalars.append(scalar)
+            }
+        }
+        return result
+    }
+
+    static func isUnsafe(_ scalar: Unicode.Scalar) -> Bool {
+        switch scalar.value {
+        case 0x00...0x1F, 0x7F...0x9F:
+            // C0 controls (including ESC, newline, tab), DEL, and C1 controls.
+            return true
+        case 0x061C, 0x200E, 0x200F, 0x202A...0x202E, 0x2066...0x2069:
+            // Bidirectional marks, embeddings, overrides, and isolates.
+            return true
+        default:
+            return false
+        }
+    }
+}
+
+/// Short, display-safe excerpts of command output for error messages.
+public enum TextExcerpt {
+    /// Returns the last `maxLines` non-empty lines of `text`, redacted and
+    /// capped at `maxCharacters`, or `nil` when there is nothing to show.
+    public static func tail(
+        of text: String,
+        maxLines: Int = 12,
+        maxCharacters: Int = 2_000,
+        redactor: Redactor = Redactor()
+    ) -> String? {
+        let lines = text
+            .split(whereSeparator: \.isNewline)
+            .map { $0.trimmingTrailingWhitespace() }
+            .filter { !$0.isEmpty }
+        guard !lines.isEmpty else { return nil }
+        var excerpt = lines.suffix(maxLines).joined(separator: "\n")
+        excerpt = redactor.redact(excerpt)
+        if excerpt.count > maxCharacters {
+            excerpt = "…" + excerpt.suffix(maxCharacters - 1)
+        }
+        return excerpt
+    }
+}
+
+extension Substring {
+    fileprivate func trimmingTrailingWhitespace() -> String {
+        var view = self
+        while let last = view.last, last.isWhitespace { view.removeLast() }
+        return String(view)
+    }
+}

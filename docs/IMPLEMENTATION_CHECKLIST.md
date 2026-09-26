@@ -15,29 +15,30 @@ tests or an explicit manual verification step.
 
 ## Phase 0 — repository foundation
 
-- [ ] Materialize the build-kit files bundled in `MACUP_MASTER_BUILD_SPEC.md`
+- [x] Materialize the build-kit files bundled in `MACUP_MASTER_BUILD_SPEC.md`
       (CLAUDE.md, docs/, SECURITY.md, CONTRIBUTING.md, templates, example config)
-- [ ] LICENSE (Apache-2.0), CHANGELOG.md, .gitignore
-- [ ] `Package.swift` with `MacUpCore` library, `macup` executable, test targets
-- [ ] Swift Testing test targets that run under full Xcode and under Command
+- [x] LICENSE (Apache-2.0), CHANGELOG.md, .gitignore
+- [x] `Package.swift` with `MacUpCore` library, `macup` executable, test targets
+- [x] Swift Testing test targets that run under full Xcode and under Command
       Line Tools (`scripts/test.sh` supplies the macro plugin path on CLT)
-- [ ] `CommandRunning` protocol + `ProcessCommandRunner`
-  - [ ] executable path + argument array, never a shell
-  - [ ] environment allowlist + overrides
-  - [ ] working directory
-  - [ ] timeout with terminate → kill escalation
-  - [ ] task cancellation
-  - [ ] stdout/stderr capture with size limits
-  - [ ] optional streaming output callback
-  - [ ] exit status + termination reason + start/end timestamps
-  - [ ] display-safe command rendering separate from the real argument array
-  - [ ] secret redaction for anything logged or displayed
-- [ ] Intentional executable resolution (configured → shell PATH → standard
+- [x] `CommandRunning` protocol + `ProcessCommandRunner`
+  - [x] executable path + argument array, never a shell
+  - [x] environment allowlist + overrides
+  - [x] working directory
+  - [x] timeout with terminate → kill escalation
+  - [x] task cancellation
+  - [x] stdout/stderr capture with size limits
+  - [x] optional streaming output callback
+  - [x] exit status + termination reason + start/end timestamps
+  - [x] display-safe command rendering separate from the real argument array
+  - [x] secret redaction for anything logged or displayed
+- [x] Intentional executable resolution (configured → shell PATH → standard
       locations), relative PATH entries ignored
-- [ ] Config paths (`~/.config/macup/config.json`, `~/.local/state/macup/`)
-- [ ] `macup --help` / `macup --version`
-- [ ] GitHub Actions CI: build, tests, CLI smoke, no-shell static check
-- [ ] Exit criteria: builds cleanly, tests run, `macup --help`, no provider
+- [x] Config paths (`~/.config/macup/config.json`, `~/.local/state/macup/`)
+- [x] `macup --help` / `macup --version`
+- [x] GitHub Actions CI: build, tests, CLI smoke, no-shell static check
+      (workflow written and its steps verified locally; first hosted run happens on push)
+- [x] Exit criteria: builds cleanly, tests run, `macup --help`, no provider
       modifications
 
 ## Phase 1 — read-only engine
