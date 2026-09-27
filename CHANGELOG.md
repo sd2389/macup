@@ -7,10 +7,28 @@ MacUp follows Semantic Versioning once releases begin.
 ## [Unreleased]
 
 ### Added
+- Scheduled read-only checks: `macup schedule enable`, `macup schedule
+  disable`, and `macup schedule status [--json]`. Enabling installs a launchd
+  **user agent** (`com.macup.check`) that runs `macup check --save-state` at
+  the chosen time. It runs as you, needs no administrator authorization,
+  leaves no process running between checks, and `disable` removes it
+  completely. There is no scheduled updating: this version still cannot
+  modify a package.
+- `macup check --save-state` writes the report to
+  `~/.local/state/macup/last-check.json`, which `macup schedule status`
+  summarises.
+- `schedule.refresh` (default `true`) controls whether a scheduled check
+  refreshes package metadata first. Without it `brew outdated` reads local
+  metadata that may be weeks old, so a nightly check would report almost
+  nothing; a refresh updates package lists only.
+- `MACUP_LAUNCH_AGENTS_DIR` overrides the LaunchAgents directory, for testing.
 - Homebrew tap: `brew install sd2389/macup/macup` builds MacUp from the
   tagged source.
 
 ### Fixed
+- `macup config show` no longer presents the `schedule` section as if it
+  worked while nothing read it. Before scheduling existed, turning it on in
+  the file was accepted, validated, and echoed back, and then nothing ran.
 - CI and the development guide find the built `macup` through SwiftPM
   (`swift build --show-bin-path`, `swift run`) instead of assuming
   `.build/debug`, which newer toolchains no longer use.

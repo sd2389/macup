@@ -28,6 +28,21 @@ public struct PrivateDirectory: Sendable {
         self.path = path
     }
 
+    /// Removes `name` from the directory, following no symlink out of it.
+    /// Returns whether a file was removed.
+    @discardableResult
+    public func remove(named name: String) throws -> Bool {
+        guard !name.isEmpty, !name.contains("/"), name != ".", name != ".." else {
+            throw MacUpError(.configurationInvalid, "Invalid file name.")
+        }
+        let directory = open(path, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
+        guard directory >= 0 else { throw MacUpError(.configurationInvalid, "\(path) is no longer a directory MacUp can use.") }
+        defer { close(directory) }
+        if unlinkat(directory, name, 0) == 0 { return true }
+        if errno == ENOENT { return false }
+        throw MacUpError(.configurationInvalid, "Could not remove \(name): \(String(cString: strerror(errno))).")
+    }
+
     /// Writes `data` to `name` inside the directory with owner-only permissions.
     /// Fails, without writing, if `name` is a symlink or the directory changed.
     public func write(_ data: Data, named name: String) throws {

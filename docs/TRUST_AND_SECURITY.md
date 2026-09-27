@@ -63,6 +63,16 @@ Mitigations:
 
 The main process runs as the user.
 
+Scheduling does not change that. `macup schedule enable` installs a per-user
+LaunchAgent in `~/Library/LaunchAgents`, loaded into the user's own launchd
+domain (`gui/<uid>`). There is no `LaunchDaemon`, no root, no privilege
+helper, no authorization prompt, and no process running between checks. The
+scheduled job runs `macup check --save-state`, which cannot install, upgrade,
+or remove anything. `macup schedule disable` unloads the job and deletes the
+property list, and `macup schedule status` shows the exact command that would
+run, so an installed schedule is never something you have to take on trust.
+
+
 When an operation legitimately needs authorization:
 - explain why
 - let macOS present standard authorization

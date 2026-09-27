@@ -17,6 +17,13 @@
 - `--json`
 - no modification
 
+## v0.1.1 — Scheduled read-only checks
+- `macup schedule enable|disable|status`
+- launchd user agent (no daemon, no root)
+- `macup check --save-state`
+- brought forward from v0.6.0: a scheduled *check* needs neither the policy
+  engine nor the execution engine, so it did not have to wait for them
+
 ## v0.2.0 — Policy + Planning
 - Auto / Ask / Ignore / Pin / Inherit
 - provider enable/disable
@@ -46,11 +53,11 @@
 - settings
 - menu bar
 
-## v0.6.0 — Scheduling
-- launchd
-- scheduled check
-- explicit-auto-only updating
-- notifications
+## v0.6.0 — Scheduled updating
+- explicit-auto-only updating on a schedule
+- notifications (needs the app bundle: a bare CLI cannot post one)
+- battery, metered-network, and quiet-hours awareness
+- the scheduled read-only check itself shipped in v0.1.1
 
 ## v0.9.0 — Public Beta
 - security review

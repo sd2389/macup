@@ -33,7 +33,8 @@
   "schedule": {
     "enabled": false,
     "frequency": "daily",
-    "time": "23:00"
+    "time": "23:00",
+    "refresh": true
   },
   "privacy": {
     "telemetry": false

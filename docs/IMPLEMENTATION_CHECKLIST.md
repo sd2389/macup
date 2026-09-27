@@ -77,12 +77,55 @@ tests or an explicit manual verification step.
 
 ### Verification (Phase 1)
 
-- `scripts/test.sh`: 220 tests (192 core, 28 CLI), all passing; no test runs
+- `scripts/test.sh`: 248 tests (211 core, 37 CLI), all passing; no test runs
   a real provider binary.
 - `scripts/check-trust-invariants.sh`: passing.
 - Manual, read-only on the development Mac: `macup check`, `--verbose`,
   `--json`, `macup provider list`, `macup config show`. Every command run was
   on the allowlist with effect `readOnly`; `--refresh` was not run.
+
+## Scheduled read-only checks (pulled forward from Phase 6)
+
+A scheduled *check* depends on neither the policy engine nor the execution
+engine, so it did not have to wait for Phases 2 and 3. Scheduled *updating*
+still does: it is Phase 6, unchanged.
+
+- [x] `LaunchAgent`: the property list is derived in one place, from the
+      configuration, with the exact executable and argument array
+- [x] The agent runs `macup check --save-state` and nothing else; a static
+      invariant in `scripts/check-trust-invariants.sh` enforces it
+- [x] Per-user LaunchAgent in `~/Library/LaunchAgents`, loaded into
+      `gui/<uid>`; no daemon, no root, no privilege helper, no authorization
+      prompt, no process between runs
+- [x] `RunAtLoad` false, so enabling a schedule does not also check at login
+- [x] `Scheduler`: install, remove, and status through `CommandRunning` with
+      `/bin/launchctl` by absolute path; label and agent path are MacUp's own
+      constants, never user text
+- [x] `macup schedule enable|disable|status [--json]`
+- [x] `macup check --save-state` writes the report atomically, owner-only,
+      to `~/.local/state/macup/last-check.json`
+- [x] `schedule.refresh` (default on), because an unrefreshed nightly check
+      reads weeks-old Homebrew metadata and reports almost nothing
+- [x] Weekly defaults to Sunday, stated in the help and shown in status
+      rather than left implicit
+- [x] Fails closed: `schedule enable` refuses to write a configuration it
+      could not read, and refuses to schedule a binary it cannot name
+      absolutely or that is not an executable file
+- [x] Status reports rather than repairs: installed-but-not-loaded, agent
+      that no longer matches the configuration, missing scheduled binary,
+      unreadable saved report
+- [x] Tests: property list contents, calendar intervals, weekday mapping,
+      refused times, install/remove/status through a fake `launchctl`, and
+      the CLI end to end. No test installs an agent on the host.
+
+### Verification (scheduling)
+
+- `scripts/test.sh`: 248 tests, all passing.
+- `scripts/check-trust-invariants.sh`: passing, with the two new scheduling
+  invariants (no system daemon; the agent runs only `check --save-state`).
+- Manual, read-only on the development Mac: `macup schedule`,
+  `macup schedule status --json`, `macup schedule enable --help`. No agent
+  was installed and `macup schedule enable` was not run.
 
 ### Carried into later phases
 
@@ -92,6 +135,9 @@ tests or an explicit manual verification step.
 - Cross-provider diagnostics (for example mise-managed Node on PATH while
   npm runs a different Node) and binary-architecture checks — Phase 4 Doctor.
 - Login-shell PATH discovery for the app — Phase 5.
+- Scheduled *updating* (explicit-`auto` items only), notifications, and
+  battery/metered-network awareness — Phase 6. Notifications need the app
+  bundle: `UNUserNotificationCenter` does not work from a bare CLI.
 
 ## Phase 5a — read-only desktop app (pulled forward at the owner's request)
 

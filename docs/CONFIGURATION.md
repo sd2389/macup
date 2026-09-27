@@ -35,7 +35,7 @@ configuration error (exit status 3), never a guess.
     "npm:@anthropic-ai/claude-code": { "policy": "ask" },
     "brew:postgresql": { "policy": "ignore" }
   },
-  "schedule": { "enabled": false, "frequency": "daily", "time": "23:00" },
+  "schedule": { "enabled": false, "frequency": "daily", "time": "23:00", "refresh": true },
   "privacy": { "telemetry": false }
 }
 ```
@@ -52,7 +52,8 @@ configuration error (exit status 3), never a guess.
 | `schedule.enabled` | `true`/`false` | `false` |
 | `schedule.frequency` | `daily`, `weekly` | `daily` |
 | `schedule.time` | `HH:mm`, 24-hour | `23:00` |
-| `schedule.weekday` | `monday` … `sunday` | — |
+| `schedule.weekday` | `monday` … `sunday` | Sunday, for a weekly schedule |
+| `schedule.refresh` | `true`/`false` — refresh package metadata before a scheduled check | `true` |
 | `privacy.telemetry` | `true`/`false` (MacUp has no telemetry) | `false` |
 
 Omitted sections take the defaults above. When no file exists, every
@@ -61,10 +62,13 @@ is no telemetry.
 
 Phase 1 uses `providers.<id>.enabled` (disabled providers are never run)
 and `providers.<id>.executablePath`. Policies are stored and validated now
-and enforced from Phase 2. The `schedule` section is stored and validated
-too, but nothing reads it yet: MacUp installs no launchd agent and runs no
-scheduled check until Phase 6, so `schedule.enabled` has no effect. `macup
-config show` says so when the file turns it on.
+and enforced from Phase 2.
+
+The `schedule` section describes the scheduled read-only check. Change it
+with `macup schedule enable` and `macup schedule disable` rather than by
+hand: those commands also install and remove the launchd agent that does the
+work. Editing `schedule.enabled` in the file on its own schedules nothing —
+`macup schedule status` will say so.
 
 ## Validation fails closed
 

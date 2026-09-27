@@ -19,7 +19,8 @@ Early development. **This version is read-only** (Phases 0 and 1 of the build pl
 | 5a | Read-only desktop app (pulled forward) | done |
 | 2 | Policies and dry-run planning | next |
 | 3 | Safe per-item updates, verification, history | planned |
-| 4–7 | Doctor, full app controls, launchd scheduling, release hardening | planned |
+| 6a | Scheduled read-only checks (pulled forward) | done |
+| 4–7 | Doctor, full app controls, scheduled updating, release hardening | planned |
 
 ## Command-line tool
 
@@ -46,6 +47,7 @@ macup check --verbose    # who manages each item, why it's rated that way, every
 macup check --json       # machine-readable output for scripts
 macup providers          # which installation of each tool MacUp uses
 macup config             # the settings MacUp is using
+macup schedule           # whether MacUp checks on its own
 ```
 
 Nothing is ever changed: this version only reports. Remove the command with
@@ -61,6 +63,20 @@ make app && open build/MacUp.app
 ```
 
 `macup check --refresh` first runs `brew update` (which updates Homebrew itself and its package lists, but no installed packages) and a fresh `softwareupdate --list` scan.
+
+## Checking on a schedule
+
+```bash
+macup schedule enable --time 09:00   # or --frequency weekly --weekday monday
+macup schedule                       # when it next runs, what it last found
+macup schedule disable               # removes it completely
+```
+
+This installs a launchd **user agent** that runs `macup check --save-state`
+at that time — as you, not as root, with no background process between runs
+and no administrator authorization. The scheduled run is the same read-only
+check, so it still changes nothing; scheduled *updating* does not exist yet.
+Results land in `~/.local/state/macup/last-check.json`.
 
 Example output (illustrative):
 

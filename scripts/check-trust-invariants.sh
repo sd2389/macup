@@ -6,7 +6,8 @@
 #      fixed script (see Sources/MacUpCore/Execution/LoginShellEnvironment.swift);
 #   2. process launching outside ProcessCommandRunner;
 #   3. modifying provider verbs — MacUp is read-only until Phase 3 adds an
-#      execution engine, at which point this rule moves to that engine's files.
+#      execution engine, at which point this rule moves to that engine's files;
+#   4. scheduling that is not a per-user LaunchAgent running only `macup check`.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -32,6 +33,17 @@ fi
 
 if grep -rnE '"(upgrade|install|reinstall|uninstall|remove|rm|cleanup|autoremove|prune|self-update|use|--install|--download|--bump|--all)"' Sources Apps; then
     fail "modifying provider command found during the read-only phases"
+fi
+
+daemons=$(grep -rnE 'LaunchDaemons|"system/|"bootstrap", *"system' Sources Apps || true)
+if [[ -n "$daemons" ]]; then
+    echo "$daemons" >&2
+    fail "scheduling must stay a per-user LaunchAgent; MacUp installs no system daemon"
+fi
+
+# The scheduled job may only ever run a read-only check.
+if ! grep -q 'var arguments = \["check", "--save-state"\]' Sources/MacUpCore/Scheduling/LaunchAgent.swift; then
+    fail "the launchd agent must run only 'macup check --save-state'"
 fi
 
 if [[ $status -eq 0 ]]; then

@@ -27,6 +27,26 @@ struct CLIContext: Sendable {
     var checkEnvironment: CheckEnvironment
     /// Ctrl+C handling is process-wide; tests turn it off.
     var handlesInterrupts: Bool
+    /// Absolute path of this `macup` binary, which is what a scheduled check
+    /// runs. Not symlink-resolved: scheduling `/opt/homebrew/bin/macup`
+    /// keeps working when Homebrew moves the version behind it.
+    var executablePath: String
+    var userID: uid_t
+    /// Scheduling talks to launchctl and the file system directly; tests
+    /// replace both so no agent is ever installed on the host.
+    var schedulerRunner: any CommandRunning
+    var schedulerFileSystem: any FileSystem
+
+    func scheduler(paths: MacUpPaths) -> Scheduler {
+        Scheduler(
+            paths: paths,
+            executable: executablePath,
+            userID: userID,
+            fileSystem: schedulerFileSystem,
+            runner: schedulerRunner,
+            processEnvironment: environment
+        )
+    }
 
     @TaskLocal static var current = CLIContext.live()
 
@@ -41,8 +61,26 @@ struct CLIContext: Sendable {
             standardOutputIsTerminal: isatty(STDOUT_FILENO) == 1,
             engine: .standard(),
             checkEnvironment: .live(processEnvironment: environment, homeDirectory: home),
-            handlesInterrupts: true
+            handlesInterrupts: true,
+            executablePath: currentExecutablePath(),
+            userID: getuid(),
+            schedulerRunner: ProcessCommandRunner(),
+            schedulerFileSystem: LocalFileSystem()
         )
+    }
+
+    /// Where this binary lives. An answer that is not an absolute path is
+    /// returned as-is; scheduling then refuses and says why, rather than
+    /// installing an agent that points at nothing.
+    static func currentExecutablePath() -> String {
+        if let path = Bundle.main.executablePath, path.hasPrefix("/") { return path }
+        let argument = CommandLine.arguments.first ?? "macup"
+        if argument.hasPrefix("/") { return argument }
+        if argument.contains("/") {
+            return URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+                .appendingPathComponent(argument).standardizedFileURL.path
+        }
+        return argument
     }
 
     /// Whether human output may use ANSI styling: only on a terminal, and

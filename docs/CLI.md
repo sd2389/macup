@@ -1,8 +1,10 @@
 # CLI reference
 
-This version of MacUp is **read-only**. No command installs, upgrades,
-removes, cleans, or prunes anything, and no command writes MacUp's
-configuration.
+This version of MacUp is **read-only** about your packages: no command
+installs, upgrades, removes, cleans, or prunes anything. Two commands write
+MacUp's own files — `macup schedule enable` and `macup schedule disable`,
+which record the schedule in the configuration and install or remove a
+launchd agent. The scheduled job itself only runs `macup check`.
 
 ## Install
 
@@ -48,14 +50,55 @@ macup --generate-completion-script zsh > ~/.zsh/completions/_macup
 | `macup check --provider <id>` | Checks only `homebrew`, `npm`, `mise`, or `macos`. Repeatable. |
 | `macup check --inventory` | Also lists installed items. |
 | `macup check --verbose` | Adds ownership chains, risk reasons, notes, and every command MacUp ran. |
+| `macup check --save-state` | Also writes the report to `~/.local/state/macup/last-check.json`. This is how a scheduled check leaves its result behind. |
 | `macup providers` / `macup provider list [--json]` | Shows which providers were found and exactly which installation MacUp uses. Runs detection only. |
 | `macup config` / `macup config show [--json]` | Shows the configuration in effect and every problem with it. Never creates the file. |
 | `macup config path [--json]` | Prints the configuration file and state directory locations. |
+| `macup schedule` / `macup schedule status [--json]` | Shows whether a check is scheduled, when it next runs, and what the last one found. Read-only. |
+| `macup schedule enable [--frequency daily\|weekly] [--time HH:mm] [--weekday <day>] [--no-refresh]` | Installs the launchd user agent that runs a read-only check, and records it in the configuration. |
+| `macup schedule disable` | Removes the agent and clears the setting. |
 | `macup --help`, `macup --version` | Help and version. |
 
 The remaining commands in the CLI contract (`update`, `plan`, `doctor`,
 `history`, `provider enable|disable`, `policy …`) arrive with Phases 2–4
 and are intentionally absent rather than stubbed.
+
+## Scheduled checks
+
+`macup schedule enable` writes `~/Library/LaunchAgents/com.macup.check.plist`
+and loads it with `launchctl bootstrap`. It is a per-user LaunchAgent, not a
+daemon: it runs as you, needs no administrator authorization, and there is no
+background process between runs.
+
+The agent runs exactly one command, which you can read in the property list
+and in `macup schedule status`:
+
+```text
+/path/to/macup check --save-state --refresh
+```
+
+That is the same read-only check as `macup check`. Scheduled *updating* does
+not exist in this version, because MacUp cannot modify a package at all yet.
+
+- The report goes to `~/.local/state/macup/last-check.json`; `macup schedule
+  status` summarises it.
+- Diagnostics go to `~/.local/state/macup/scheduler.log`.
+- `RunAtLoad` is false, so enabling a nightly check does not also run one at
+  every login.
+- launchd runs a missed calendar job once after the Mac wakes, so a machine
+  asleep at the chosen time still checks.
+- `--no-refresh` drops the metadata refresh. Without a refresh, `brew
+  outdated` reads local metadata that may be weeks old, so a scheduled check
+  would report almost nothing. A refresh updates package lists only.
+- Weekly defaults to Sunday when no `--weekday` is given; `macup schedule
+  status` always shows the day it resolved to.
+- `macup schedule disable` unloads the job and deletes the property list.
+  Nothing is left behind.
+
+`macup schedule status` reports rather than repairs. It says when the
+installed agent no longer matches the configuration, when the scheduled
+binary has moved or been deleted, and when launchd does not have the job
+loaded.
 
 ### What `--refresh` does
 
@@ -93,10 +136,10 @@ finish, the output says so and the check exits with status 2.
 | --- | --- |
 | 0 | The command completed. For `check`, every enabled provider was checked or is simply not installed. Updates being available is not an error. |
 | 2 | `check` completed but at least one provider failed or left updates out (listed updates MacUp could not read, or lookups the provider could not finish); results are partial. |
-| 3 | The configuration is invalid. Read-only commands still ran (a file other users could change is ignored, so defaults were used); automatic modifications stay disabled. When `MACUP_CONFIG_DIR`/`MACUP_STATE_DIR` is not absolute, nothing runs. |
+| 3 | The configuration is invalid. Read-only commands still ran (a file other users could change is ignored, so defaults were used); automatic modifications stay disabled. When `MACUP_CONFIG_DIR`/`MACUP_STATE_DIR`/`MACUP_LAUNCH_AGENTS_DIR` is not absolute, nothing runs. |
 | 64 | Invalid command-line usage. |
 | 130 | Interrupted with Ctrl+C. |
-| 1 | Unexpected internal error. |
+| 1 | Unexpected internal error, and `schedule enable`/`disable` failing to install, remove, or record the schedule. |
 
 When several apply, the first in this order wins: 130, 2, 3.
 
@@ -162,3 +205,11 @@ example and fails if the encoding changes.
 - `macup config path --json` → `"kind": "configPaths"`: `configFile`,
   `configDirectory`, `stateDirectory`, and their `…Source` (`standard` or
   `environment`).
+- `macup schedule status --json` → `"kind": "schedule"`:
+  `enabledInConfiguration`, `schedule` (for example `"every day at 23:00"`),
+  `refreshesMetadata`, `label`, `agentPath`, `agentInstalled`, `agentLoaded`
+  (null when MacUp could not ask launchd), `agentMatchesConfiguration` (null
+  when no agent is installed), `command` (the exact command launchd runs),
+  `executablePath`, `executableExists`, `nextRun`, `logPath`, `warnings[]`,
+  and `lastCheck` (`path`, `finishedAt`, `updatesAvailable`,
+  `providersWithErrors`, `unreadable`) when a saved report exists.

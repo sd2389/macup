@@ -29,7 +29,7 @@ public enum ConfigurationValidator {
     static let globalKeys: Set<String> = ["defaultPolicy", "confirmMajorUpdates"]
     static let providerKeys: Set<String> = ["enabled", "policy", "executablePath"]
     static let itemKeys: Set<String> = ["policy"]
-    static let scheduleKeys: Set<String> = ["enabled", "frequency", "time", "weekday"]
+    static let scheduleKeys: Set<String> = ["enabled", "frequency", "time", "weekday", "refresh"]
     static let privacyKeys: Set<String> = ["telemetry"]
 
     /// Executable file names that a configured `executablePath` must end in.

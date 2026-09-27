@@ -56,6 +56,10 @@ jobs:
           "$macup" --version
           "$macup" config path --json
           "$macup" config show
+          # Reporting only: this installs no agent. `schedule enable` is
+          # deliberately never run in CI.
+          "$macup" schedule status
+          "$macup" schedule status --json
 
       # A real, read-only check on the disposable runner. Exit status 2
       # (a provider failed, for example a registry hiccup) is tolerated; the

@@ -16,9 +16,10 @@ struct MacUpCommand: AsyncParsableCommand {
               macup check --json      Machine-readable output for scripts
               macup providers         Which installation of each tool MacUp uses
               macup config            The settings MacUp is using
+              macup schedule          Whether MacUp checks automatically
             """,
         version: MacUp.version,
-        subcommands: [CheckCommand.self, ProviderCommand.self, ConfigCommand.self],
+        subcommands: [CheckCommand.self, ProviderCommand.self, ConfigCommand.self, ScheduleCommand.self],
         defaultSubcommand: CheckCommand.self
     )
 }

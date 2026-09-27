@@ -100,12 +100,24 @@ public struct MacUpConfiguration: Sendable, Hashable, Codable {
         /// Local time as `HH:mm` (24-hour).
         public var time: String
         public var weekday: Weekday?
+        /// Whether a scheduled check refreshes provider metadata first.
+        /// Without it `brew outdated` reads metadata that may be weeks old,
+        /// so a nightly check would report almost nothing. A refresh updates
+        /// package lists only; it never upgrades an installed package.
+        public var refresh: Bool
 
-        public init(enabled: Bool = false, frequency: Frequency = .daily, time: String = "23:00", weekday: Weekday? = nil) {
+        public init(
+            enabled: Bool = false,
+            frequency: Frequency = .daily,
+            time: String = "23:00",
+            weekday: Weekday? = nil,
+            refresh: Bool = true
+        ) {
             self.enabled = enabled
             self.frequency = frequency
             self.time = time
             self.weekday = weekday
+            self.refresh = refresh
         }
 
         public init(from decoder: any Decoder) throws {
@@ -114,7 +126,13 @@ public struct MacUpConfiguration: Sendable, Hashable, Codable {
             frequency = try container.decodeIfPresent(Frequency.self, forKey: .frequency) ?? .daily
             time = try container.decodeIfPresent(String.self, forKey: .time) ?? "23:00"
             weekday = try container.decodeIfPresent(Weekday.self, forKey: .weekday)
+            refresh = try container.decodeIfPresent(Bool.self, forKey: .refresh) ?? true
         }
+
+        /// The day a weekly schedule runs when the configuration does not name
+        /// one. Stated here rather than left implicit, and shown by
+        /// `macup schedule status`.
+        public static let defaultWeekday = Weekday.sunday
     }
 
     public struct PrivacySettings: Sendable, Hashable, Codable {

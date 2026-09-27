@@ -1,4 +1,5 @@
 import ArgumentParser
+import Foundation
 import MacUpCore
 
 struct CheckCommand: AsyncParsableCommand {
@@ -35,6 +36,12 @@ struct CheckCommand: AsyncParsableCommand {
     @Flag(name: .shortAndLong, help: "Show ownership, risk reasons, notes, and every command MacUp ran.")
     var verbose = false
 
+    @Flag(
+        name: .customLong("save-state"),
+        help: "Also write the report to ~/.local/state/macup/last-check.json. This is how a scheduled check leaves its result behind."
+    )
+    var saveState = false
+
     func validate() throws {
         for name in providers where !ProviderID(rawValue: name).isKnown {
             throw ValidationError(
@@ -62,15 +69,31 @@ struct CheckCommand: AsyncParsableCommand {
             await engine.run(configuration: loaded, options: options, environment: environment)
         }
 
-        if json {
-            context.print(try JSONOutput.encode(report))
+        let encoded = (json || saveState) ? try JSONOutput.encode(report) : nil
+        if let encoded, json {
+            context.print(encoded)
         } else {
             let style = TextStyle(enabled: context.allowsStyling, homeDirectory: context.homeDirectory)
             context.print(CheckRenderer(report: report, style: style, verbose: verbose).render())
         }
 
         if report.cancelled { throw MacUpExitCode.cancelled.exitCode }
+
+        // A cancelled run has nothing worth saving; anything else is recorded
+        // even when a provider failed, so a scheduled run leaves evidence.
+        var saveFailed = false
+        if saveState, let encoded {
+            do {
+                try PrivateDirectory(paths.stateDirectory).write(Data(encoded.utf8), named: MacUpPaths.lastCheckFileName)
+            } catch {
+                let message = (error as? MacUpError)?.message ?? "The report could not be saved."
+                context.printError("error: \(TerminalText.sanitize(message))")
+                saveFailed = true
+            }
+        }
+
         if report.hasProviderErrors || report.summary.providersIncomplete > 0 { throw MacUpExitCode.providerErrors.exitCode }
         if !report.configuration.valid { throw MacUpExitCode.configurationInvalid.exitCode }
+        if saveFailed { throw MacUpExitCode.failure.exitCode }
     }
 }

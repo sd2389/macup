@@ -1,5 +1,6 @@
 import ArgumentParser
 import Foundation
+import Testing
 import MacUpCore
 import MacUpTestSupport
 
@@ -31,6 +32,15 @@ final class CLIHarness: @unchecked Sendable {
     let runner = FakeCommandRunner()
     let fileSystem = FakeFileSystem()
     let configDirectory: TemporaryDirectory
+    /// Scheduling writes real files, so it gets real temporary directories.
+    /// `launchctl` is faked, so no test ever installs an agent on the host.
+    let stateDirectory: TemporaryDirectory
+    let launchAgentsDirectory: TemporaryDirectory
+    let binDirectory: TemporaryDirectory
+    let schedulerRunner = FakeCommandRunner()
+    var schedulerFileSystem: any FileSystem = LocalFileSystem()
+    var executablePath: String
+    var userID: uid_t = 501
     var environment: [String: String]
     var homeDirectory = "/Users/example"
     var isTerminal = false
@@ -56,6 +66,10 @@ final class CLIHarness: @unchecked Sendable {
 
     init() throws {
         configDirectory = try TemporaryDirectory(prefix: "macup-cli-config")
+        stateDirectory = try TemporaryDirectory(prefix: "macup-cli-state")
+        launchAgentsDirectory = try TemporaryDirectory(prefix: "macup-cli-agents")
+        binDirectory = try TemporaryDirectory(prefix: "macup-cli-bin")
+        executablePath = try binDirectory.makeScript("macup", "exit 0").path
         environment = [
             "HOME": "/Users/example",
             "PATH": "/opt/homebrew/bin:/usr/bin:/bin",
@@ -85,6 +99,32 @@ final class CLIHarness: @unchecked Sendable {
         runner.register("npm", ["ls", "-g", "--json", "--depth=0"], .success(#"{"name": "lib", "dependencies": {}}"#))
     }
 
+    /// Points MacUp's state and LaunchAgents directories at this harness's
+    /// temporary ones. Opt-in, so tests of the default paths keep seeing them.
+    func useTemporaryDirectories() {
+        environment[MacUpPaths.stateDirectoryVariable] = stateDirectory.path
+        environment[MacUpPaths.launchAgentsDirectoryVariable] = launchAgentsDirectory.path
+    }
+
+    var agentPath: String { launchAgentsDirectory.path + "/" + LaunchAgent.fileName }
+    var serviceTarget: String { "gui/\(userID)/\(LaunchAgent.label)" }
+
+    /// Answers the launchctl calls `macup schedule` makes.
+    func expectLaunchctl(bootstrap: FakeCommandRunner.Response = .success(), loaded: Bool = true) {
+        schedulerRunner.register(path: Scheduler.launchctlPath, ["bootout", serviceTarget], .success())
+        schedulerRunner.register(path: Scheduler.launchctlPath, ["bootstrap", "gui/\(userID)", agentPath], bootstrap)
+        schedulerRunner.register(
+            path: Scheduler.launchctlPath,
+            ["print", serviceTarget],
+            loaded ? .success() : .exit(113, standardError: "Could not find service")
+        )
+    }
+
+    func readConfig() throws -> [String: Any] {
+        let data = try Data(contentsOf: configDirectory.appending("config.json"))
+        return try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    }
+
     func writeConfig(_ json: String) throws {
         try json.write(to: configDirectory.appending("config.json"), atomically: true, encoding: .utf8)
     }
@@ -106,7 +146,11 @@ final class CLIHarness: @unchecked Sendable {
                 homeDirectory: homeDirectory,
                 system: SystemInfo(productVersion: "27.0", buildVersion: "26A428", architecture: "arm64")
             ),
-            handlesInterrupts: false
+            handlesInterrupts: false,
+            executablePath: executablePath,
+            userID: userID,
+            schedulerRunner: schedulerRunner,
+            schedulerFileSystem: schedulerFileSystem
         )
         return try await runCLI(arguments, context: context, stdout: stdout, stderr: stderr)
     }

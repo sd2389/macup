@@ -46,6 +46,14 @@ Translates provider-specific machine state into MacUp models and constructs prov
 ### CommandRunner
 The only normal path for launching external executables.
 
+### Scheduler
+Owns the launchd user agent that runs a scheduled check: building the property
+list, loading and unloading it through `launchctl`, and reporting what is
+actually installed. It is a user agent, never a daemon, and the only command it
+can schedule is `macup check`. The label (`com.macup.check`) and the agent path
+are MacUp's own constants, so no part of the `launchctl` invocation comes from
+user text.
+
 ## Data flow
 
 ### Check

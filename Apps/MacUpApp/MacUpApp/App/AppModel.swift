@@ -71,7 +71,7 @@ final class AppModel {
             // Match the CLI's refusal visibly: say why the default location is in use.
             let message = (error as? MacUpError)?.message ?? "The configuration location could not be resolved."
             pathProblem = ConfigurationIssue(.error, "", message + " MacUp is using the default location instead.")
-            paths = MacUpPaths(configDirectory: home + "/.config/macup", stateDirectory: home + "/.local/state/macup")
+            paths = MacUpPaths.standard(homeDirectory: home)
         }
         var loaded = ConfigurationStore(paths: paths).load()
         if let pathProblem { loaded.issues.insert(pathProblem, at: 0) }
