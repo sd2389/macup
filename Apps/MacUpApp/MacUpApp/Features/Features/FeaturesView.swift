@@ -8,15 +8,19 @@ import SwiftUI
 struct FeaturesView: View {
     @Environment(AppModel.self) private var model
 
+    /// Side by side while the window is wide enough for the text to stay
+    /// readable, one column when it is not.
+    private let columns = [GridItem(.adaptive(minimum: 330, maximum: 460), spacing: 16, alignment: .top)]
+
     var body: some View {
         ScrollView {
-            VStack(spacing: 16) {
+            LazyVGrid(columns: columns, alignment: .leading, spacing: 16) {
                 AutomaticChecksFeature()
                 ApprovalFeature()
                 FaceMatchFeature()
             }
             .padding(20)
-            .frame(maxWidth: 720, alignment: .leading)
+            .frame(maxWidth: 1180, alignment: .leading)
             .frame(maxWidth: .infinity)
         }
         .task {
@@ -42,28 +46,26 @@ private struct FeatureCard<Detail: View>: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .top, spacing: 14) {
-                Image(systemName: symbol)
-                    .font(.system(size: 20))
-                    .foregroundStyle(isOn ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
-                    .frame(width: 26, height: 22)
-                    .accessibilityHidden(true)
-
-                VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 12) {
+                    Image(systemName: symbol)
+                        .font(.system(size: 19))
+                        .foregroundStyle(isOn ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
+                        .frame(width: 24, height: 22)
+                        .accessibilityHidden(true)
                     Text(title).font(.headline)
-                    Text(summary)
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 12)
+                    Toggle(title, isOn: $isOn)
+                        .labelsHidden()
+                        .toggleStyle(.switch)
+                        .disabled(isBusy)
+                        .accessibilityLabel(title)
                 }
-
-                Spacer(minLength: 12)
-
-                Toggle(title, isOn: $isOn)
-                    .labelsHidden()
-                    .toggleStyle(.switch)
-                    .disabled(isBusy)
-                    .accessibilityLabel(title)
+                Text(summary)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
             .padding(16)
 
@@ -82,6 +84,7 @@ private struct FeatureCard<Detail: View>: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 12))
         .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(.separator))
     }
@@ -106,22 +109,34 @@ private struct AutomaticChecksFeature: View {
             state: state
         ) {
             if draft.enabled {
-                HStack(spacing: 20) {
-                    Picker("How often", selection: $draft.frequency) {
-                        Text("Daily").tag(MacUpConfiguration.ScheduleSettings.Frequency.daily)
-                        Text("Weekly").tag(MacUpConfiguration.ScheduleSettings.Frequency.weekly)
-                    }
-                    .fixedSize()
-                    if draft.frequency == .weekly {
-                        Picker("Day", selection: weekday) {
-                            ForEach(MacUpConfiguration.ScheduleSettings.Weekday.allCases, id: \.self) { day in
-                                Text(day.rawValue.capitalizedFirst).tag(day)
-                            }
+                Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 8) {
+                    GridRow {
+                        Text("How often").foregroundStyle(.secondary)
+                        Picker("How often", selection: $draft.frequency) {
+                            Text("Daily").tag(MacUpConfiguration.ScheduleSettings.Frequency.daily)
+                            Text("Weekly").tag(MacUpConfiguration.ScheduleSettings.Frequency.weekly)
                         }
+                        .labelsHidden()
                         .fixedSize()
                     }
-                    DatePicker("Time", selection: time, displayedComponents: .hourAndMinute)
-                        .fixedSize()
+                    if draft.frequency == .weekly {
+                        GridRow {
+                            Text("Day").foregroundStyle(.secondary)
+                            Picker("Day", selection: weekday) {
+                                ForEach(MacUpConfiguration.ScheduleSettings.Weekday.allCases, id: \.self) { day in
+                                    Text(day.rawValue.capitalizedFirst).tag(day)
+                                }
+                            }
+                            .labelsHidden()
+                            .fixedSize()
+                        }
+                    }
+                    GridRow {
+                        Text("Time").foregroundStyle(.secondary)
+                        DatePicker("Time", selection: time, displayedComponents: .hourAndMinute)
+                            .labelsHidden()
+                            .fixedSize()
+                    }
                 }
                 if hasUnsavedChanges {
                     Button("Apply Changes") { Task { await model.applySchedule(draft) } }
