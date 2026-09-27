@@ -9,12 +9,16 @@ struct FeaturesView: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
-        Form {
-            AutomaticChecksFeature()
-            ApprovalFeature()
-            FaceMatchFeature()
+        ScrollView {
+            VStack(spacing: 16) {
+                AutomaticChecksFeature()
+                ApprovalFeature()
+                FaceMatchFeature()
+            }
+            .padding(20)
+            .frame(maxWidth: 720, alignment: .leading)
+            .frame(maxWidth: .infinity)
         }
-        .formStyle(.grouped)
         .task {
             model.loadConfiguration()
             model.loadFaceEnrollment()
@@ -23,8 +27,12 @@ struct FeaturesView: View {
     }
 }
 
-/// A feature row: what it is, whether it is on, and what it is doing.
-private struct FeatureRow<Detail: View>: View {
+/// One feature: what it is, a switch, and its settings once it is on.
+///
+/// A card rather than a form section, so the description sits with the thing
+/// it describes and the settings are visibly part of the same feature.
+private struct FeatureCard<Detail: View>: View {
+    let symbol: String
     let title: String
     let summary: String
     @Binding var isOn: Bool
@@ -33,21 +41,52 @@ private struct FeatureRow<Detail: View>: View {
     @ViewBuilder var detail: Detail
 
     var body: some View {
-        Section {
-            Toggle(isOn: $isOn) {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(title).font(.headline)
-                    Text(summary).font(.callout).foregroundStyle(.secondary)
-                }
-            }
-            .disabled(isBusy)
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .top, spacing: 14) {
+                Image(systemName: symbol)
+                    .font(.system(size: 20))
+                    .foregroundStyle(isOn ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
+                    .frame(width: 26, height: 22)
+                    .accessibilityHidden(true)
 
-            if let state {
-                Text(state).font(.callout).foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title).font(.headline)
+                    Text(summary)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer(minLength: 12)
+
+                Toggle(title, isOn: $isOn)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .disabled(isBusy)
+                    .accessibilityLabel(title)
             }
-            detail
+            .padding(16)
+
+            if state != nil || hasDetail {
+                Divider()
+                VStack(alignment: .leading, spacing: 12) {
+                    if let state {
+                        Text(state)
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    detail
+                }
+                .padding(16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
         }
+        .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(.separator))
     }
+
+    private var hasDetail: Bool { !(Detail.self == EmptyView.self) }
 }
 
 // MARK: - Automatic checks
@@ -58,7 +97,8 @@ private struct AutomaticChecksFeature: View {
     @State private var loaded = false
 
     var body: some View {
-        FeatureRow(
+        FeatureCard(
+            symbol: "clock",
             title: "Check automatically",
             summary: "Look for updates on a schedule. The check only reports; it never installs anything.",
             isOn: enabled,
@@ -66,18 +106,23 @@ private struct AutomaticChecksFeature: View {
             state: state
         ) {
             if draft.enabled {
-                Picker("How often", selection: $draft.frequency) {
-                    Text("Daily").tag(MacUpConfiguration.ScheduleSettings.Frequency.daily)
-                    Text("Weekly").tag(MacUpConfiguration.ScheduleSettings.Frequency.weekly)
-                }
-                if draft.frequency == .weekly {
-                    Picker("Day", selection: weekday) {
-                        ForEach(MacUpConfiguration.ScheduleSettings.Weekday.allCases, id: \.self) { day in
-                            Text(day.rawValue.capitalizedFirst).tag(day)
-                        }
+                HStack(spacing: 20) {
+                    Picker("How often", selection: $draft.frequency) {
+                        Text("Daily").tag(MacUpConfiguration.ScheduleSettings.Frequency.daily)
+                        Text("Weekly").tag(MacUpConfiguration.ScheduleSettings.Frequency.weekly)
                     }
+                    .fixedSize()
+                    if draft.frequency == .weekly {
+                        Picker("Day", selection: weekday) {
+                            ForEach(MacUpConfiguration.ScheduleSettings.Weekday.allCases, id: \.self) { day in
+                                Text(day.rawValue.capitalizedFirst).tag(day)
+                            }
+                        }
+                        .fixedSize()
+                    }
+                    DatePicker("Time", selection: time, displayedComponents: .hourAndMinute)
+                        .fixedSize()
                 }
-                DatePicker("Time", selection: time, displayedComponents: .hourAndMinute)
                 if hasUnsavedChanges {
                     Button("Apply Changes") { Task { await model.applySchedule(draft) } }
                         .disabled(model.isChangingSchedule)
@@ -151,7 +196,8 @@ private struct ApprovalFeature: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
-        FeatureRow(
+        FeatureCard(
+            symbol: "lock.shield",
             title: "Ask before changing anything",
             summary: "macOS asks you to confirm before MacUp changes a setting. It never sees your fingerprint or your password.",
             isOn: enabled,
@@ -185,7 +231,8 @@ private struct FaceMatchFeature: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
-        FeatureRow(
+        FeatureCard(
+            symbol: "faceid",
             title: "Face match",
             summary: "Use the camera to approve a change instead of Touch ID. A photograph of you passes it, so it is a shortcut, not a lock.",
             isOn: enabled,
