@@ -118,6 +118,16 @@ still does: it is Phase 6, unchanged.
       refused times, install/remove/status through a fake `launchctl`, and
       the CLI end to end. No test installs an agent on the host.
 
+- [x] The app has the same feature (CLAUDE.md §26 rule 13): Settings →
+      Scheduling with switch, frequency, day, time, and refresh; the exact
+      command shown before installing; warnings from `ScheduleStatus`;
+      next-check lines on the Dashboard and in the menu bar
+- [x] `MacUp.app` bundles the CLI at `Contents/Helpers/macup` and schedules
+      that copy, so app and scheduled CLI cannot be different versions
+- [ ] App view-model tests — the app still has no test target. `Scheduler`
+      and `LaunchAgent` are fully covered; the app layer is verified by
+      rendering its own windows (`MacUp --snapshot-dir`).
+
 ### Verification (scheduling)
 
 - `scripts/test.sh`: 248 tests, all passing.
@@ -126,6 +136,9 @@ still does: it is Phase 6, unchanged.
 - Manual, read-only on the development Mac: `macup schedule`,
   `macup schedule status --json`, `macup schedule enable --help`. No agent
   was installed and `macup schedule enable` was not run.
+- The app's Settings pane was rendered in both states (schedule off, and a
+  weekly schedule read from a temporary configuration directory) with
+  `MacUp --snapshot-dir`. Nothing was installed.
 
 ### Carried into later phases
 

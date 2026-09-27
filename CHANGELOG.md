@@ -14,6 +14,14 @@ MacUp follows Semantic Versioning once releases begin.
   leaves no process running between checks, and `disable` removes it
   completely. There is no scheduled updating: this version still cannot
   modify a package.
+- The app schedules checks too: **Settings → Scheduling** has the switch,
+  frequency, day, time, and metadata-refresh controls, shows the exact command
+  it will install before turning it on, and reports what is really scheduled
+  rather than what the configuration asks for. The Dashboard and the menu bar
+  show the next check when one is actually loaded.
+- `MacUp.app` now bundles the `macup` CLI at `Contents/Helpers/macup` and
+  schedules that copy, so a scheduled check can never be a different version
+  of MacUp than the app that scheduled it.
 - `macup check --save-state` writes the report to
   `~/.local/state/macup/last-check.json`, which `macup schedule status`
   summarises.

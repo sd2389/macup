@@ -21,6 +21,13 @@ final class AppModel {
     /// Why the login-shell environment could not be read, if it could not.
     private(set) var environmentProblem: String?
 
+    /// What is actually scheduled, as opposed to what the configuration asks
+    /// for. Read from launchd and the installed agent.
+    private(set) var scheduleStatus: ScheduleStatus?
+    private(set) var isChangingSchedule = false
+    /// Why the last scheduling change did not happen, if it did not.
+    private(set) var scheduleProblem: String?
+
     private var environment: [String: String]?
     private let home = FileManager.default.homeDirectoryForCurrentUser.path
 
@@ -58,6 +65,94 @@ final class AppModel {
                 system: .current()
             )
         )
+    }
+
+    // MARK: - Scheduling
+
+    var scheduleSettings: MacUpConfiguration.ScheduleSettings {
+        configuration?.configuration.schedule ?? MacUpConfiguration.ScheduleSettings()
+    }
+
+    /// Asks launchd and the file system what is scheduled. Changes nothing.
+    func refreshScheduleStatus() async {
+        let loaded = configuration ?? loadConfiguration()
+        guard let paths = try? resolvedPaths(), let executable = scheduledExecutable() else {
+            scheduleStatus = nil
+            return
+        }
+        scheduleStatus = await scheduler(paths: paths, executable: executable).status(loaded.configuration.schedule)
+    }
+
+    /// Installs or removes the scheduled check and records it in the
+    /// configuration. The same rules as the CLI: MacUp will not write a
+    /// configuration it could not read, and will not schedule a command it
+    /// cannot name.
+    func applySchedule(_ settings: MacUpConfiguration.ScheduleSettings) async {
+        guard !isChangingSchedule else { return }
+        isChangingSchedule = true
+        defer { isChangingSchedule = false }
+        scheduleProblem = nil
+
+        let loaded = loadConfiguration()
+        guard !loaded.hasErrors else {
+            scheduleProblem = "MacUp will not change a configuration it cannot read. Fix the errors above first."
+            return
+        }
+        guard let paths = try? resolvedPaths() else {
+            scheduleProblem = "MacUp could not resolve where its files live, so it changed nothing."
+            return
+        }
+        guard let executable = scheduledExecutable() else {
+            scheduleProblem = "MacUp could not find the macup command to schedule. Install the command-line tool, then try again."
+            return
+        }
+
+        let scheduler = scheduler(paths: paths, executable: executable)
+        do {
+            if settings.enabled {
+                _ = try await scheduler.install(settings)
+            } else {
+                _ = try await scheduler.remove()
+            }
+            var configuration = loaded.configuration
+            configuration.schedule = settings
+            try ConfigurationStore(paths: paths).save(configuration)
+            self.configuration = loadConfiguration()
+        } catch let error as MacUpError {
+            scheduleProblem = error.message
+        } catch {
+            scheduleProblem = "The schedule could not be changed."
+        }
+        await refreshScheduleStatus()
+    }
+
+    /// The `macup` command a scheduled check runs. The copy inside the app
+    /// bundle comes first: it is always present and always the same version as
+    /// the app, so a schedule cannot end up running an older CLI. Otherwise
+    /// MacUp looks for an installed `macup` on the user's search path.
+    func scheduledExecutable() -> String? {
+        let bundled = Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/macup").path
+        if FileManager.default.isExecutableFile(atPath: bundled) { return bundled }
+        let path = environment?["PATH"] ?? ProcessInfo.processInfo.environment["PATH"]
+        let search = ExecutableSearch(name: "macup", searchPath: SearchPath.parse(path))
+        if case .found(let resolved) = ExecutableResolver(fileSystem: LocalFileSystem()).resolve(search) {
+            return resolved.path
+        }
+        return nil
+    }
+
+    private func scheduler(paths: MacUpPaths, executable: String) -> Scheduler {
+        Scheduler(
+            paths: paths,
+            executable: executable,
+            fileSystem: LocalFileSystem(),
+            runner: ProcessCommandRunner(),
+            processEnvironment: environment ?? ProcessInfo.processInfo.environment
+        )
+    }
+
+    private func resolvedPaths() throws -> MacUpPaths {
+        try MacUpPaths.resolve(homeDirectory: home, environment: ProcessInfo.processInfo.environment)
     }
 
     /// Reads the configuration file. Reading never creates or changes it.

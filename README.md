@@ -78,6 +78,11 @@ and no administrator authorization. The scheduled run is the same read-only
 check, so it still changes nothing; scheduled *updating* does not exist yet.
 Results land in `~/.local/state/macup/last-check.json`.
 
+The app has the same control under **Settings → Scheduling**: a switch, how
+often, the day and time, and whether to refresh package lists first. It shows
+the exact command it will schedule before you turn it on, and the Dashboard
+and menu bar show when the next check is due.
+
 Example output (illustrative):
 
 ```text

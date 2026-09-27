@@ -1010,13 +1010,17 @@ When implementing:
 10. It is acceptable to run read-only detection commands.
 11. Never execute `brew upgrade`, `npm update -g`, `mise upgrade`, `softwareupdate --install`, cleanup/prune/uninstall commands during automated development/testing on the owner's machine.
 12. Do not push/merge/release without the owner's explicit instruction.
-13. Before each phase, write/update a short implementation checklist.
-14. At the end of each phase, run tests and report:
+13. Every user-facing feature ships in **both** surfaces in the same piece of
+   work: the `macup` CLI and the SwiftUI app. A feature that exists only in
+   the CLI is not done. The app needs a real control, not a label showing a
+   value it cannot change. Both surfaces use `MacUpCore` only.
+14. Before each phase, write/update a short implementation checklist.
+15. At the end of each phase, run tests and report:
    - files changed
    - tests
    - remaining risks
    - manual verification steps
-15. If a trust/security requirement conflicts with convenience, trust/security wins.
+16. If a trust/security requirement conflicts with convenience, trust/security wins.
 
 ## 27. Initial implementation request
 

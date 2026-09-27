@@ -13,6 +13,10 @@ struct DashboardView: View {
                             .font(.largeTitle.weight(.semibold))
                         Text(statusLine(report))
                             .foregroundStyle(.secondary)
+                        if let next = scheduledNext {
+                            Text("Next automatic check \(next.formatted(date: .abbreviated, time: .shortened)).")
+                                .foregroundStyle(.secondary)
+                        }
                         if report.summary.updatesAvailable > 0 {
                             Button("Review Updates") { model.section = .updates }
                                 .buttonStyle(.borderedProminent)
@@ -39,6 +43,7 @@ struct DashboardView: View {
                 }
             }
             .formStyle(.grouped)
+            .task { await model.refreshScheduleStatus() }
         } else if model.isChecking {
             ProgressView("Checking your Mac…")
         } else {
@@ -50,6 +55,14 @@ struct DashboardView: View {
                 Button("Check Now") { Task { await model.checkNow() } }
             }
         }
+    }
+
+    /// When the next scheduled check will actually happen. Nil unless one is
+    /// installed and loaded, so the dashboard never promises a check that is
+    /// only configured.
+    private var scheduledNext: Date? {
+        guard let status = model.scheduleStatus, status.isActive else { return nil }
+        return status.nextRun
     }
 
     private func statusLine(_ report: CheckReport) -> String {

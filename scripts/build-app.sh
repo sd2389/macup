@@ -9,12 +9,17 @@ cd "$(dirname "$0")/.."
 
 configuration="${1:-release}"
 swift build -c "$configuration" --product MacUpApp --force-resolved-versions
+# The app schedules this copy of the CLI, so the two can never be different
+# versions of MacUp.
+swift build -c "$configuration" --product macup --force-resolved-versions
 binary="$(swift build -c "$configuration" --show-bin-path)/MacUpApp"
+cli="$(swift build -c "$configuration" --show-bin-path)/macup"
 
 app="build/MacUp.app"
 rm -rf "$app"
-mkdir -p "$app/Contents/MacOS"
+mkdir -p "$app/Contents/MacOS" "$app/Contents/Helpers"
 cp "$binary" "$app/Contents/MacOS/MacUp"
+cp "$cli" "$app/Contents/Helpers/macup"
 cp Apps/MacUpApp/MacUpApp/Resources/Info.plist "$app/Contents/Info.plist"
 codesign --force --sign - "$app"
 echo "$app"

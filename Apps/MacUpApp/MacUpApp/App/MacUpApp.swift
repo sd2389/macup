@@ -112,6 +112,11 @@ struct MenuBarContent: View {
         if let report = model.report {
             Text("Last checked at \(report.finishedAt.formatted(date: .omitted, time: .shortened))")
         }
+        // Only when a check will really happen: an agent that is installed and
+        // loaded, not merely a schedule written in the configuration.
+        if let status = model.scheduleStatus, status.isActive, let next = status.nextRun {
+            Text("Next check \(next.formatted(date: .abbreviated, time: .shortened))")
+        }
         Divider()
         Button("Review Updates…") { show(.updates) }
             .disabled(model.updateCount == 0)
