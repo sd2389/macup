@@ -1,3 +1,4 @@
+import AVFoundation
 import Foundation
 import MacUpCore
 import Observation
@@ -94,6 +95,11 @@ final class AppModel {
     private(set) var securityProblem: String?
     private(set) var faceEnrollment: FaceEnrollment?
     private(set) var isEnrollingFace = false
+    /// The live camera session while enrolling, so the reader can see what
+    /// the camera sees rather than watch a spinner.
+    private(set) var faceCaptureSession: AVCaptureSession?
+    /// What enrolment is doing right now, in words.
+    private(set) var faceStage: String?
     /// What enrolling or reading the enrolment went wrong with, if anything.
     private(set) var faceProblem: String?
 
@@ -151,8 +157,22 @@ final class AppModel {
             store: FaceEnrollmentStore(paths: paths),
             comparator: FaceComparator(threshold: Float(loaded.configuration.security.faceMatchThreshold))
         )
+        defer {
+            service.camera.end()
+            faceCaptureSession = nil
+            faceStage = nil
+        }
         do {
-            faceEnrollment = try await service.enroll()
+            faceStage = "Opening the camera"
+            try await service.camera.begin()
+            faceCaptureSession = service.camera.captureSession
+            // A moment to be in frame before the samples are taken, so the
+            // first picture is not of someone still reaching for the mouse.
+            faceStage = "Look at the camera"
+            try? await Task.sleep(for: .milliseconds(1400))
+            faceStage = "Taking pictures"
+            faceEnrollment = try await service.enroll(cameraIsOpen: true)
+
             var configuration = loaded.configuration
             configuration.security.faceUnlock = true
             try ConfigurationStore(paths: paths).save(configuration)

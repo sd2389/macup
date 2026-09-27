@@ -28,6 +28,9 @@ struct FeaturesView: View {
             model.loadFaceEnrollment()
             await model.refreshScheduleStatus()
         }
+        .sheet(isPresented: .constant(model.isEnrollingFace)) {
+            FaceEnrollmentSheet()
+        }
     }
 }
 
@@ -261,10 +264,6 @@ private struct FaceMatchFeature: View {
                 .disabled(!model.cameraPresent || model.isEnrollingFace)
                 Button("Forget Face") { model.forgetFace() }
                     .disabled(model.faceEnrollment == nil || model.isEnrollingFace)
-                if model.isEnrollingFace {
-                    ProgressView().controlSize(.small)
-                    Text("Look at the camera…").font(.caption).foregroundStyle(.secondary)
-                }
             }
             if let spread = model.faceEnrollment?.sampleSpread, Double(spread) >= model.securitySettings.faceMatchThreshold {
                 Label(

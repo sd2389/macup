@@ -78,21 +78,54 @@ extension CGRect {
     var area: CGFloat { width * height }
 }
 
-/// Takes a few still pictures from the camera and stops.
+/// Runs the camera for as long as a capture needs it, and no longer.
 ///
-/// The camera is opened for the moment it takes to capture, then closed. The
-/// recording light is on while it is open, which is the honest signal that
-/// MacUp is looking.
-public actor FaceCamera {
-    public enum Failure: Sendable {
-        case noCamera
-        case accessDenied
-        case timedOut
-    }
+/// The session is held rather than rebuilt per frame so the UI can show a
+/// preview of the same session: someone being asked to look at a camera
+/// should be able to see what it sees.
+public final class FaceCamera: @unchecked Sendable {
+    private let lock = NSLock()
+    private var session: FaceCameraSession?
 
     public init() {}
 
-    /// Asks macOS for camera access if it has not been decided yet.
+    public static var accessGranted: Bool {
+        AVCaptureDevice.authorizationStatus(for: .video) == .authorized
+    }
+
+    public static var hasCamera: Bool {
+        preferredDevice() != nil
+    }
+
+    /// The camera MacUp will use, named as macOS names it.
+    public static var cameraName: String? {
+        preferredDevice()?.localizedName
+    }
+
+    /// Which camera to open.
+    ///
+    /// `AVCaptureDevice.default(for:)` can return an iPhone acting as a
+    /// Continuity Camera. macOS offers that device even when the phone is not
+    /// nearby or not awake, and the session then starts and sends nothing at
+    /// all. So a camera attached to this Mac is preferred, and Continuity is
+    /// used only when there is no other.
+    public static func preferredDevice() -> AVCaptureDevice? {
+        let discovery = AVCaptureDevice.DiscoverySession(
+            deviceTypes: [.builtInWideAngleCamera, .external, .continuityCamera],
+            mediaType: .video,
+            position: .unspecified
+        )
+        let devices = discovery.devices
+        return devices.first { !$0.isContinuityCamera }
+            ?? devices.first
+            ?? AVCaptureDevice.default(for: .video)
+    }
+
+    /// The running session, for a preview layer. `nil` before ``begin()``.
+    public var captureSession: AVCaptureSession? {
+        lock.withLock { session?.session }
+    }
+
     public func requestAccess() async -> Bool {
         switch AVCaptureDevice.authorizationStatus(for: .video) {
         case .authorized: return true
@@ -101,18 +134,15 @@ public actor FaceCamera {
         }
     }
 
-    public static var accessGranted: Bool {
-        AVCaptureDevice.authorizationStatus(for: .video) == .authorized
-    }
-
-    public static var hasCamera: Bool {
-        AVCaptureDevice.default(for: .video) != nil
-    }
-
-    /// Captures `count` frames, spaced out so they are not the same instant.
-    public func capture(count: Int, spacing: Duration = .milliseconds(350)) async throws -> [CGImage] {
-        guard AVCaptureDevice.default(for: .video) != nil else {
-            throw MacUpError(.providerUnavailable, "This Mac has no camera MacUp can use.")
+    /// Opens the camera and waits until it is actually running. Throws rather
+    /// than leaving a caller to time out on a session that never started.
+    public func begin() async throws {
+        guard Self.preferredDevice() != nil else {
+            throw MacUpError(
+                .providerUnavailable,
+                "This Mac has no camera MacUp can use.",
+                recoverySuggestion: "A Mac with no built-in camera needs one connected before a face can be enrolled."
+            )
         }
         guard await requestAccess() else {
             throw MacUpError(
@@ -122,14 +152,40 @@ public actor FaceCamera {
             )
         }
         let session = try FaceCameraSession()
-        defer { session.stop() }
-        session.start()
+        lock.withLock { self.session = session }
+        try await session.start()
+    }
 
+    public func end() {
+        let session = lock.withLock {
+            let current = self.session
+            self.session = nil
+            return current
+        }
+        session?.stop()
+    }
+
+    /// Captures `count` frames, spaced out so they are not the same instant.
+    /// ``begin()`` must have been called.
+    public func capture(count: Int, spacing: Duration = .milliseconds(300)) async throws -> [CGImage] {
+        guard let session = lock.withLock({ self.session }) else {
+            throw MacUpError(.verificationFailed, "The camera was not open.")
+        }
         var frames: [CGImage] = []
-        let deadline = ContinuousClock.now.advanced(by: .seconds(15))
+        // Generous, because the first frame after a cold start can take a
+        // moment, and a camera that is going to work usually works at once.
+        let deadline = ContinuousClock.now.advanced(by: .seconds(20))
         while frames.count < count {
             if ContinuousClock.now > deadline {
-                throw MacUpError(.timeout, "The camera did not produce a usable picture in time.")
+                throw MacUpError(
+                    .timeout,
+                    frames.isEmpty
+                        ? "The camera is open but sent MacUp no pictures."
+                        : "The camera sent only \(frames.count) of \(count) pictures in time.",
+                    recoverySuggestion: frames.isEmpty
+                        ? "If another app is using the camera, or the default camera is an iPhone that is not nearby, close or disconnect it and try again."
+                        : "Try again in better light."
+                )
             }
             try await Task.sleep(for: spacing)
             if let frame = session.latestFrame() { frames.append(frame) }
@@ -140,7 +196,7 @@ public actor FaceCamera {
 
 /// The AVFoundation plumbing, kept apart from the policy above.
 final class FaceCameraSession: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate, @unchecked Sendable {
-    private let session = AVCaptureSession()
+    let session = AVCaptureSession()
     private let output = AVCaptureVideoDataOutput()
     private let queue = DispatchQueue(label: "dev.macup.face-camera")
     private let lock = NSLock()
@@ -151,7 +207,7 @@ final class FaceCameraSession: NSObject, AVCaptureVideoDataOutputSampleBufferDel
         super.init()
     }
 
-    convenience init(device: AVCaptureDevice? = AVCaptureDevice.default(for: .video)) throws {
+    convenience init(device: AVCaptureDevice? = FaceCamera.preferredDevice()) throws {
         self.init()
         guard let device, let input = try? AVCaptureDeviceInput(device: device), session.canAddInput(input) else {
             throw MacUpError(.providerUnavailable, "MacUp could not open the camera.")
@@ -160,6 +216,9 @@ final class FaceCameraSession: NSObject, AVCaptureVideoDataOutputSampleBufferDel
         session.sessionPreset = .high
         session.addInput(input)
         output.alwaysDiscardsLateVideoFrames = true
+        // Ask for a pixel format Core Image reads directly, rather than
+        // whatever the device would otherwise hand over.
+        output.videoSettings = [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA]
         output.setSampleBufferDelegate(self, queue: queue)
         guard session.canAddOutput(output) else {
             session.commitConfiguration()
@@ -169,14 +228,29 @@ final class FaceCameraSession: NSObject, AVCaptureVideoDataOutputSampleBufferDel
         session.commitConfiguration()
     }
 
-    func start() {
+    /// Starts the session and returns once it is running, so a caller never
+    /// waits for frames from a session that failed to start.
+    func start() async throws {
         let session = session
-        queue.async { session.startRunning() }
+        await withCheckedContinuation { continuation in
+            queue.async {
+                session.startRunning()
+                continuation.resume()
+            }
+        }
+        guard session.isRunning else {
+            throw MacUpError(
+                .providerUnavailable,
+                "The camera did not start.",
+                recoverySuggestion: "Another app may be using it. Close it and try again."
+            )
+        }
     }
 
     func stop() {
-        session.stopRunning()
         output.setSampleBufferDelegate(nil, queue: nil)
+        let session = session
+        queue.async { session.stopRunning() }
     }
 
     func latestFrame() -> CGImage? {
@@ -231,7 +305,11 @@ public struct FaceUnlockService: Sendable {
     /// face varied between samples. A spread at or above the threshold means
     /// matching will not work reliably, and the caller is expected to say so.
     @discardableResult
-    public func enroll(samples: Int = 5) async throws -> FaceEnrollment {
+    public func enroll(samples: Int = 5, cameraIsOpen: Bool = false) async throws -> FaceEnrollment {
+        if !cameraIsOpen {
+            try await camera.begin()
+        }
+        defer { if !cameraIsOpen { camera.end() } }
         let frames = try await camera.capture(count: max(samples, FaceEnrollment.minimumSamples))
         var signatures: [FaceSignature] = []
         for frame in frames {
@@ -266,6 +344,8 @@ public struct FaceUnlockService: Sendable {
 
         let frames: [CGImage]
         do {
+            try await camera.begin()
+            defer { camera.end() }
             frames = try await camera.capture(count: 2, spacing: .milliseconds(250))
         } catch let error as MacUpError {
             return .unavailable(error.message)

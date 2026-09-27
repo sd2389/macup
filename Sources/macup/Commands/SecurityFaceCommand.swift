@@ -61,7 +61,8 @@ struct FaceStatusCommand: AsyncParsableCommand {
         } else {
             let style = TextStyle(enabled: context.allowsStyling, homeDirectory: context.homeDirectory)
             var lines = [style.bold("Face match") + " · " + document.state]
-            lines.append("  Camera: " + (document.cameraPresent ? (document.cameraAllowed ? "allowed" : "found, but MacUp has no permission yet") : "none found"))
+            let camera = document.cameraName.map { TerminalText.sanitize($0) } ?? "none found"
+            lines.append("  Camera: " + (document.cameraPresent ? camera + (document.cameraAllowed ? "" : " (MacUp has no permission yet)") : "none found"))
             if let enrollment {
                 lines.append("  Enrolled: \(enrollment.signatures.count) samples on \(enrollment.createdAt.formatted(date: .abbreviated, time: .shortened))")
                 lines.append("  Stored: " + style.path(store.path))
@@ -205,6 +206,7 @@ struct FaceDocument: Encodable {
     let threshold: Double
     let cameraPresent: Bool
     let cameraAllowed: Bool
+    let cameraName: String?
     let storedAt: String
     let problem: String?
 
@@ -224,6 +226,7 @@ struct FaceDocument: Encodable {
         threshold = settings.faceMatchThreshold
         self.cameraPresent = cameraPresent
         self.cameraAllowed = cameraAllowed
+        cameraName = FaceCamera.cameraName
         storedAt = path
         self.problem = problem
     }
