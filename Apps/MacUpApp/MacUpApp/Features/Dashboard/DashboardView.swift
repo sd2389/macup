@@ -8,28 +8,64 @@ struct DashboardView: View {
         if let report = model.report {
             Form {
                 Section {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(model.status.headline)
-                            .font(.largeTitle.weight(.semibold))
-                        Text(statusLine(report))
-                            .foregroundStyle(.secondary)
-                        if let next = scheduledNext {
-                            Text("Next automatic check \(next.formatted(date: .abbreviated, time: .shortened)).")
+                    HStack(alignment: .top, spacing: 16) {
+                        Image(systemName: model.status.symbolName)
+                            .font(.system(size: 30, weight: .regular))
+                            .foregroundStyle(statusTint)
+                            .frame(width: 38)
+                            .accessibilityHidden(true)
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(model.status.headline)
+                                .font(.largeTitle.weight(.semibold))
+                            Text(statusLine(report))
                                 .foregroundStyle(.secondary)
-                        }
-                        if report.summary.updatesAvailable > 0 {
-                            Button("Review Updates") { model.section = .updates }
-                                .buttonStyle(.borderedProminent)
-                                .controlSize(.large)
-                                .padding(.top, 10)
+                            if report.summary.updatesAvailable > 0 {
+                                Button("Review Updates") { model.section = .updates }
+                                    .buttonStyle(.borderedProminent)
+                                    .controlSize(.large)
+                                    .padding(.top, 10)
+                            }
                         }
                     }
                     .padding(.vertical, 10)
                 }
 
+                // Only what MacUp actually knows. No score, no percentage.
+                Section {
+                    HStack(alignment: .top, spacing: 0) {
+                        ForEach(facts(report), id: \.label) { fact in
+                            if fact.label != facts(report).first?.label { Divider().frame(height: 34) }
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(fact.value)
+                                    .font(.title3.weight(.medium))
+                                    .monospacedDigit()
+                                Text(fact.label)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.leading, fact.label == facts(report).first?.label ? 0 : 16)
+                            .accessibilityElement(children: .combine)
+                            .accessibilityLabel("\(fact.label): \(fact.value)")
+                        }
+                    }
+                    .padding(.vertical, 4)
+                }
+
                 Section("Providers") {
                     ForEach(report.providers, id: \.provider) { provider in
-                        ProviderRow(provider: provider, updateCount: report.updates(for: provider.provider).count)
+                        let updates = report.updates(for: provider.provider)
+                        Button {
+                            // Take the reader to what this row is about,
+                            // rather than to the top of a list they then
+                            // have to search.
+                            model.selectedUpdate = updates.first?.id ?? model.selectedUpdate
+                            model.section = .updates
+                        } label: {
+                            ProviderRow(provider: provider, updates: updates)
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(updates.isEmpty)
                     }
                 }
 
@@ -65,6 +101,43 @@ struct DashboardView: View {
         return status.nextRun
     }
 
+    private var statusTint: Color {
+        switch model.status {
+        case .upToDate: return .green
+        case .updatesAvailable: return .accentColor
+        case .incomplete: return .orange
+        case .notChecked, .checking: return .secondary
+        }
+    }
+
+    private struct Fact: Hashable {
+        let label: String
+        let value: String
+    }
+
+    /// The glanceable numbers from CLAUDE.md §13, and nothing invented.
+    /// A figure is shown only when MacUp has it.
+    private func facts(_ report: CheckReport) -> [Fact] {
+        var facts = [
+            Fact(label: "Updates", value: "\(report.summary.updatesAvailable)"),
+            Fact(
+                label: "Providers checked",
+                value: "\(report.summary.providersChecked) of \(report.providers.count)"
+            ),
+        ]
+        if report.pinnedCount > 0 {
+            facts.append(Fact(label: "Pinned by provider", value: "\(report.pinnedCount)"))
+        }
+        facts.append(Fact(
+            label: "Last check",
+            value: report.finishedAt.formatted(date: .omitted, time: .shortened)
+        ))
+        if let next = scheduledNext {
+            facts.append(Fact(label: "Next check", value: next.formatted(date: .abbreviated, time: .shortened)))
+        }
+        return facts
+    }
+
     private func statusLine(_ report: CheckReport) -> String {
         var parts = ["Checked at \(report.finishedAt.formatted(date: .omitted, time: .shortened)). Nothing was changed."]
         switch report.pinnedCount {
@@ -96,7 +169,10 @@ struct DashboardView: View {
 
 private struct ProviderRow: View {
     let provider: ProviderReport
-    let updateCount: Int
+    let updates: [UpdateCandidate]
+
+    private var updateCount: Int { updates.count }
+    private var highRiskCount: Int { updates.filter { $0.risk.level == .high }.count }
 
     var body: some View {
         HStack(spacing: 12) {
@@ -114,9 +190,23 @@ private struct ProviderRow: View {
                     .truncationMode(.middle)
             }
             Spacer()
-            Text(status)
-                .foregroundStyle(provider.hasErrors ? AnyShapeStyle(.red) : AnyShapeStyle(.secondary))
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(status)
+                    .foregroundStyle(provider.hasErrors ? AnyShapeStyle(.red) : AnyShapeStyle(.secondary))
+                if highRiskCount > 0 {
+                    Text(highRiskCount == 1 ? "1 high risk" : "\(highRiskCount) high risk")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            if !updates.isEmpty {
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+                    .accessibilityHidden(true)
+            }
         }
+        .contentShape(Rectangle())
         .padding(.vertical, 2)
     }
 

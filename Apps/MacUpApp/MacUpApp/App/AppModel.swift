@@ -14,6 +14,9 @@ final class AppModel {
     }
 
     var section: Section? = .dashboard
+    /// Which update the Updates screen has selected. On the model so the
+    /// dashboard can open a provider's first update directly.
+    var selectedUpdate: PackageID?
     private(set) var report: CheckReport?
     private(set) var configuration: LoadedConfiguration?
     private(set) var isChecking = false

@@ -3,15 +3,15 @@ import SwiftUI
 
 struct UpdatesView: View {
     @Environment(AppModel.self) private var model
-    @State private var selection: PackageID?
     @State private var showsInspector = true
 
     var body: some View {
+        @Bindable var model = model
         let report = model.report
         let updates = report?.updates ?? []
         Group {
             if let report, !updates.isEmpty {
-                List(selection: $selection) {
+                List(selection: $model.selectedUpdate) {
                     if !model.status.reasons.isEmpty {
                         Section {
                             ForEach(model.status.reasons, id: \.self) { reason in
@@ -29,7 +29,7 @@ struct UpdatesView: View {
                         }
                     }
                 }
-                .onAppear { if selection == nil { selection = updates.first?.id } }
+                .onAppear { if model.selectedUpdate == nil { model.selectedUpdate = updates.first?.id } }
             } else if report != nil, !model.status.reasons.isEmpty {
                 ContentUnavailableView(
                     "Check Incomplete",
@@ -46,7 +46,7 @@ struct UpdatesView: View {
         }
         .inspector(isPresented: $showsInspector) {
             Group {
-                if let update = updates.first(where: { $0.id == selection }) {
+                if let update = updates.first(where: { $0.id == model.selectedUpdate }) {
                     UpdateDetail(update: update)
                 } else {
                     ContentUnavailableView("No Selection", systemImage: "sidebar.trailing", description: Text("Select an update to see its details."))
