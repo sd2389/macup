@@ -268,6 +268,19 @@ struct ProviderAndConfigCommandTests {
         #expect(object["automaticModificationsAllowed"] as? Bool == false)
         #expect((object["issues"] as? [Any])?.count == 2)
     }
+
+    @Test("config show says a configured schedule does not run yet")
+    func configShowInertSchedule() async throws {
+        let harness = try CLIHarness()
+        try harness.writeConfig(#"{"schemaVersion": 1, "schedule": {"enabled": true, "frequency": "daily", "time": "23:00"}}"#)
+        let run = try await harness.run(["config", "show"])
+        #expect(run.exitCode == nil)
+        #expect(run.standardOutput.contains("Scheduling: set in the file, but this version of MacUp runs no scheduled checks."))
+
+        try harness.writeConfig(#"{"schemaVersion": 1, "schedule": {"enabled": false}}"#)
+        let off = try await harness.run(["config", "show"])
+        #expect(!off.standardOutput.contains("Scheduling:"))
+    }
 }
 
 extension JSONDecoder {

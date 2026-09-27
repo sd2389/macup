@@ -68,6 +68,9 @@ struct ConfigShowCommand: AsyncParsableCommand {
             lines.append(loaded.allowsAutomaticModification
                 ? "Automatic changes: none happen in this version of MacUp."
                 : "Automatic changes: disabled until the errors below are fixed.")
+            if loaded.configuration.schedule.enabled {
+                lines.append("Scheduling: set in the file, but this version of MacUp runs no scheduled checks.")
+            }
             if !loaded.issues.isEmpty {
                 lines.append("")
                 for issue in loaded.issues {

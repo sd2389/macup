@@ -77,7 +77,7 @@ tests or an explicit manual verification step.
 
 ### Verification (Phase 1)
 
-- `scripts/test.sh`: 194 tests (171 core, 23 CLI), all passing; no test runs
+- `scripts/test.sh`: 220 tests (192 core, 28 CLI), all passing; no test runs
   a real provider binary.
 - `scripts/check-trust-invariants.sh`: passing.
 - Manual, read-only on the development Mac: `macup check`, `--verbose`,

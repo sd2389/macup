@@ -61,7 +61,10 @@ is no telemetry.
 
 Phase 1 uses `providers.<id>.enabled` (disabled providers are never run)
 and `providers.<id>.executablePath`. Policies are stored and validated now
-and enforced from Phase 2.
+and enforced from Phase 2. The `schedule` section is stored and validated
+too, but nothing reads it yet: MacUp installs no launchd agent and runs no
+scheduled check until Phase 6, so `schedule.enabled` has no effect. `macup
+config show` says so when the file turns it on.
 
 ## Validation fails closed
 
