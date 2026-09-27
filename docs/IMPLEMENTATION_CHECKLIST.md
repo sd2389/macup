@@ -163,6 +163,8 @@ still does: it is Phase 6, unchanged.
         spread is wider than the threshold so matching cannot work
   - [x] Every surface — CLI, app, README, trust document — says a photograph
         of the enrolled person passes it
+  - [x] Reachable in one click: the app's Features screen, one row per
+        feature with one switch each
 - [ ] Face matching accuracy is untested against real faces. Vision's feature
       prints were built for image similarity, not identity, so the default
       threshold is a starting point rather than a tuned value.

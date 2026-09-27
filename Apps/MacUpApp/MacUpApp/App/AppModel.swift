@@ -10,7 +10,7 @@ import Observation
 @Observable
 final class AppModel {
     enum Section: Hashable {
-        case dashboard, updates, doctor, history
+        case dashboard, updates, features, doctor, history
     }
 
     var section: Section? = .dashboard

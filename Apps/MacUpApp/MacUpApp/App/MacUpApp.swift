@@ -49,6 +49,8 @@ struct ContentView: View {
                 Label("Updates", systemImage: "arrow.down.circle")
                     .badge(model.updateCount)
                     .tag(AppModel.Section.updates)
+                Label("Features", systemImage: "switch.2")
+                    .tag(AppModel.Section.features)
                 Label("Doctor", systemImage: "stethoscope")
                     .badge(model.attentionCount)
                     .tag(AppModel.Section.doctor)
@@ -73,6 +75,7 @@ struct ContentView: View {
             switch model.section ?? .dashboard {
             case .dashboard: DashboardView()
             case .updates: UpdatesView()
+            case .features: FeaturesView()
             case .doctor: DoctorView()
             case .history: HistoryView()
             }

@@ -2,8 +2,11 @@ import AppKit
 import MacUpCore
 import SwiftUI
 
-/// The configuration, and the one part of it MacUp can change today: the
-/// scheduled read-only check. Editing the rest arrives with update policies.
+/// What MacUp is configured with, and where that configuration lives.
+///
+/// The switches moved to the Features screen, where one row per feature is
+/// easier to find than a section part-way down a long form. Editing providers
+/// and policies arrives with update policies.
 struct SettingsView: View {
     @Environment(AppModel.self) private var model
 
@@ -33,8 +36,6 @@ struct SettingsView: View {
                 }
             }
 
-            SecuritySection()
-
             Section("Providers") {
                 ForEach(ProviderID.known, id: \.self) { provider in
                     LabeledContent(provider.displayName, value: configuration.settings(for: provider).enabled ? "On" : "Off")
@@ -48,8 +49,6 @@ struct SettingsView: View {
                 }
             }
 
-            ScheduleSection()
-
             Section("Privacy") {
                 Text("MacUp has no telemetry and no account. Nothing about your Mac leaves it, except the requests your package managers make themselves.")
             }
@@ -60,16 +59,14 @@ struct SettingsView: View {
             }
 
             Section {
-                Text("Apart from scheduling, settings are read-only in this version. To change the rest, edit the configuration file.")
+                Button("Open Features") { model.section = .features }
+                Text("Automatic checks, approval, and face match are on the Features screen. The rest is read-only in this version; to change it, edit the configuration file.")
                     .foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)
         .frame(width: 560, height: 700)
-        .onAppear {
-            model.loadConfiguration()
-            Task { await model.refreshScheduleStatus() }
-        }
+        .onAppear { model.loadConfiguration() }
     }
 
     private func status(_ loaded: LoadedConfiguration?) -> String {
@@ -79,257 +76,5 @@ struct SettingsView: View {
         case (.file, true): return "Has errors; automatic changes are off"
         case (.file, false): return "Valid"
         }
-    }
-}
-
-
-/// Turns the scheduled read-only check on and off.
-///
-/// Changes are applied deliberately rather than as a side effect of moving a
-/// picker: turning this on installs a launchd agent, so the exact command it
-/// will run is shown first and nothing happens until Apply.
-private struct ScheduleSection: View {
-    @Environment(AppModel.self) private var model
-    @State private var draft = MacUpConfiguration.ScheduleSettings()
-    @State private var loaded = false
-
-    var body: some View {
-        Section("Scheduling") {
-            Toggle("Check automatically", isOn: $draft.enabled)
-                .help("Runs the same read-only check on a schedule. It never installs or upgrades anything.")
-
-            if draft.enabled {
-                Picker("How often", selection: $draft.frequency) {
-                    Text("Daily").tag(MacUpConfiguration.ScheduleSettings.Frequency.daily)
-                    Text("Weekly").tag(MacUpConfiguration.ScheduleSettings.Frequency.weekly)
-                }
-                if draft.frequency == .weekly {
-                    Picker("Day", selection: weekdayBinding) {
-                        ForEach(MacUpConfiguration.ScheduleSettings.Weekday.allCases, id: \.self) { day in
-                            Text(day.rawValue.capitalizedFirst).tag(day)
-                        }
-                    }
-                }
-                DatePicker("Time", selection: timeBinding, displayedComponents: .hourAndMinute)
-                Toggle("Refresh package lists first", isOn: $draft.refresh)
-                    .help("Without this, Homebrew results come from local metadata that may be weeks old. A refresh updates package lists only; it never upgrades a package.")
-            }
-
-            // Shown only while the schedule is on, so the off state stays a
-            // toggle and one line, but the exact command is never hidden from
-            // someone about to install it.
-            if draft.enabled {
-                if let command {
-                    LabeledContent("Will run") {
-                        Text(command.displayPath)
-                            .textSelection(.enabled)
-                            .font(.callout.monospaced())
-                    }
-                } else {
-                    Label(
-                        "MacUp could not find the macup command to schedule.",
-                        systemImage: "exclamationmark.triangle"
-                    )
-                }
-            }
-
-            ForEach(statusLines, id: \.self) { line in
-                Text(line).foregroundStyle(.secondary).font(.callout)
-            }
-            ForEach(model.scheduleStatus?.warnings ?? [], id: \.self) { warning in
-                Label(warning.displaySafe, systemImage: "exclamationmark.triangle")
-            }
-            if let problem = model.scheduleProblem {
-                Label(problem.displaySafe, systemImage: "xmark.octagon")
-                    .foregroundStyle(.red)
-            }
-
-            HStack {
-                Button(applyTitle) { Task { await model.applySchedule(draft) } }
-                    .disabled(!canApply)
-                if model.isChangingSchedule { ProgressView().controlSize(.small) }
-                Spacer()
-                Text("A scheduled check changes nothing.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .onAppear { reload() }
-        .onChange(of: model.configuration?.configuration.schedule) { reload() }
-    }
-
-    private func reload() {
-        guard !loaded || !model.isChangingSchedule else { return }
-        draft = model.scheduleSettings
-        loaded = true
-    }
-
-    private var command: String? {
-        model.scheduleStatus?.command ?? model.scheduledExecutable().map { $0 + " check --save-state" }
-    }
-
-    private var canApply: Bool {
-        guard !model.isChangingSchedule else { return false }
-        guard draft != model.scheduleSettings || draft.enabled != (model.scheduleStatus?.agentInstalled ?? false) else {
-            return false
-        }
-        return !draft.enabled || model.scheduledExecutable() != nil
-    }
-
-    private var applyTitle: String {
-        let installed = model.scheduleStatus?.agentInstalled == true
-        if draft.enabled { return installed ? "Update Schedule" : "Turn On" }
-        // With nothing installed there is nothing to turn off; the button is
-        // disabled anyway, so it names the action the switch would enable.
-        return installed ? "Turn Off" : "Turn On"
-    }
-
-    private var statusLines: [String] {
-        guard let status = model.scheduleStatus else { return [] }
-        var lines: [String] = []
-        if status.isActive, let next = status.nextRun {
-            lines.append("Next check \(next.formatted(date: .abbreviated, time: .shortened)).")
-        } else if !status.agentInstalled {
-            lines.append("No check is scheduled.")
-        }
-        if let last = status.lastCheck {
-            if last.unreadable {
-                lines.append("The last saved report could not be read.")
-            } else {
-                var text = "Last scheduled check"
-                if let finished = last.finishedAt {
-                    text += " \(finished.formatted(date: .abbreviated, time: .shortened))"
-                }
-                if let updates = last.updatesAvailable {
-                    text += ": \(updates == 1 ? "1 update" : "\(updates) updates")"
-                }
-                lines.append(text + ".")
-            }
-        }
-        return lines
-    }
-
-    private var timeBinding: Binding<Date> {
-        Binding(
-            get: {
-                let parts = (try? LaunchAgent.clockTime(draft.time)) ?? (hour: 23, minute: 0)
-                return Calendar.current.date(bySettingHour: parts.hour, minute: parts.minute, second: 0, of: Date()) ?? Date()
-            },
-            set: { date in
-                let components = Calendar.current.dateComponents([.hour, .minute], from: date)
-                draft.time = String(format: "%02d:%02d", components.hour ?? 23, components.minute ?? 0)
-            }
-        )
-    }
-
-    private var weekdayBinding: Binding<MacUpConfiguration.ScheduleSettings.Weekday> {
-        Binding(get: { draft.resolvedWeekday }, set: { draft.weekday = $0 })
-    }
-}
-
-
-/// Whether macOS asks the device owner to confirm before MacUp changes
-/// anything, using whatever this Mac has: Touch ID, Face ID, or Optic ID,
-/// with the login password or an unlocked Apple Watch as the fallback.
-private struct SecuritySection: View {
-    @Environment(AppModel.self) private var model
-    @State private var draft = MacUpConfiguration.SecuritySettings()
-    @State private var loaded = false
-
-    var body: some View {
-        Section("Approval") {
-            LabeledContent("This Mac", value: sensorText)
-
-            Toggle("Ask before MacUp changes anything", isOn: $draft.requireApproval)
-                .help("macOS asks you to confirm before MacUp installs a scheduled check or, later, applies an update.")
-            if draft.requireApproval {
-                Toggle("Allow your password or Apple Watch", isOn: $draft.allowPasswordFallback)
-                    .help("Lets you confirm when the sensor cannot be used. Without it, a Mac with no sensor could never approve a change.")
-                if !model.canAskForApproval(with: draft) {
-                    Label(
-                        "This Mac cannot ask you to confirm right now, so MacUp would refuse every change.",
-                        systemImage: "exclamationmark.triangle"
-                    )
-                }
-            }
-
-            if let problem = model.securityProblem {
-                Label(problem.displaySafe, systemImage: "xmark.octagon")
-                    .foregroundStyle(.red)
-            }
-
-            faceRows
-
-            HStack {
-                Button("Apply") { Task { await model.applySecurity(draft) } }
-                    .disabled(!canApply)
-                Spacer()
-            }
-
-            Text("A confirmation, not a lock. MacUp runs as you, and so do brew, npm, and mise: anyone at an unlocked Mac can run them directly. MacUp never sees your fingerprint, your face, or your password.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
-        .onAppear {
-            reload()
-            model.loadFaceEnrollment()
-        }
-        .onChange(of: model.configuration?.configuration.security) { reload() }
-    }
-
-    /// MacUp's own camera check. Presented apart from the macOS sensors above,
-    /// and labelled for what it is, because it is not one of them.
-    @ViewBuilder
-    private var faceRows: some View {
-        LabeledContent("Face match (camera)", value: faceStateText)
-        if let spread = model.faceEnrollment?.sampleSpread {
-            let threshold = model.securitySettings.faceMatchThreshold
-            Text(String(format: "Your own samples differ by up to %.2f; the threshold is %.2f.", spread, threshold))
-                .font(.caption)
-                .foregroundStyle(Double(spread) >= threshold ? AnyShapeStyle(.red) : AnyShapeStyle(.secondary))
-        }
-        if let problem = model.faceProblem {
-            Label(problem.displaySafe, systemImage: "exclamationmark.triangle")
-        }
-        HStack {
-            Button(model.faceEnrollment == nil ? "Enroll Face…" : "Enroll Again…") {
-                Task { await model.enrollFace() }
-            }
-            .disabled(!model.cameraPresent || model.isEnrollingFace)
-            Button("Forget Face") { model.forgetFace() }
-                .disabled(model.faceEnrollment == nil || model.isEnrollingFace)
-            if model.isEnrollingFace {
-                ProgressView().controlSize(.small)
-                Text("Look at the camera…").font(.caption).foregroundStyle(.secondary)
-            }
-        }
-        Text("A photograph of you passes this check, so it is a shortcut and not a lock. When the face does not match, MacUp still asks macOS, so it cannot lock you out. No image is stored and nothing leaves this Mac.")
-            .font(.caption)
-            .foregroundStyle(.secondary)
-    }
-
-    private var faceStateText: String {
-        guard model.cameraPresent else { return "No camera found" }
-        guard let enrollment = model.faceEnrollment else { return "Not enrolled" }
-        let samples = "\(enrollment.signatures.count) samples"
-        return model.securitySettings.faceUnlock ? "On · \(samples)" : "Enrolled, turned off · \(samples)"
-    }
-
-    private func reload() {
-        guard !loaded || !model.isChangingSchedule else { return }
-        draft = model.securitySettings
-        loaded = true
-    }
-
-    private var sensorText: String {
-        let capability = model.biometricCapability
-        if capability.isAvailable { return capability.kind.displayName }
-        if let reason = capability.unavailableReason { return reason.displaySafe }
-        return capability.kind.displayName
-    }
-
-    private var canApply: Bool {
-        guard !model.isChangingSchedule, draft != model.securitySettings else { return false }
-        return !draft.requireApproval || model.canAskForApproval(with: draft)
     }
 }

@@ -73,15 +73,16 @@ macup security              # which sensor this Mac has
 
 macOS does the asking with whatever the Mac has — Touch ID, Face ID, or Optic
 ID — falling back to your password or Apple Watch. MacUp never sees your
-fingerprint, your face, or your password. The same switch is in the app under
-**Settings → Approval**.
+fingerprint, your face, or your password. The same switch is on the app's
+**Features** screen.
 
 It is a confirmation, not a lock: MacUp runs as you, and so do `brew`, `npm`,
 and `mise`. What it buys is a deliberate step in front of every change MacUp
 itself makes.
 
 MacUp also has a camera face match of its own, off by default
-(`macup security face enroll`). No Mac has a Face ID sensor, and macOS exposes
+(`macup security face enroll`, or Features → Face match). No Mac has a Face
+ID sensor, and macOS exposes
 no face-recognition API, so this compares how alike two pictures look — **a
 photograph of you passes it**. It can only approve early; when it does not
 match, MacUp still asks macOS. Treat it as a shortcut, not as security.
@@ -100,10 +101,10 @@ and no administrator authorization. The scheduled run is the same read-only
 check, so it still changes nothing; scheduled *updating* does not exist yet.
 Results land in `~/.local/state/macup/last-check.json`.
 
-The app has the same control under **Settings → Scheduling**: a switch, how
-often, the day and time, and whether to refresh package lists first. It shows
-the exact command it will schedule before you turn it on, and the Dashboard
-and menu bar show when the next check is due.
+The app has the same control on its **Features** screen: one row per feature,
+one switch each — automatic checks, approval, and face match. The Dashboard
+and the menu bar show when the next check is due. Settings stays what it is:
+where the configuration lives and what is in it.
 
 Example output (illustrative):
 

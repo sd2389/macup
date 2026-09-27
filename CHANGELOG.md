@@ -34,6 +34,11 @@ MacUp follows Semantic Versioning once releases begin.
   leaves no process running between checks, and `disable` removes it
   completely. There is no scheduled updating: this version still cannot
   modify a package.
+- A **Features** screen in the app's navigation: one row per feature, one
+  switch each, in plain language — automatic checks, approval, and face match.
+  The switches moved there from Settings, which goes back to being the
+  configuration inspector: where the file is, what is in it, and what MacUp
+  read from the environment.
 - Settings is reachable from the app itself: a row at the bottom of the
   sidebar and a toolbar button, not only ⌘, and the menu bar.
 - The app schedules checks too: **Settings → Scheduling** has the switch,

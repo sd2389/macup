@@ -1,0 +1,251 @@
+import MacUpCore
+import SwiftUI
+
+/// Everything MacUp can do for you, each one a row you can turn on.
+///
+/// One screen, one row per feature, one switch each. Settings stays what it
+/// is: where the configuration lives and what is in it.
+struct FeaturesView: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        Form {
+            AutomaticChecksFeature()
+            ApprovalFeature()
+            FaceMatchFeature()
+        }
+        .formStyle(.grouped)
+        .task {
+            model.loadConfiguration()
+            model.loadFaceEnrollment()
+            await model.refreshScheduleStatus()
+        }
+    }
+}
+
+/// A feature row: what it is, whether it is on, and what it is doing.
+private struct FeatureRow<Detail: View>: View {
+    let title: String
+    let summary: String
+    @Binding var isOn: Bool
+    var isBusy = false
+    var state: String?
+    @ViewBuilder var detail: Detail
+
+    var body: some View {
+        Section {
+            Toggle(isOn: $isOn) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title).font(.headline)
+                    Text(summary).font(.callout).foregroundStyle(.secondary)
+                }
+            }
+            .disabled(isBusy)
+
+            if let state {
+                Text(state).font(.callout).foregroundStyle(.secondary)
+            }
+            detail
+        }
+    }
+}
+
+// MARK: - Automatic checks
+
+private struct AutomaticChecksFeature: View {
+    @Environment(AppModel.self) private var model
+    @State private var draft = MacUpConfiguration.ScheduleSettings()
+    @State private var loaded = false
+
+    var body: some View {
+        FeatureRow(
+            title: "Check automatically",
+            summary: "Look for updates on a schedule. The check only reports; it never installs anything.",
+            isOn: enabled,
+            isBusy: model.isChangingSchedule,
+            state: state
+        ) {
+            if draft.enabled {
+                Picker("How often", selection: $draft.frequency) {
+                    Text("Daily").tag(MacUpConfiguration.ScheduleSettings.Frequency.daily)
+                    Text("Weekly").tag(MacUpConfiguration.ScheduleSettings.Frequency.weekly)
+                }
+                if draft.frequency == .weekly {
+                    Picker("Day", selection: weekday) {
+                        ForEach(MacUpConfiguration.ScheduleSettings.Weekday.allCases, id: \.self) { day in
+                            Text(day.rawValue.capitalizedFirst).tag(day)
+                        }
+                    }
+                }
+                DatePicker("Time", selection: time, displayedComponents: .hourAndMinute)
+                if hasUnsavedChanges {
+                    Button("Apply Changes") { Task { await model.applySchedule(draft) } }
+                        .disabled(model.isChangingSchedule)
+                }
+            }
+            ForEach(model.scheduleStatus?.warnings ?? [], id: \.self) { warning in
+                Label(warning.displaySafe, systemImage: "exclamationmark.triangle")
+            }
+            if let problem = model.scheduleProblem {
+                Label(problem.displaySafe, systemImage: "xmark.octagon").foregroundStyle(.red)
+            }
+        }
+        .onAppear { reload() }
+        .onChange(of: model.configuration?.configuration.schedule) { reload() }
+    }
+
+    private func reload() {
+        guard !model.isChangingSchedule else { return }
+        draft = model.scheduleSettings
+        loaded = true
+    }
+
+    /// Turning it on or off applies at once; the details below get one Apply,
+    /// so changing a time cannot ask for approval on every keystroke.
+    private var enabled: Binding<Bool> {
+        Binding(
+            get: { draft.enabled },
+            set: { newValue in
+                draft.enabled = newValue
+                var settings = draft
+                settings.enabled = newValue
+                Task { await model.applySchedule(settings) }
+            }
+        )
+    }
+
+    private var hasUnsavedChanges: Bool {
+        loaded && draft != model.scheduleSettings
+    }
+
+    private var state: String? {
+        guard let status = model.scheduleStatus else { return nil }
+        if status.isActive, let next = status.nextRun {
+            return "Next check \(next.formatted(date: .abbreviated, time: .shortened))."
+        }
+        if draft.enabled && !status.agentInstalled { return "Not running yet." }
+        return nil
+    }
+
+    private var time: Binding<Date> {
+        Binding(
+            get: {
+                let parts = (try? LaunchAgent.clockTime(draft.time)) ?? (hour: 23, minute: 0)
+                return Calendar.current.date(bySettingHour: parts.hour, minute: parts.minute, second: 0, of: Date()) ?? Date()
+            },
+            set: { date in
+                let components = Calendar.current.dateComponents([.hour, .minute], from: date)
+                draft.time = String(format: "%02d:%02d", components.hour ?? 23, components.minute ?? 0)
+            }
+        )
+    }
+
+    private var weekday: Binding<MacUpConfiguration.ScheduleSettings.Weekday> {
+        Binding(get: { draft.resolvedWeekday }, set: { draft.weekday = $0 })
+    }
+}
+
+// MARK: - Approval
+
+private struct ApprovalFeature: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        FeatureRow(
+            title: "Ask before changing anything",
+            summary: "macOS asks you to confirm before MacUp changes a setting. It never sees your fingerprint or your password.",
+            isOn: enabled,
+            isBusy: model.isChangingSchedule,
+            state: "This Mac: \(model.biometricCapability.kind.displayName)."
+        ) {
+            if let problem = model.securityProblem {
+                Label(problem.displaySafe, systemImage: "xmark.octagon").foregroundStyle(.red)
+            }
+            Text("A confirmation, not a lock: MacUp runs as you, and so do brew, npm, and mise.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var enabled: Binding<Bool> {
+        Binding(
+            get: { model.securitySettings.requireApproval },
+            set: { newValue in
+                var settings = model.securitySettings
+                settings.requireApproval = newValue
+                Task { await model.applySecurity(settings) }
+            }
+        )
+    }
+}
+
+// MARK: - Face match
+
+private struct FaceMatchFeature: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        FeatureRow(
+            title: "Face match",
+            summary: "Use the camera to approve a change instead of Touch ID. A photograph of you passes it, so it is a shortcut, not a lock.",
+            isOn: enabled,
+            isBusy: model.isEnrollingFace,
+            state: state
+        ) {
+            HStack {
+                Button(model.faceEnrollment == nil ? "Enroll Face…" : "Enroll Again…") {
+                    Task { await model.enrollFace() }
+                }
+                .disabled(!model.cameraPresent || model.isEnrollingFace)
+                Button("Forget Face") { model.forgetFace() }
+                    .disabled(model.faceEnrollment == nil || model.isEnrollingFace)
+                if model.isEnrollingFace {
+                    ProgressView().controlSize(.small)
+                    Text("Look at the camera…").font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            if let spread = model.faceEnrollment?.sampleSpread, Double(spread) >= model.securitySettings.faceMatchThreshold {
+                Label(
+                    "Your own samples vary more than the threshold allows, so this will usually fail to recognise you. Enroll again in even light.",
+                    systemImage: "exclamationmark.triangle"
+                )
+            }
+            if let problem = model.faceProblem {
+                Label(problem.displaySafe, systemImage: "exclamationmark.triangle")
+            }
+            if model.faceEnrollment != nil && !model.securitySettings.requireApproval {
+                Text("MacUp is not asking for approval, so this does nothing yet. Turn on “Ask before changing anything” above.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var state: String? {
+        guard model.cameraPresent else { return "This Mac has no camera MacUp can use." }
+        guard let enrollment = model.faceEnrollment else { return "No face enrolled yet." }
+        return "Enrolled \(enrollment.signatures.count) samples on \(enrollment.createdAt.formatted(date: .abbreviated, time: .shortened))."
+    }
+
+    /// The switch cannot be on without an enrolled face, so turning it on with
+    /// none enrolled starts enrolment rather than setting a flag that does
+    /// nothing.
+    private var enabled: Binding<Bool> {
+        Binding(
+            get: { model.securitySettings.faceUnlock && model.faceEnrollment != nil },
+            set: { newValue in
+                if newValue && model.faceEnrollment == nil {
+                    Task { await model.enrollFace() }
+                    return
+                }
+                if newValue {
+                    var settings = model.securitySettings
+                    settings.faceUnlock = true
+                    Task { await model.applySecurity(settings) }
+                } else {
+                    model.forgetFace()
+                }
+            }
+        )
+    }
+}
