@@ -201,7 +201,10 @@ public final class FaceCamera: @unchecked Sendable {
                 let counts = session.counts()
                 let detail: String
                 let suggestion: String
-                if counts.received == 0 {
+                if let fault = session.fault {
+                    detail = "The camera stopped sending pictures: \(fault)."
+                    suggestion = "Close anything else using the camera and try again."
+                } else if counts.received == 0 {
                     detail = session.connectionIsActive
                         ? "The camera is open and connected but sent MacUp no pictures."
                         : "The camera is open but macOS never made its video connection active, so no pictures arrived."
@@ -235,6 +238,11 @@ final class FaceCameraSession: NSObject, AVCaptureVideoDataOutputSampleBufferDel
     /// nothing or sent pictures MacUp could not read.
     private var received = 0
     private var converted = 0
+    /// What macOS said went wrong, if it said anything. Without this, a
+    /// session that fails at runtime looks exactly like one that is merely
+    /// slow.
+    private var sessionFault: String?
+    private var observers: [any NSObjectProtocol] = []
     private static let context = CIContext()
 
     override init() {
@@ -263,6 +271,8 @@ final class FaceCameraSession: NSObject, AVCaptureVideoDataOutputSampleBufferDel
         output.videoSettings = [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA]
         output.setSampleBufferDelegate(self, queue: queue)
 
+        observe()
+
         guard let connection = output.connection(with: .video) else {
             throw MacUpError(
                 .providerUnavailable,
@@ -281,6 +291,40 @@ final class FaceCameraSession: NSObject, AVCaptureVideoDataOutputSampleBufferDel
     /// Whether macOS considers the video connection live, for diagnostics.
     var connectionIsActive: Bool {
         output.connection(with: .video)?.isActive ?? false
+    }
+
+    /// What macOS reported about the session, if anything.
+    var fault: String? {
+        lock.withLock { sessionFault }
+    }
+
+    private func observe() {
+        let center = NotificationCenter.default
+        let runtimeError = center.addObserver(
+            forName: AVCaptureSession.runtimeErrorNotification,
+            object: session,
+            queue: nil
+        ) { [weak self] notification in
+            let error = notification.userInfo?[AVCaptureSessionErrorKey] as? NSError
+            self?.record(error?.localizedDescription ?? "the capture session failed")
+        }
+        let interrupted = center.addObserver(
+            forName: AVCaptureSession.wasInterruptedNotification,
+            object: session,
+            queue: nil
+        ) { [weak self] _ in
+            self?.record("another app took the camera")
+        }
+        lock.withLock { observers = [runtimeError, interrupted] }
+    }
+
+    private func record(_ fault: String) {
+        lock.withLock { if sessionFault == nil { sessionFault = fault } }
+    }
+
+    deinit {
+        let observers = lock.withLock { self.observers }
+        for observer in observers { NotificationCenter.default.removeObserver(observer) }
     }
 
     /// Starts the session and returns once it is running, so a caller never

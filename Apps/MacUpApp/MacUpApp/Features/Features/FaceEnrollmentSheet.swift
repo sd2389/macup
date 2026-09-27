@@ -30,8 +30,6 @@ private struct CameraPreview: NSViewRepresentable {
 /// on visible and obvious, and to say what is happening at each step.
 struct FaceEnrollmentSheet: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var scanning = false
 
     var body: some View {
         VStack(spacing: 18) {
@@ -50,7 +48,6 @@ struct FaceEnrollmentSheet: View {
                         .frame(width: 320, height: 240)
                         .clipShape(RoundedRectangle(cornerRadius: 14))
                         .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(.separator))
-                        .transition(.scale(scale: 0.94).combined(with: .opacity))
                 } else {
                     RoundedRectangle(cornerRadius: 14)
                         .fill(.quaternary)
@@ -58,16 +55,14 @@ struct FaceEnrollmentSheet: View {
                         .overlay(ProgressView())
                 }
 
-                // A ring that breathes while pictures are being taken. It
-                // conveys "the camera is on now", so it is off when reduced
-                // motion is on and the wording carries it instead.
+                // A still outline. It marks the frame without moving: a
+                // pulsing border next to a live camera feed is noise, and it
+                // competes with the thing the reader is meant to look at.
                 RoundedRectangle(cornerRadius: 14)
                     .strokeBorder(.tint, lineWidth: 2)
                     .frame(width: 320, height: 240)
-                    .opacity(scanning && !reduceMotion ? 0.9 : 0.25)
-                    .scaleEffect(scanning && !reduceMotion ? 1.015 : 1)
+                    .opacity(0.5)
             }
-            .animation(.easeInOut(duration: 0.35), value: model.faceCaptureSession != nil)
 
             if let camera = FaceCamera.cameraName {
                 Text("Using \(camera)")
@@ -84,12 +79,6 @@ struct FaceEnrollmentSheet: View {
         }
         .padding(24)
         .frame(minWidth: 380)
-        .onAppear {
-            guard !reduceMotion else { return }
-            withAnimation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true)) {
-                scanning = true
-            }
-        }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Enrolling your face. \(model.faceStage ?? "Working").")
     }

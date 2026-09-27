@@ -17,9 +17,13 @@ cli="$(swift build -c "$configuration" --show-bin-path)/macup"
 
 app="build/MacUp.app"
 rm -rf "$app"
-mkdir -p "$app/Contents/MacOS" "$app/Contents/Helpers"
+# The icon is drawn from source rather than committed as a binary blob.
+swift scripts/make-icon.swift >/dev/null
+
+mkdir -p "$app/Contents/MacOS" "$app/Contents/Helpers" "$app/Contents/Resources"
 cp "$binary" "$app/Contents/MacOS/MacUp"
 cp "$cli" "$app/Contents/Helpers/macup"
 cp Apps/MacUpApp/MacUpApp/Resources/Info.plist "$app/Contents/Info.plist"
+cp build/MacUp.icns "$app/Contents/Resources/MacUp.icns"
 codesign --force --sign - "$app"
 echo "$app"

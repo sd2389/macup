@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="MacUp">
+  <defs>
+    <linearGradient id="macup-plate" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#599EFF"/>
+      <stop offset="1" stop-color="#084FC7"/>
+    </linearGradient>
+  </defs>
+  <rect width="100" height="100" rx="22.37" fill="url(#macup-plate)"/>
+  <g fill="#fff" stroke="#fff">
+    <rect x="45" y="32" width="10" height="34" rx="5" stroke="none"/>
+    <path d="M28 47 L50 27 L72 47" fill="none" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="26" y="71.5" width="48" height="7.5" rx="3.7" stroke="none"/>
+  </g>
+</svg>

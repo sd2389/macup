@@ -8,6 +8,8 @@
 	<string>MacUp</string>
 	<key>CFBundleExecutable</key>
 	<string>MacUp</string>
+	<key>CFBundleIconFile</key>
+	<string>MacUp</string>
 	<key>CFBundleIdentifier</key>
 	<string>dev.macup.MacUp</string>
 	<key>CFBundleInfoDictionaryVersion</key>
