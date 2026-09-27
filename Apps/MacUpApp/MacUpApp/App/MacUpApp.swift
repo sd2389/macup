@@ -38,9 +38,7 @@ struct MacUpApp: App {
 
 struct ContentView: View {
     @Environment(AppModel.self) private var model
-    #if DEBUG
     @Environment(\.openSettings) private var openSettings
-    #endif
 
     var body: some View {
         @Bindable var model = model
@@ -58,6 +56,19 @@ struct ContentView: View {
                     .tag(AppModel.Section.history)
             }
             .navigationSplitViewColumnWidth(min: 180, ideal: 200)
+            // Settings belongs in the primary navigation (UX_SPEC), not only
+            // behind ⌘, and the menu bar, where people were not finding it.
+            .safeAreaInset(edge: .bottom) {
+                Button { openSettings() } label: {
+                    Label("Settings", systemImage: "gearshape")
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .keyboardShortcut(",", modifiers: .command)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+            }
         } detail: {
             switch model.section ?? .dashboard {
             case .dashboard: DashboardView()
@@ -81,6 +92,12 @@ struct ContentView: View {
                     }
                     .help("Check for updates. Checking never changes anything.")
                 }
+            }
+            ToolbarItem(placement: .automatic) {
+                Button { openSettings() } label: {
+                    Label("Settings", systemImage: "gearshape")
+                }
+                .help("MacUp's settings, including scheduled checks")
             }
         }
         .task {

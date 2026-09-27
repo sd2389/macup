@@ -14,6 +14,8 @@ MacUp follows Semantic Versioning once releases begin.
   leaves no process running between checks, and `disable` removes it
   completely. There is no scheduled updating: this version still cannot
   modify a package.
+- Settings is reachable from the app itself: a row at the bottom of the
+  sidebar and a toolbar button, not only ⌘, and the menu bar.
 - The app schedules checks too: **Settings → Scheduling** has the switch,
   frequency, day, time, and metadata-refresh controls, shows the exact command
   it will install before turning it on, and reports what is really scheduled
