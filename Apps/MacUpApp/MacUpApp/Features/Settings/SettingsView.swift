@@ -65,7 +65,9 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 560, height: 700)
+        // Sized, not fixed: a fixed height clips the form at larger text
+        // sizes, which is exactly who needs the extra room (CLAUDE.md §21).
+        .frame(minWidth: 520, idealWidth: 580, minHeight: 420, idealHeight: 700)
         .onAppear { model.loadConfiguration() }
     }
 

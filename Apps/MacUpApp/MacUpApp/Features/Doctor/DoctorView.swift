@@ -26,7 +26,9 @@ struct DoctorView: View {
                                     .foregroundStyle(.secondary)
                             }
                         } icon: {
-                            Image(systemName: "exclamationmark.triangle").foregroundStyle(.orange)
+                            Image(systemName: "exclamationmark.triangle")
+                                .foregroundStyle(.orange)
+                                .accessibilityHidden(true)
                         }
                     }
                 }

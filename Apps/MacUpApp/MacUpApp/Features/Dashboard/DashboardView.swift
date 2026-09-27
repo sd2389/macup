@@ -104,6 +104,7 @@ private struct ProviderRow: View {
                 .font(.title3)
                 .foregroundStyle(.secondary)
                 .frame(width: 28)
+                .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 Text([provider.displayName, provider.version?.displaySafe].compactMap { $0 }.joined(separator: " "))
                 Text(detail)

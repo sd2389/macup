@@ -34,7 +34,9 @@ struct RiskLabel: View {
         Label {
             Text(level.displayName.capitalizedFirst)
         } icon: {
-            Image(systemName: symbol).foregroundStyle(tint)
+            Image(systemName: symbol)
+                .foregroundStyle(tint)
+                .accessibilityHidden(true)
         }
     }
 
@@ -105,7 +107,11 @@ struct ErrorRow: View {
                 Text("Nothing was changed.").font(.callout).foregroundStyle(.secondary)
             }
         } icon: {
-            Image(systemName: "xmark.octagon").foregroundStyle(.red)
+            Image(systemName: "xmark.octagon")
+                .foregroundStyle(.red)
+                .accessibilityHidden(true)
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Error: \(error.message)")
     }
 }
