@@ -6,9 +6,7 @@
     </linearGradient>
   </defs>
   <rect width="100" height="100" rx="22.37" fill="url(#macup-plate)"/>
-  <g fill="#fff" stroke="#fff">
-    <rect x="45" y="32" width="10" height="34" rx="5" stroke="none"/>
-    <path d="M28 47 L50 27 L72 47" fill="none" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
-    <rect x="26" y="71.5" width="48" height="7.5" rx="3.7" stroke="none"/>
-  </g>
+  <path d="M25.5 74.5 V38.5 L50 59.5 L74.5 26.5 V74.5"
+        fill="none" stroke="#fff" stroke-width="12.5"
+        stroke-linecap="round" stroke-linejoin="round"/>
 </svg>

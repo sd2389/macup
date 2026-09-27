@@ -1,9 +1,9 @@
 #!/usr/bin/env swift
 // Draws MacUp's icon and writes build/MacUp.icns.
 //
-// The mark is kept to two shapes so it survives being 16 points wide: an
-// arrow pointing up, standing on a base. Up for what the app is for, the
-// base for the machine it does not disturb.
+// The mark is an M whose right shoulder rises higher than its left, so the
+// letter leans upward without needing an arrow drawn into it. One stroked
+// path, because it has to stay legible at sixteen points in a menu bar.
 //
 //   swift scripts/make-icon.swift
 
@@ -58,36 +58,18 @@ func draw(size: Int) -> Data? {
     )
     context.restoreGState()
 
-    context.setFillColor(CGColor(red: 1, green: 1, blue: 1, alpha: 1))
+    // The M. Outer strokes are vertical, the valley sits above the baseline,
+    // and the right peak is higher than the left.
     context.setStrokeColor(CGColor(red: 1, green: 1, blue: 1, alpha: 1))
-
-    // The arrow: a stem with a chevron head.
-    let stem = CGPath(
-        roundedRect: CGRect(x: x(0.45), y: y(0.66), width: s * 0.10, height: s * 0.34),
-        cornerWidth: s * 0.05,
-        cornerHeight: s * 0.05,
-        transform: nil
-    )
-    context.addPath(stem)
-    context.fillPath()
-
-    context.setLineWidth(s * 0.10)
+    context.setLineWidth(s * 0.125)
     context.setLineCap(.round)
     context.setLineJoin(.round)
-    context.move(to: CGPoint(x: x(0.28), y: y(0.47)))
-    context.addLine(to: CGPoint(x: x(0.50), y: y(0.27)))
-    context.addLine(to: CGPoint(x: x(0.72), y: y(0.47)))
+    context.move(to: CGPoint(x: x(0.255), y: y(0.745)))
+    context.addLine(to: CGPoint(x: x(0.255), y: y(0.385)))
+    context.addLine(to: CGPoint(x: x(0.50), y: y(0.595)))
+    context.addLine(to: CGPoint(x: x(0.745), y: y(0.265)))
+    context.addLine(to: CGPoint(x: x(0.745), y: y(0.745)))
     context.strokePath()
-
-    // The base it stands on.
-    let base = CGPath(
-        roundedRect: CGRect(x: x(0.26), y: y(0.79), width: s * 0.48, height: s * 0.075),
-        cornerWidth: s * 0.037,
-        cornerHeight: s * 0.037,
-        transform: nil
-    )
-    context.addPath(base)
-    context.fillPath()
 
     guard let image = context.makeImage() else { return nil }
     let rep = NSBitmapImageRep(cgImage: image)
