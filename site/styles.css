@@ -1,0 +1,253 @@
+/* MacUp site. One accent, one radius scale, one type stack.
+   The type stack is the system face on purpose: MacUp is a Mac tool, and SF
+   is what its users already read all day. */
+
+:root {
+  color-scheme: light dark;
+
+  --accent: #0b5fd0;
+  --accent-ink: #ffffff;
+
+  --bg: #fbfbfc;
+  --bg-raised: #ffffff;
+  --ink: #16181d;
+  --ink-soft: #565c68;
+  --ink-faint: #868d9b;
+  --rule: #e3e5ea;
+  --rule-strong: #c9cdd6;
+  --shell: #f0f1f4;
+
+  --radius: 12px;
+  --radius-sm: 8px;
+
+  --measure: 62ch;
+  --page: 1180px;
+
+  --step-1: clamp(0.82rem, 0.8rem + 0.1vw, 0.88rem);
+  --step-0: clamp(1rem, 0.96rem + 0.18vw, 1.08rem);
+  --step-1-up: clamp(1.2rem, 1.1rem + 0.4vw, 1.38rem);
+  --step-2: clamp(1.7rem, 1.45rem + 1vw, 2.3rem);
+  --step-3: clamp(2.05rem, 1.6rem + 1.5vw, 2.75rem);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --accent: #7fb0ff;
+    --accent-ink: #0a1020;
+
+    --bg: #101216;
+    --bg-raised: #171a20;
+    --ink: #eef0f4;
+    --ink-soft: #a7aeba;
+    --ink-faint: #767d8a;
+    --rule: #262a33;
+    --rule-strong: #363c47;
+    --shell: #0b0d11;
+  }
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  font-size: var(--step-0);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+code, kbd, pre, .mono {
+  font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
+  font-size: 0.92em;
+}
+
+a { color: inherit; }
+
+h1, h2, h3 {
+  margin: 0;
+  letter-spacing: -0.022em;
+  line-height: 1.12;
+  text-wrap: balance;
+}
+
+h1 { font-size: var(--step-3); font-weight: 640; }
+h2 { font-size: var(--step-2); font-weight: 620; }
+h3 { font-size: var(--step-1-up); font-weight: 600; letter-spacing: -0.012em; }
+
+p { margin: 0; max-width: var(--measure); }
+
+.wrap {
+  width: 100%;
+  max-width: var(--page);
+  margin-inline: auto;
+  padding-inline: 24px;
+}
+
+section { padding-block: clamp(56px, 8vw, 104px); }
+
+/* Navigation: one line, 64px tall. */
+.nav {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: saturate(180%) blur(14px);
+  border-bottom: 1px solid var(--rule);
+}
+.nav .wrap { display: flex; align-items: center; gap: 28px; }
+.nav__brand { font-weight: 620; letter-spacing: -0.02em; text-decoration: none; }
+.nav__links { margin-left: auto; display: flex; align-items: center; gap: 24px; }
+.nav__links a { color: var(--ink-soft); text-decoration: none; font-size: var(--step-1); }
+.nav__links a:hover { color: var(--ink); }
+
+/* Hero: text and the app itself, side by side. */
+.hero { padding-block: clamp(40px, 6vw, 88px) clamp(48px, 7vw, 96px); }
+.hero .wrap {
+  display: grid;
+  gap: clamp(32px, 5vw, 64px);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.06fr);
+  align-items: center;
+}
+.hero p { color: var(--ink-soft); font-size: var(--step-1-up); margin-top: 20px; }
+.hero__actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 32px; }
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+  padding: 11px 20px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  font-size: var(--step-0);
+  font-weight: 560;
+  text-decoration: none;
+  transition: transform 0.16s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.16s;
+}
+.button--primary { background: var(--accent); color: var(--accent-ink); }
+.button--primary:hover { background: color-mix(in srgb, var(--accent) 86%, black); }
+.button--quiet { border-color: var(--rule-strong); color: var(--ink); }
+.button--quiet:hover { border-color: var(--ink-faint); }
+.button:active { transform: translateY(1px); }
+
+.copyline {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 20px;
+  padding: 10px 14px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+  background: var(--bg-raised);
+  max-width: max-content;
+}
+.copyline span { color: var(--ink-faint); user-select: none; }
+.copyline code { color: var(--ink); }
+
+/* Screenshots of the real app. */
+.shot {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: var(--radius);
+  border: 1px solid var(--rule);
+  box-shadow: 0 24px 60px -32px rgb(20 26 40 / 0.38);
+}
+@media (prefers-color-scheme: dark) {
+  .shot { box-shadow: 0 24px 60px -30px rgb(0 0 0 / 0.72); }
+}
+
+/* The promise: three statements, separated by rules, no cards. */
+.promise { border-block: 1px solid var(--rule); background: var(--bg-raised); }
+.promise .wrap { display: grid; gap: 0; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.promise div { padding: 8px 32px; border-left: 1px solid var(--rule); }
+.promise div:first-child { padding-left: 0; border-left: 0; }
+.promise strong { display: block; font-size: var(--step-1-up); font-weight: 600; letter-spacing: -0.012em; }
+.promise p { margin-top: 8px; color: var(--ink-soft); font-size: var(--step-1); }
+
+/* Terminal: real output from a real run. */
+.terminal {
+  margin-top: 36px;
+  background: var(--shell);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.terminal__bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--rule);
+  color: var(--ink-faint);
+  font-size: var(--step-1);
+}
+.terminal pre {
+  margin: 0;
+  padding: 20px 22px 24px;
+  overflow-x: auto;
+  line-height: 1.7;
+  color: var(--ink);
+}
+.terminal .prompt { color: var(--ink-faint); }
+.terminal .flag { color: var(--accent); }
+.terminal .quiet { color: var(--ink-soft); }
+
+/* Providers: a compact grid, no boxes. */
+.providers { display: grid; gap: 28px 40px; grid-template-columns: repeat(4, minmax(0, 1fr)); margin-top: 36px; }
+.providers h3 { font-size: var(--step-0); }
+.providers p { margin-top: 6px; color: var(--ink-soft); font-size: var(--step-1); }
+.providers code { color: var(--ink-faint); }
+
+/* Showcase: one large image, its explanation beside it. */
+.showcase .wrap { display: grid; gap: clamp(28px, 4vw, 56px); grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); align-items: center; }
+.showcase--flip .wrap { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); }
+.showcase--flip .showcase__text { order: 2; }
+.showcase p { margin-top: 16px; color: var(--ink-soft); }
+
+/* What it will not do: two columns of plain statements. */
+.never { background: var(--bg-raised); border-block: 1px solid var(--rule); }
+.never ul { margin: 32px 0 0; padding: 0; list-style: none; display: grid; gap: 22px 48px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+/* The heading already says these are things MacUp will not do, so the list
+   needs no marker repeating it. */
+.never li { padding-top: 18px; border-top: 1px solid var(--rule); color: var(--ink-soft); max-width: var(--measure); }
+.never strong { color: var(--ink); font-weight: 580; }
+
+/* Install. */
+.install { text-align: center; }
+.install p { margin-inline: auto; color: var(--ink-soft); margin-top: 16px; }
+.install .copyline { margin-inline: auto; margin-top: 28px; }
+.install .hero__actions { justify-content: center; }
+
+footer { border-top: 1px solid var(--rule); padding-block: 40px; color: var(--ink-faint); font-size: var(--step-1); }
+footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 28px; align-items: center; }
+footer a { color: var(--ink-soft); text-decoration: none; }
+footer a:hover { color: var(--ink); }
+footer .spacer { margin-left: auto; }
+
+/* Motion: entrances only, and only when the reader wants them. */
+@media (prefers-reduced-motion: no-preference) {
+  .reveal { opacity: 0; transform: translateY(14px); animation: rise 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+  .reveal--2 { animation-delay: 0.08s; }
+  .reveal--3 { animation-delay: 0.16s; }
+  @keyframes rise { to { opacity: 1; transform: none; } }
+}
+
+@media (max-width: 900px) {
+  .hero .wrap,
+  .showcase .wrap,
+  .showcase--flip .wrap { grid-template-columns: minmax(0, 1fr); }
+  .showcase--flip .showcase__text { order: 0; }
+  .promise .wrap { grid-template-columns: minmax(0, 1fr); }
+  .promise div { padding: 20px 0; border-left: 0; border-top: 1px solid var(--rule); }
+  .promise div:first-child { border-top: 0; padding-top: 8px; }
+  .providers { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .never ul { grid-template-columns: minmax(0, 1fr); }
+  .nav__links a:not(.nav__cta) { display: none; }
+}

@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MacUp: understand your Mac development environment</title>
+<meta name="description" content="MacUp shows what is outdated across Homebrew, npm globals, mise, and macOS, in one place. This version reports and changes nothing.">
+<meta property="og:title" content="MacUp">
+<meta property="og:description" content="One place to understand your Mac development environment. This version reports and changes nothing.">
+<meta property="og:type" content="website">
+<meta property="og:image" content="screenshots/dashboard-light.png">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<nav class="nav">
+  <div class="wrap">
+    <a class="nav__brand" href="/">MacUp</a>
+    <div class="nav__links">
+      <a href="#what">What it checks</a>
+      <a href="#trust">Trust</a>
+      <a href="https://github.com/sd2389/macup">Source</a>
+      <a class="nav__cta" href="#install">Install</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="reveal">
+      <h1>Understand your Mac development environment.</h1>
+      <p>Homebrew, npm globals, mise, and macOS. MacUp tells you what is outdated, who owns it, and what it would run.</p>
+      <div class="hero__actions">
+        <a class="button button--primary" href="#install">Install</a>
+        <a class="button button--quiet" href="https://github.com/sd2389/macup">Read the source</a>
+      </div>
+      <div class="copyline">
+        <span>$</span><code>brew install sd2389/macup/macup</code>
+      </div>
+    </div>
+    <picture class="reveal reveal--2">
+      <source media="(prefers-color-scheme: dark)" srcset="screenshots/dashboard-dark.png">
+      <img class="shot" src="screenshots/dashboard-light.png" width="2080" height="1360"
+           alt="The MacUp dashboard listing Homebrew, npm, mise, and macOS with the number of updates found for each.">
+    </picture>
+  </div>
+</header>
+
+<section class="promise">
+  <div class="wrap">
+    <div>
+      <strong>It reports</strong>
+      <p>This version installs, upgrades, and removes nothing. Running a check cannot change a package.</p>
+    </div>
+    <div>
+      <strong>It shows the command</strong>
+      <p>Every command MacUp runs is an executable path and an argument list you can read. There is no shell.</p>
+    </div>
+    <div>
+      <strong>It stays here</strong>
+      <p>No account, no cloud, no telemetry. What MacUp learns about your Mac stays on it.</p>
+    </div>
+  </div>
+</section>
+
+<section id="what">
+  <div class="wrap">
+    <h2>Four ecosystems, one answer</h2>
+    <p style="margin-top:16px;color:var(--ink-soft)">Most Macs run several package managers that do not know about each other. MacUp asks all of them and puts the answers in one list.</p>
+
+    <div class="providers">
+      <div>
+        <h3>Homebrew</h3>
+        <p>Formulae and casks, with pins respected and apps that update themselves marked as such.</p>
+        <p><code>brew:git</code></p>
+      </div>
+      <div>
+        <h3>npm globals</h3>
+        <p>Global packages only, with the exact node and prefix that own them.</p>
+        <p><code>npm:@scope/name</code></p>
+      </div>
+      <div>
+        <h3>mise</h3>
+        <p>Runtimes and tools, with the version range you asked for kept as you wrote it.</p>
+        <p><code>mise:node</code></p>
+      </div>
+      <div>
+        <h3>macOS</h3>
+        <p>Software updates listed, including whether a restart is required. Detection only.</p>
+        <p><code>macos:27.2</code></p>
+      </div>
+    </div>
+
+    <div class="terminal">
+      <div class="terminal__bar mono">macup check</div>
+<pre><span class="prompt">$</span> macup check
+
+MacUp check <span class="quiet">·</span> read-only <span class="quiet">·</span> nothing was changed
+
+Homebrew 7.0.6 <span class="quiet">·</span> ~/.homebrew/bin/brew
+  107 installed <span class="quiet">·</span> 1 update
+  brew:mysql  9.7.1 <span class="flag">→</span> 26.7.0_2  high risk <span class="quiet">·</span> major
+
+mise 2026.7.3 <span class="quiet">·</span> ~/.local/bin/mise
+  2 installed <span class="quiet">·</span> up to date
+
+macOS 27.0 <span class="quiet">·</span> /usr/sbin/softwareupdate
+  macos:macOS 27.2 Beta  27.0 <span class="flag">→</span> 27.2  high risk <span class="quiet">·</span> restart required
+
+<span class="quiet">2 updates available. Nothing was changed.</span></pre>
+    </div>
+  </div>
+</section>
+
+<section class="showcase">
+  <div class="wrap">
+    <div class="showcase__text">
+      <h2>Risk you can argue with</h2>
+      <p>Every update says how far it moves, what that means, and who manages it. A major version bump is not filed next to a patch, and a version string that is not SemVer is called unknown rather than guessed at.</p>
+      <p>Select an update to see the installed version, the available one, and the provider that owns it.</p>
+    </div>
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="screenshots/updates-dark.png">
+      <img class="shot" src="screenshots/updates-light.png" width="2080" height="1360"
+           alt="The MacUp updates list grouped by provider, with a detail panel showing installed version, available version, and risk.">
+    </picture>
+  </div>
+</section>
+
+<section class="showcase showcase--flip">
+  <div class="wrap">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="screenshots/features-dark.png">
+      <img class="shot" src="screenshots/features-light.png" width="2080" height="1360"
+           alt="The MacUp features screen with switches for automatic checks, approval before changes, and face match.">
+    </picture>
+    <div class="showcase__text">
+      <h2>Turn things on, one switch at a time</h2>
+      <p>Schedule a check with launchd, as a user agent rather than a root daemon. Ask macOS to confirm with Touch ID before MacUp changes a setting. Each feature says what it does before it asks you to configure it.</p>
+      <p>The command line has the same features. Neither surface is the afterthought.</p>
+    </div>
+  </div>
+</section>
+
+<section class="never" id="trust">
+  <div class="wrap">
+    <h2>What MacUp will not do</h2>
+    <ul>
+      <li><strong>Build a command out of text.</strong> Every process is an executable path and an argument array. Nothing is handed to a shell.</li>
+      <li><strong>Run as root.</strong> No privileged daemon, no helper tool, no hidden authorization.</li>
+      <li><strong>Clean up after itself.</strong> No automatic cleanup, prune, or uninstall. Reclaiming disk space is your decision.</li>
+      <li><strong>Guess.</strong> When MacUp cannot tell who owns an item or what command would be correct, it skips it and says why.</li>
+      <li><strong>Phone home.</strong> No account, no analytics endpoint, no remote kill switch, no remote execution.</li>
+      <li><strong>Claim a rollback it does not have.</strong> Recovery is reported per provider, honestly, including when the answer is unknown.</li>
+    </ul>
+  </div>
+</section>
+
+<section class="install" id="install">
+  <div class="wrap">
+    <h2>Install it</h2>
+    <p>Needs macOS 14 or later and the Xcode Command Line Tools. The formula builds from source.</p>
+    <div class="copyline">
+      <span>$</span><code>brew install sd2389/macup/macup</code>
+    </div>
+    <div class="hero__actions">
+      <a class="button button--primary" href="https://github.com/sd2389/macup">Read the source</a>
+      <a class="button button--quiet" href="https://github.com/sd2389/macup/blob/main/docs/CLI.md">CLI reference</a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <span>MacUp is open source under Apache 2.0.</span>
+    <span class="spacer"></span>
+    <a href="https://github.com/sd2389/macup">GitHub</a>
+    <a href="https://github.com/sd2389/macup/blob/main/SECURITY.md">Security</a>
+    <a href="https://github.com/sd2389/macup/blob/main/docs/TRUST_AND_SECURITY.md">Trust</a>
+  </div>
+</footer>
+
+</body>
+</html>

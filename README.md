@@ -54,6 +54,12 @@ Nothing is ever changed: this version only reports. Remove the command with
 `brew uninstall macup` or, for a clone install, `make uninstall`;
 `make install PREFIX=/usr/local` installs it elsewhere.
 
+## Site
+
+`site/` holds the project's landing page: one static page, no build step, using
+real screenshots captured from the app. Preview it with
+`python3 -m http.server 4173 --directory site`.
+
 ## Desktop app
 
 The same information in a native window and the menu bar:

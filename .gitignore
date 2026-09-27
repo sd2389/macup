@@ -25,3 +25,4 @@ xcuserdata/
 *.p8
 *.cer
 *.mobileprovision
+.claude/launch.json
