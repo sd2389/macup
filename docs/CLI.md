@@ -57,11 +57,42 @@ macup --generate-completion-script zsh > ~/.zsh/completions/_macup
 | `macup schedule` / `macup schedule status [--json]` | Shows whether a check is scheduled, when it next runs, and what the last one found. Read-only. |
 | `macup schedule enable [--frequency daily\|weekly] [--time HH:mm] [--weekday <day>] [--no-refresh]` | Installs the launchd user agent that runs a read-only check, and records it in the configuration. |
 | `macup schedule disable` | Removes the agent and clears the setting. |
+| `macup security` / `macup security status [--json]` | Shows which sensor this Mac has and whether MacUp asks for approval. Read-only, no prompt. |
+| `macup security require <on\|off> [--no-password-fallback]` | Turns the approval requirement on or off. |
 | `macup --help`, `macup --version` | Help and version. |
 
 The remaining commands in the CLI contract (`update`, `plan`, `doctor`,
 `history`, `provider enable|disable`, `policy …`) arrive with Phases 2–4
 and are intentionally absent rather than stubbed.
+
+## Approval before a change
+
+MacUp can require the device owner's approval before it changes anything:
+
+```bash
+macup security require on
+macup security            # which sensor this Mac has, and whether MacUp asks
+```
+
+macOS does the asking, with whatever the Mac has — Touch ID, Face ID, or
+Optic ID on hardware that has one — and your login password or an unlocked
+Apple Watch as the fallback. MacUp never sees your fingerprint, your face, or
+your password: it asks macOS a yes-or-no question and is told yes or no.
+
+**This is a confirmation, not a lock.** MacUp runs as you, so anyone at your
+unlocked Mac can run `brew`, `npm`, or `mise` directly without it, and can
+edit `~/.config/macup/config.json` to turn it off. What it buys is a
+deliberate step in front of every change MacUp itself makes, in the CLI and
+the app alike.
+
+- Today the gated change is the schedule (`macup schedule enable|disable`).
+  The execution engine uses the same gate when it arrives.
+- Changing the setting is itself gated, by the rule in force at the time.
+- MacUp refuses to require an approval this Mac could never give: if there is
+  no usable sensor and no fallback, `macup security require on` fails rather
+  than leaving you unable to change anything.
+- No Mac has a Face ID sensor today. MacUp reads the sensor from macOS rather
+  than assuming, so a Mac that ever has one needs no change here.
 
 ## Scheduled checks
 
@@ -138,6 +169,7 @@ finish, the output says so and the check exits with status 2.
 | 2 | `check` completed but at least one provider failed or left updates out (listed updates MacUp could not read, or lookups the provider could not finish); results are partial. |
 | 3 | The configuration is invalid. Read-only commands still ran (a file other users could change is ignored, so defaults were used); automatic modifications stay disabled. When `MACUP_CONFIG_DIR`/`MACUP_STATE_DIR`/`MACUP_LAUNCH_AGENTS_DIR` is not absolute, nothing runs. |
 | 64 | Invalid command-line usage. |
+| 77 | The device owner did not approve the change, or MacUp could not ask. Nothing was changed. |
 | 130 | Interrupted with Ctrl+C. |
 | 1 | Unexpected internal error, and `schedule enable`/`disable` failing to install, remove, or record the schedule. |
 
@@ -205,6 +237,10 @@ example and fails if the encoding changes.
 - `macup config path --json` → `"kind": "configPaths"`: `configFile`,
   `configDirectory`, `stateDirectory`, and their `…Source` (`standard` or
   `environment`).
+- `macup security status --json` → `"kind": "security"`: `requireApproval`,
+  `allowPasswordFallback`, `biometry` (`touchID`, `faceID`, `opticID`,
+  `none`), `biometryDisplayName`, `biometricsAvailable`, `fallbackAvailable`,
+  `unavailableReason`.
 - `macup schedule status --json` → `"kind": "schedule"`:
   `enabledInConfiguration`, `schedule` (for example `"every day at 23:00"`),
   `refreshesMetadata`, `label`, `agentPath`, `agentInstalled`, `agentLoaded`

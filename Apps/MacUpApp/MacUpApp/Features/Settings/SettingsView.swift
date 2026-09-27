@@ -33,6 +33,8 @@ struct SettingsView: View {
                 }
             }
 
+            SecuritySection()
+
             Section("Providers") {
                 ForEach(ProviderID.known, id: \.self) { provider in
                     LabeledContent(provider.displayName, value: configuration.settings(for: provider).enabled ? "On" : "Off")
@@ -222,5 +224,69 @@ private struct ScheduleSection: View {
 
     private var weekdayBinding: Binding<MacUpConfiguration.ScheduleSettings.Weekday> {
         Binding(get: { draft.resolvedWeekday }, set: { draft.weekday = $0 })
+    }
+}
+
+
+/// Whether macOS asks the device owner to confirm before MacUp changes
+/// anything, using whatever this Mac has: Touch ID, Face ID, or Optic ID,
+/// with the login password or an unlocked Apple Watch as the fallback.
+private struct SecuritySection: View {
+    @Environment(AppModel.self) private var model
+    @State private var draft = MacUpConfiguration.SecuritySettings()
+    @State private var loaded = false
+
+    var body: some View {
+        Section("Approval") {
+            LabeledContent("This Mac", value: sensorText)
+
+            Toggle("Ask before MacUp changes anything", isOn: $draft.requireApproval)
+                .help("macOS asks you to confirm before MacUp installs a scheduled check or, later, applies an update.")
+            if draft.requireApproval {
+                Toggle("Allow your password or Apple Watch", isOn: $draft.allowPasswordFallback)
+                    .help("Lets you confirm when the sensor cannot be used. Without it, a Mac with no sensor could never approve a change.")
+                if !model.canAskForApproval(with: draft) {
+                    Label(
+                        "This Mac cannot ask you to confirm right now, so MacUp would refuse every change.",
+                        systemImage: "exclamationmark.triangle"
+                    )
+                }
+            }
+
+            if let problem = model.securityProblem {
+                Label(problem.displaySafe, systemImage: "xmark.octagon")
+                    .foregroundStyle(.red)
+            }
+
+            HStack {
+                Button("Apply") { Task { await model.applySecurity(draft) } }
+                    .disabled(!canApply)
+                Spacer()
+            }
+
+            Text("A confirmation, not a lock. MacUp runs as you, and so do brew, npm, and mise: anyone at an unlocked Mac can run them directly. MacUp never sees your fingerprint, your face, or your password.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .onAppear { reload() }
+        .onChange(of: model.configuration?.configuration.security) { reload() }
+    }
+
+    private func reload() {
+        guard !loaded || !model.isChangingSchedule else { return }
+        draft = model.securitySettings
+        loaded = true
+    }
+
+    private var sensorText: String {
+        let capability = model.biometricCapability
+        if capability.isAvailable { return capability.kind.displayName }
+        if let reason = capability.unavailableReason { return reason.displaySafe }
+        return capability.kind.displayName
+    }
+
+    private var canApply: Bool {
+        guard !model.isChangingSchedule, draft != model.securitySettings else { return false }
+        return !draft.requireApproval || model.canAskForApproval(with: draft)
     }
 }

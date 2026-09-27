@@ -36,7 +36,8 @@ configuration error (exit status 3), never a guess.
     "brew:postgresql": { "policy": "ignore" }
   },
   "schedule": { "enabled": false, "frequency": "daily", "time": "23:00", "refresh": true },
-  "privacy": { "telemetry": false }
+  "privacy": { "telemetry": false },
+  "security": { "requireApproval": false, "allowPasswordFallback": true }
 }
 ```
 
@@ -55,6 +56,8 @@ configuration error (exit status 3), never a guess.
 | `schedule.weekday` | `monday` … `sunday` | Sunday, for a weekly schedule |
 | `schedule.refresh` | `true`/`false` — refresh package metadata before a scheduled check | `true` |
 | `privacy.telemetry` | `true`/`false` (MacUp has no telemetry) | `false` |
+| `security.requireApproval` | `true`/`false` — ask the device owner before MacUp changes anything | `false` |
+| `security.allowPasswordFallback` | `true`/`false` — let the login password or an unlocked Apple Watch stand in for the sensor | `true` |
 
 Omitted sections take the defaults above. When no file exists, every
 provider is enabled, everything is Ask First, scheduling is off, and there
@@ -63,6 +66,12 @@ is no telemetry.
 Phase 1 uses `providers.<id>.enabled` (disabled providers are never run)
 and `providers.<id>.executablePath`. Policies are stored and validated now
 and enforced from Phase 2.
+
+The `security` section is what `macup security require` writes. Turning
+`requireApproval` on by hand works too, but MacUp will then refuse every
+change if this Mac cannot ask you anything; the command checks that first.
+Editing this file is always possible — it is your file, and MacUp never locks
+you out of it.
 
 The `schedule` section describes the scheduled read-only check. Change it
 with `macup schedule enable` and `macup schedule disable` rather than by

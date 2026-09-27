@@ -77,7 +77,7 @@ tests or an explicit manual verification step.
 
 ### Verification (Phase 1)
 
-- `scripts/test.sh`: 248 tests (211 core, 37 CLI), all passing; no test runs
+- `scripts/test.sh`: 262 tests (218 core, 44 CLI), all passing; no test runs
   a real provider binary.
 - `scripts/check-trust-invariants.sh`: passing.
 - Manual, read-only on the development Mac: `macup check`, `--verbose`,
@@ -127,6 +127,30 @@ still does: it is Phase 6, unchanged.
 - [ ] App view-model tests — the app still has no test target. `Scheduler`
       and `LaunchAgent` are fully covered; the app layer is verified by
       rendering its own windows (`MacUp --snapshot-dir`).
+
+## Approval before a change (biometrics)
+
+- [x] `BiometricAuthorizing` protocol, `LocalAuthenticator` over
+      `LocalAuthentication`, and a fake so no test shows a prompt
+- [x] The sensor is read from macOS (`LABiometryType`), never assumed: Touch
+      ID, Face ID, and Optic ID all map, and an unknown sensor is reported as
+      unnamed rather than guessed at
+- [x] MacUp never sees a fingerprint, a face, or a password; it passes a
+      reason string it wrote itself and receives a yes or a no
+- [x] One `ApprovalGate` for every modifying action, so the execution engine
+      cannot skip it later
+- [x] Fails closed: an approval MacUp could not obtain is a refusal (exit 77)
+- [x] `security.requireApproval` and `security.allowPasswordFallback`
+- [x] `macup security status [--json]`, `macup security require on|off`
+- [x] Changing the requirement is itself gated by the rule in force
+- [x] MacUp refuses to require an approval this Mac could never give, rather
+      than leaving the user unable to change anything
+- [x] The app has the same feature: Settings → Approval, above the sections it
+      governs, with the sensor named and the honest caption
+- [x] Documented as a confirmation, not a lock, in the CLI reference, the
+      trust document, the README, and the UI itself
+- [ ] No camera-based face matching of MacUp's own. A photograph defeats it;
+      shipping it under the word "unlock" would misrepresent what it protects.
 
 ### Verification (scheduling)
 

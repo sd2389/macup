@@ -38,5 +38,9 @@
   },
   "privacy": {
     "telemetry": false
+  },
+  "security": {
+    "requireApproval": false,
+    "allowPasswordFallback": true
   }
 }

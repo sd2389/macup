@@ -36,6 +36,15 @@ struct CLIContext: Sendable {
     /// replace both so no agent is ever installed on the host.
     var schedulerRunner: any CommandRunning
     var schedulerFileSystem: any FileSystem
+    /// macOS authentication, replaced in tests so no test shows a prompt.
+    var authorizer: any BiometricAuthorizing
+
+    /// Asks the device owner to approve a change, when the configuration says
+    /// to. Returns the outcome; the caller refuses the change unless it allows
+    /// one, and explains why.
+    func approval(_ action: String, _ configuration: MacUpConfiguration) async -> ApprovalOutcome {
+        await ApprovalGate(settings: configuration.security, authorizer: authorizer).approve(action)
+    }
 
     func scheduler(paths: MacUpPaths) -> Scheduler {
         Scheduler(
@@ -65,7 +74,8 @@ struct CLIContext: Sendable {
             executablePath: currentExecutablePath(),
             userID: getuid(),
             schedulerRunner: ProcessCommandRunner(),
-            schedulerFileSystem: LocalFileSystem()
+            schedulerFileSystem: LocalFileSystem(),
+            authorizer: LocalAuthenticator()
         )
     }
 

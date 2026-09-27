@@ -14,6 +14,9 @@ enum MacUpExitCode: Int32, CaseIterable {
     case configurationInvalid = 3
     /// Invalid command-line usage.
     case usage = 64
+    /// The device owner did not approve the change, or MacUp could not ask.
+    /// Nothing was changed.
+    case notApproved = 77
     /// Interrupted with Ctrl+C.
     case cancelled = 130
 

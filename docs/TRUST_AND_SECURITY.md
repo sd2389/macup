@@ -79,6 +79,35 @@ When an operation legitimately needs authorization:
 - never collect the password in MacUp UI
 - avoid custom privilege helpers until a separately reviewed need exists
 
+## Approval, and what it is not
+
+MacUp can require the device owner's approval before it changes anything
+(`macup security require on`, or Settings → Approval). macOS does the asking
+through `LocalAuthentication`, with whatever sensor the Mac reports — Touch
+ID, Face ID, or Optic ID — and the login password or an unlocked Apple Watch
+as the fallback. MacUp passes a reason string it wrote itself and receives a
+yes or a no. It never sees, stores, or transmits a fingerprint, a face, or a
+password, which is the same rule as rule 9 of the trust contract.
+
+It is deliberately described as a confirmation, never as a lock:
+
+- MacUp runs as the user. Anyone at an unlocked Mac can run `brew`, `npm`, or
+  `mise` directly, with no prompt from anyone.
+- The configuration file is the user's own file and can be edited to turn the
+  requirement off. MacUp does not defend against its owner.
+- There is no secret for the OS to withhold: v1 has no account, no tokens, and
+  no cloud, so there is nothing to put behind a Keychain access-control list,
+  which is where macOS would really enforce biometrics.
+
+What it does buy is one deliberate step in front of every change MacUp itself
+makes, enforced in one place (`ApprovalGate`) for the CLI and the app alike,
+so a future modifying action cannot quietly skip it. Approval that MacUp could
+not obtain is a refusal, not a pass.
+
+MacUp does not implement face recognition of its own. Camera-based matching
+that a photograph defeats would be security theatre, and shipping it under the
+word "unlock" would misrepresent what it protects.
+
 ## Remote architecture rule
 
 If cloud/team functionality exists later, the server may express declarative desired state/policy, never arbitrary shell commands.

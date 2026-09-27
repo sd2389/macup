@@ -17,9 +17,10 @@ struct MacUpCommand: AsyncParsableCommand {
               macup providers         Which installation of each tool MacUp uses
               macup config            The settings MacUp is using
               macup schedule          Whether MacUp checks automatically
+              macup security          Ask for Touch ID before MacUp changes anything
             """,
         version: MacUp.version,
-        subcommands: [CheckCommand.self, ProviderCommand.self, ConfigCommand.self, ScheduleCommand.self],
+        subcommands: [CheckCommand.self, ProviderCommand.self, ConfigCommand.self, ScheduleCommand.self, SecurityCommand.self],
         defaultSubcommand: CheckCommand.self
     )
 }

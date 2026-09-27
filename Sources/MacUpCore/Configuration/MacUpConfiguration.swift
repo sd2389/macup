@@ -14,6 +14,7 @@ public struct MacUpConfiguration: Sendable, Hashable, Codable {
     public var items: [String: ItemSettings]
     public var schedule: ScheduleSettings
     public var privacy: PrivacySettings
+    public var security: SecuritySettings
 
     public init(
         schemaVersion: Int = MacUpConfiguration.currentSchemaVersion,
@@ -21,7 +22,8 @@ public struct MacUpConfiguration: Sendable, Hashable, Codable {
         providers: [String: ProviderSettings] = [:],
         items: [String: ItemSettings] = [:],
         schedule: ScheduleSettings = ScheduleSettings(),
-        privacy: PrivacySettings = PrivacySettings()
+        privacy: PrivacySettings = PrivacySettings(),
+        security: SecuritySettings = SecuritySettings()
     ) {
         self.schemaVersion = schemaVersion
         self.global = global
@@ -29,6 +31,7 @@ public struct MacUpConfiguration: Sendable, Hashable, Codable {
         self.items = items
         self.schedule = schedule
         self.privacy = privacy
+        self.security = security
     }
 
     /// Used when no configuration file exists: every provider enabled,
@@ -148,8 +151,35 @@ public struct MacUpConfiguration: Sendable, Hashable, Codable {
         }
     }
 
+    /// Whether MacUp asks the device owner to confirm before it changes
+    /// anything.
+    ///
+    /// This is a confirmation, not a security boundary: MacUp runs as you, so
+    /// anyone at an unlocked Mac can run the package managers directly. What
+    /// it does buy is a deliberate step in front of every change MacUp makes,
+    /// in the app and in the CLI alike.
+    public struct SecuritySettings: Sendable, Hashable, Codable {
+        /// Ask before MacUp changes anything (today: the schedule).
+        public var requireApproval: Bool
+        /// Let the login password, or an unlocked Apple Watch, stand in when
+        /// the sensor is unavailable. Without it, a Mac with no biometric
+        /// sensor could never approve a change.
+        public var allowPasswordFallback: Bool
+
+        public init(requireApproval: Bool = false, allowPasswordFallback: Bool = true) {
+            self.requireApproval = requireApproval
+            self.allowPasswordFallback = allowPasswordFallback
+        }
+
+        public init(from decoder: any Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            requireApproval = try container.decodeIfPresent(Bool.self, forKey: .requireApproval) ?? false
+            allowPasswordFallback = try container.decodeIfPresent(Bool.self, forKey: .allowPasswordFallback) ?? true
+        }
+    }
+
     private enum CodingKeys: String, CodingKey {
-        case schemaVersion, global, providers, items, schedule, privacy
+        case schemaVersion, global, providers, items, schedule, privacy, security
     }
 
     public init(from decoder: any Decoder) throws {
@@ -160,5 +190,6 @@ public struct MacUpConfiguration: Sendable, Hashable, Codable {
         items = try container.decodeIfPresent([String: ItemSettings].self, forKey: .items) ?? [:]
         schedule = try container.decodeIfPresent(ScheduleSettings.self, forKey: .schedule) ?? ScheduleSettings()
         privacy = try container.decodeIfPresent(PrivacySettings.self, forKey: .privacy) ?? PrivacySettings()
+        security = try container.decodeIfPresent(SecuritySettings.self, forKey: .security) ?? SecuritySettings()
     }
 }

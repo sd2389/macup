@@ -38,6 +38,7 @@ final class CLIHarness: @unchecked Sendable {
     let launchAgentsDirectory: TemporaryDirectory
     let binDirectory: TemporaryDirectory
     let schedulerRunner = FakeCommandRunner()
+    let authorizer = FakeBiometricAuthorizer()
     var schedulerFileSystem: any FileSystem = LocalFileSystem()
     var executablePath: String
     var userID: uid_t = 501
@@ -150,7 +151,8 @@ final class CLIHarness: @unchecked Sendable {
             executablePath: executablePath,
             userID: userID,
             schedulerRunner: schedulerRunner,
-            schedulerFileSystem: schedulerFileSystem
+            schedulerFileSystem: schedulerFileSystem,
+            authorizer: authorizer
         )
         return try await runCLI(arguments, context: context, stdout: stdout, stderr: stderr)
     }

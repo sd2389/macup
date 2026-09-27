@@ -64,6 +64,22 @@ make app && open build/MacUp.app
 
 `macup check --refresh` first runs `brew update` (which updates Homebrew itself and its package lists, but no installed packages) and a fresh `softwareupdate --list` scan.
 
+## Asking before it changes anything
+
+```bash
+macup security require on   # Touch ID before MacUp changes the schedule
+macup security              # which sensor this Mac has
+```
+
+macOS does the asking with whatever the Mac has — Touch ID, Face ID, or Optic
+ID — falling back to your password or Apple Watch. MacUp never sees your
+fingerprint, your face, or your password. The same switch is in the app under
+**Settings → Approval**.
+
+It is a confirmation, not a lock: MacUp runs as you, and so do `brew`, `npm`,
+and `mise`. What it buys is a deliberate step in front of every change MacUp
+itself makes.
+
 ## Checking on a schedule
 
 ```bash

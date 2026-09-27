@@ -30,6 +30,9 @@ final class AppModel {
 
     private var environment: [String: String]?
     private let home = FileManager.default.homeDirectoryForCurrentUser.path
+    /// macOS authentication. A stored property so a future test target can
+    /// replace it; nothing here ever sees a fingerprint, a face, or a password.
+    private let authorizer: any BiometricAuthorizing = LocalAuthenticator()
 
     var updateCount: Int { report?.summary.updatesAvailable ?? 0 }
 
@@ -65,6 +68,65 @@ final class AppModel {
                 system: .current()
             )
         )
+    }
+
+    // MARK: - Approval
+
+    var securitySettings: MacUpConfiguration.SecuritySettings {
+        configuration?.configuration.security ?? MacUpConfiguration.SecuritySettings()
+    }
+
+    /// What this Mac can ask for. Reading it shows no prompt.
+    var biometricCapability: BiometricCapability {
+        ApprovalGate(settings: securitySettings, authorizer: authorizer).capability
+    }
+
+    /// Whether MacUp could get approval at all with the given settings. When it
+    /// could not, requiring approval would stop MacUp changing anything.
+    func canAskForApproval(with settings: MacUpConfiguration.SecuritySettings) -> Bool {
+        let capability = ApprovalGate(settings: settings, authorizer: authorizer).capability
+        return capability.isAvailable || (settings.allowPasswordFallback && capability.hasFallback)
+    }
+
+    private(set) var securityProblem: String?
+
+    /// Turns the approval requirement on or off. Changing it is itself a
+    /// change, so it goes through the gate that is in force now.
+    func applySecurity(_ settings: MacUpConfiguration.SecuritySettings) async {
+        guard !isChangingSchedule else { return }
+        isChangingSchedule = true
+        defer { isChangingSchedule = false }
+        securityProblem = nil
+
+        let loaded = loadConfiguration()
+        guard !loaded.hasErrors else {
+            securityProblem = "MacUp will not change a configuration it cannot read. Fix the errors above first."
+            return
+        }
+        let approval = await ApprovalGate(settings: loaded.configuration.security, authorizer: authorizer)
+            .approve("change when MacUp asks for your approval")
+        guard approval.allowsChange else {
+            securityProblem = approval.explanation
+            return
+        }
+        guard !settings.requireApproval || canAskForApproval(with: settings) else {
+            securityProblem = "This Mac cannot ask you to confirm right now, so requiring approval would stop MacUp changing anything."
+            return
+        }
+        guard let paths = try? resolvedPaths() else {
+            securityProblem = "MacUp could not resolve where its files live, so it changed nothing."
+            return
+        }
+        var configuration = loaded.configuration
+        configuration.security = settings
+        do {
+            try ConfigurationStore(paths: paths).save(configuration)
+            self.configuration = loadConfiguration()
+        } catch let error as MacUpError {
+            securityProblem = error.message
+        } catch {
+            securityProblem = "The setting could not be saved."
+        }
     }
 
     // MARK: - Scheduling
@@ -104,6 +166,13 @@ final class AppModel {
         }
         guard let executable = scheduledExecutable() else {
             scheduleProblem = "MacUp could not find the macup command to schedule. Install the command-line tool, then try again."
+            return
+        }
+
+        let approval = await ApprovalGate(settings: loaded.configuration.security, authorizer: authorizer)
+            .approve("change MacUp's scheduled check")
+        guard approval.allowsChange else {
+            scheduleProblem = approval.explanation
             return
         }
 

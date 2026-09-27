@@ -25,11 +25,12 @@ public struct ConfigurationIssue: Sendable, Hashable, Codable {
 /// certainty is an error, because a misread policy could let an update run
 /// that the user meant to block.
 public enum ConfigurationValidator {
-    static let topLevelKeys: Set<String> = ["schemaVersion", "global", "providers", "items", "schedule", "privacy"]
+    static let topLevelKeys: Set<String> = ["schemaVersion", "global", "providers", "items", "schedule", "privacy", "security"]
     static let globalKeys: Set<String> = ["defaultPolicy", "confirmMajorUpdates"]
     static let providerKeys: Set<String> = ["enabled", "policy", "executablePath"]
     static let itemKeys: Set<String> = ["policy"]
     static let scheduleKeys: Set<String> = ["enabled", "frequency", "time", "weekday", "refresh"]
+    static let securityKeys: Set<String> = ["requireApproval", "allowPasswordFallback"]
     static let privacyKeys: Set<String> = ["telemetry"]
 
     /// Executable file names that a configured `executablePath` must end in.
@@ -55,6 +56,7 @@ public enum ConfigurationValidator {
         check(object, topLevelKeys, at: "")
         check(object["global"], globalKeys, at: "global")
         check(object["schedule"], scheduleKeys, at: "schedule")
+        check(object["security"], securityKeys, at: "security")
         check(object["privacy"], privacyKeys, at: "privacy")
         if let providers = object["providers"] as? [String: Any] {
             for (name, value) in providers { check(value, providerKeys, at: "providers.\(name)") }

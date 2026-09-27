@@ -7,6 +7,15 @@ MacUp follows Semantic Versioning once releases begin.
 ## [Unreleased]
 
 ### Added
+- Optional approval before MacUp changes anything: `macup security require on`
+  and `macup security status [--json]`, with the same switch in the app under
+  **Settings → Approval**. macOS asks through `LocalAuthentication` using
+  whatever sensor the Mac reports — Touch ID, Face ID, or Optic ID — with the
+  login password or an unlocked Apple Watch as the fallback. MacUp never sees
+  a fingerprint, a face, or a password. One `ApprovalGate` serves the CLI and
+  the app, so the execution engine cannot skip it later. Approval that could
+  not be obtained is a refusal (exit status 77), never a pass. Documented as a
+  confirmation, not a lock: MacUp runs as you, and so do brew, npm, and mise.
 - Scheduled read-only checks: `macup schedule enable`, `macup schedule
   disable`, and `macup schedule status [--json]`. Enabling installs a launchd
   **user agent** (`com.macup.check`) that runs `macup check --save-state` at
