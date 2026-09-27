@@ -9,17 +9,20 @@ private struct CameraPreview: NSViewRepresentable {
 
     func makeNSView(context: Context) -> NSView {
         let view = NSView()
-        view.wantsLayer = true
         let preview = AVCaptureVideoPreviewLayer(session: session)
         preview.videoGravity = .resizeAspectFill
-        preview.frame = view.bounds
-        preview.autoresizingMask = [.layerWidthSizable, .layerHeightSizable]
+        preview.backgroundColor = NSColor.black.cgColor
+        // A layer-hosting view takes its layer before wantsLayer is set.
+        // The other order throws the layer away and shows nothing.
         view.layer = preview
+        view.wantsLayer = true
         return view
     }
 
     func updateNSView(_ nsView: NSView, context: Context) {
-        (nsView.layer as? AVCaptureVideoPreviewLayer)?.session = session
+        guard let preview = nsView.layer as? AVCaptureVideoPreviewLayer else { return }
+        if preview.session !== session { preview.session = session }
+        preview.frame = nsView.bounds
     }
 }
 
@@ -76,6 +79,7 @@ struct FaceEnrollmentSheet: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: 320)
         }
         .padding(24)

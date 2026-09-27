@@ -74,6 +74,9 @@ struct FaceStatusCommand: AsyncParsableCommand {
                 }
             }
             if let problem { lines.append("  " + style.text(problem)) }
+            if !FaceCamera.canStreamCamera {
+                lines.append("  " + style.text("Enrolling happens in the MacUp app: macOS streams the camera only to an application, not to a command."))
+            }
             lines.append("")
             lines.append("A photograph of you passes this check. It is a shortcut, not a lock:")
             lines.append("when it does not match, MacUp still asks macOS, so it cannot lock you out.")
@@ -119,6 +122,13 @@ struct FaceEnrollCommand: AsyncParsableCommand {
             context.printError("error: \(TerminalText.sanitize(approval.explanation ?? "MacUp did not get your approval."))")
             context.printError("Nothing was changed.")
             throw MacUpExitCode.notApproved.exitCode
+        }
+
+        guard FaceCamera.canStreamCamera else {
+            context.printError("error: macOS streams the camera only to an application, not to a command.")
+            context.printError("Enroll in the MacUp app: Features, then Face match, then Enroll Face.")
+            context.printError("`macup security face status` and `forget` work here as normal.")
+            throw MacUpExitCode.failure.exitCode
         }
 
         context.printError("Look at the camera. MacUp is taking \(samples) pictures.")

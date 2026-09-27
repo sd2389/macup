@@ -131,16 +131,48 @@ public struct LocalAuthenticator: BiometricAuthorizing {
             return .unavailable(capability.unavailableReason ?? "MacUp could not ask you to confirm.")
         }
 
-        let context = LAContext()
+        let box = ContextBox()
         let kind = capability.kind
+
+        // A prompt nobody answers must not hold MacUp open forever. After the
+        // deadline the context is invalidated, which ends the evaluation, and
+        // the result says it timed out rather than that someone declined.
+        let deadline = Task {
+            try? await Task.sleep(for: Self.promptTimeout)
+            box.expire()
+        }
+        defer { deadline.cancel() }
+
         return await withCheckedContinuation { continuation in
-            context.evaluatePolicy(policy, localizedReason: reason) { success, error in
+            box.context.evaluatePolicy(policy, localizedReason: reason) { success, error in
                 if success {
                     continuation.resume(returning: .approved(kind))
+                } else if box.didExpire {
+                    continuation.resume(returning: .declined(
+                        "MacUp waited for your approval and did not get it, so nothing was changed."
+                    ))
                 } else {
                     continuation.resume(returning: Self.failure(error, kind: kind))
                 }
             }
+        }
+    }
+
+    /// How long MacUp waits for the device owner to answer.
+    static let promptTimeout = Duration.seconds(90)
+
+    /// Holds the `LAContext` so it can be invalidated from the timer without
+    /// passing a non-Sendable type across tasks.
+    private final class ContextBox: @unchecked Sendable {
+        let context = LAContext()
+        private let lock = NSLock()
+        private var expired = false
+
+        var didExpire: Bool { lock.withLock { expired } }
+
+        func expire() {
+            lock.withLock { expired = true }
+            context.invalidate()
         }
     }
 
