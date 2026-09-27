@@ -59,6 +59,9 @@ macup --generate-completion-script zsh > ~/.zsh/completions/_macup
 | `macup schedule disable` | Removes the agent and clears the setting. |
 | `macup security` / `macup security status [--json]` | Shows which sensor this Mac has and whether MacUp asks for approval. Read-only, no prompt. |
 | `macup security require <on\|off> [--no-password-fallback]` | Turns the approval requirement on or off. |
+| `macup security face` / `macup security face status [--json]` | Whether a face is enrolled, and how well it can match. Opens no camera. |
+| `macup security face enroll [--samples <n>]` | Takes a few pictures and remembers what they look like. |
+| `macup security face forget` | Deletes the enrolled face and turns the camera check off. |
 | `macup --help`, `macup --version` | Help and version. |
 
 The remaining commands in the CLI contract (`update`, `plan`, `doctor`,
@@ -93,6 +96,34 @@ the app alike.
   than leaving you unable to change anything.
 - No Mac has a Face ID sensor today. MacUp reads the sensor from macOS rather
   than assuming, so a Mac that ever has one needs no change here.
+
+### The camera face match
+
+MacUp also has a face check of its own, off by default:
+
+```bash
+macup security face enroll     # a few pictures, then the camera closes
+macup security face            # enrolled? how well can it match?
+macup security face forget     # delete it
+```
+
+Be clear about what this is. macOS exposes no face-recognition API — Vision
+finds *a* face in a picture, it does not tell you whose. So MacUp crops to the
+face and compares Vision image feature prints, which measures how alike two
+pictures look. **A photograph of the enrolled person passes.**
+
+It is therefore a shortcut, never the thing that makes a change safe:
+
+- It can only approve early. When it does not match, MacUp still runs the
+  macOS prompt, so a bad match cannot lock you out.
+- It does nothing unless `security.requireApproval` is also on. `macup config
+  show` says so when it is not.
+- What is stored is a list of numbers in `~/.local/state/macup/`, owner-only.
+  No image is kept and nothing leaves the Mac. The camera is open only for the
+  moment of capture, with the recording light on.
+- `status` reports how far apart your own enrolled samples are. If that spread
+  is wider than `security.faceMatchThreshold`, matching cannot work, and MacUp
+  says so rather than letting you find out later.
 
 ## Scheduled checks
 
@@ -241,6 +272,9 @@ example and fails if the encoding changes.
   `allowPasswordFallback`, `biometry` (`touchID`, `faceID`, `opticID`,
   `none`), `biometryDisplayName`, `biometricsAvailable`, `fallbackAvailable`,
   `unavailableReason`.
+- `macup security face status --json` → `"kind": "securityFace"`: `enabled`,
+  `enrolled`, `sampleCount`, `enrolledAt`, `sampleSpread`, `threshold`,
+  `cameraPresent`, `cameraAllowed`, `storedAt`, `problem`.
 - `macup schedule status --json` → `"kind": "schedule"`:
   `enabledInConfiguration`, `schedule` (for example `"every day at 23:00"`),
   `refreshesMetadata`, `label`, `agentPath`, `agentInstalled`, `agentLoaded`

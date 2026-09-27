@@ -165,16 +165,37 @@ public struct MacUpConfiguration: Sendable, Hashable, Codable {
         /// the sensor is unavailable. Without it, a Mac with no biometric
         /// sensor could never approve a change.
         public var allowPasswordFallback: Bool
+        /// Let MacUp's own camera face match approve a change, as a shortcut
+        /// before the macOS prompt. Off by default: it compares how alike two
+        /// pictures look, so a photograph of the enrolled person passes.
+        public var faceUnlock: Bool
+        /// How close a live picture must be to an enrolled one. Smaller is
+        /// stricter. There is no principled value; see `FaceComparator`.
+        public var faceMatchThreshold: Double
 
-        public init(requireApproval: Bool = false, allowPasswordFallback: Bool = true) {
+        /// Written as a decimal so the value people read in the file and in
+        /// `--json` is the value they set, not a binary-float neighbour of it.
+        public static let defaultFaceMatchThreshold = 0.6
+
+        public init(
+            requireApproval: Bool = false,
+            allowPasswordFallback: Bool = true,
+            faceUnlock: Bool = false,
+            faceMatchThreshold: Double = MacUpConfiguration.SecuritySettings.defaultFaceMatchThreshold
+        ) {
             self.requireApproval = requireApproval
             self.allowPasswordFallback = allowPasswordFallback
+            self.faceUnlock = faceUnlock
+            self.faceMatchThreshold = faceMatchThreshold
         }
 
         public init(from decoder: any Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             requireApproval = try container.decodeIfPresent(Bool.self, forKey: .requireApproval) ?? false
             allowPasswordFallback = try container.decodeIfPresent(Bool.self, forKey: .allowPasswordFallback) ?? true
+            faceUnlock = try container.decodeIfPresent(Bool.self, forKey: .faceUnlock) ?? false
+            faceMatchThreshold = try container.decodeIfPresent(Double.self, forKey: .faceMatchThreshold)
+                ?? Self.defaultFaceMatchThreshold
         }
     }
 

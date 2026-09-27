@@ -80,6 +80,12 @@ It is a confirmation, not a lock: MacUp runs as you, and so do `brew`, `npm`,
 and `mise`. What it buys is a deliberate step in front of every change MacUp
 itself makes.
 
+MacUp also has a camera face match of its own, off by default
+(`macup security face enroll`). No Mac has a Face ID sensor, and macOS exposes
+no face-recognition API, so this compares how alike two pictures look — **a
+photograph of you passes it**. It can only approve early; when it does not
+match, MacUp still asks macOS. Treat it as a shortcut, not as security.
+
 ## Checking on a schedule
 
 ```bash

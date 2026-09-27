@@ -104,9 +104,36 @@ makes, enforced in one place (`ApprovalGate`) for the CLI and the app alike,
 so a future modifying action cannot quietly skip it. Approval that MacUp could
 not obtain is a refusal, not a pass.
 
-MacUp does not implement face recognition of its own. Camera-based matching
-that a photograph defeats would be security theatre, and shipping it under the
-word "unlock" would misrepresent what it protects.
+### The camera face match
+
+MacUp does include a face check of its own, off by default, and it is
+documented here rather than advertised, because it is not security.
+
+macOS exposes no face-recognition API: Vision finds *a* face in a picture and
+does not tell you whose. What MacUp does is crop to the face and compare
+Vision image feature prints — a measure of how alike two pictures look. A
+photograph of the enrolled person passes it. There is no Secure Enclave, no
+liveness check, and no macOS enforcement behind it.
+
+It is constrained so that it cannot be mistaken for a lock:
+
+- It can only approve early. A face that does not match falls through to the
+  macOS prompt rather than refusing, so it can never lock anyone out, and it
+  never replaces the macOS check as the only way through.
+- It reports `cameraFace`, never `faceID`, so what approved a change is always
+  distinguishable from a hardware sensor in the UI, the logs, and `--json`.
+- It does nothing unless approval is also required; the validator warns when
+  it is on and inert.
+- What is stored is a list of numbers derived from the pictures, owner-only in
+  the state directory. No image is kept, nothing leaves the Mac, and the
+  camera is open only for the moment of capture, recording light on.
+- Enrolment reports how far apart the enrolled samples of one face are, so the
+  threshold can be judged rather than trusted. When the spread is wider than
+  the threshold, MacUp says matching cannot work.
+
+If this feature were ever presented as protecting anything, that would be
+misrepresentation. It is a convenience for its owner, on their own machine,
+and every surface that shows it says so.
 
 ## Remote architecture rule
 

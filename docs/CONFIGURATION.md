@@ -37,7 +37,12 @@ configuration error (exit status 3), never a guess.
   },
   "schedule": { "enabled": false, "frequency": "daily", "time": "23:00", "refresh": true },
   "privacy": { "telemetry": false },
-  "security": { "requireApproval": false, "allowPasswordFallback": true }
+  "security": {
+    "requireApproval": false,
+    "allowPasswordFallback": true,
+    "faceUnlock": false,
+    "faceMatchThreshold": 0.6
+  }
 }
 ```
 
@@ -58,6 +63,8 @@ configuration error (exit status 3), never a guess.
 | `privacy.telemetry` | `true`/`false` (MacUp has no telemetry) | `false` |
 | `security.requireApproval` | `true`/`false` — ask the device owner before MacUp changes anything | `false` |
 | `security.allowPasswordFallback` | `true`/`false` — let the login password or an unlocked Apple Watch stand in for the sensor | `true` |
+| `security.faceUnlock` | `true`/`false` — let MacUp's own camera face match approve early | `false` |
+| `security.faceMatchThreshold` | distance greater than 0 and no more than 5; smaller is stricter | `0.6` |
 
 Omitted sections take the defaults above. When no file exists, every
 provider is enabled, everything is Ask First, scheduling is off, and there

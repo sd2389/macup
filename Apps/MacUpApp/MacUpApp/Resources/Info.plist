@@ -24,6 +24,8 @@
 	<string>public.app-category.developer-tools</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>14.0</string>
+	<key>NSCameraUsageDescription</key>
+	<string>MacUp uses the camera only when you ask it to enroll or check a face, to approve a change you started. No image is stored and nothing leaves this Mac.</string>
 	<key>NSHighResolutionCapable</key>
 	<true/>
 </dict>

@@ -21,7 +21,7 @@ struct SecurityCommand: AsyncParsableCommand {
             Today the only change MacUp can make is the scheduled check. The \
             execution engine uses the same gate when it arrives.
             """,
-        subcommands: [SecurityStatusCommand.self, SecurityRequireCommand.self],
+        subcommands: [SecurityStatusCommand.self, SecurityRequireCommand.self, SecurityFaceCommand.self],
         defaultSubcommand: SecurityStatusCommand.self
     )
 }
@@ -108,7 +108,7 @@ struct SecurityRequireCommand: AsyncParsableCommand {
 
         // Changing this setting is itself a change, so it goes through the gate
         // that is in force now, not the one being asked for.
-        let approval = await context.approval("change when MacUp asks for your approval", loaded.configuration)
+        let approval = await context.approval("change when MacUp asks for your approval", loaded.configuration, paths: paths)
         guard approval.allowsChange else {
             context.printError("error: \(TerminalText.sanitize(approval.explanation ?? "MacUp did not get your approval."))")
             context.printError("Nothing was changed.")

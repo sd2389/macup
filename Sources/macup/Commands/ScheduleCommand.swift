@@ -108,7 +108,7 @@ struct ScheduleEnableCommand: AsyncParsableCommand {
             throw MacUpExitCode.configurationInvalid.exitCode
         }
 
-        let approval = await context.approval("change MacUp's scheduled check", loaded.configuration)
+        let approval = await context.approval("change MacUp's scheduled check", loaded.configuration, paths: paths)
         guard approval.allowsChange else {
             context.printError("error: \(TerminalText.sanitize(approval.explanation ?? "MacUp did not get your approval."))")
             context.printError("Nothing was changed.")
@@ -174,7 +174,7 @@ struct ScheduleDisableCommand: AsyncParsableCommand {
         let loaded = store.load()
         let scheduler = context.scheduler(paths: paths)
 
-        let approval = await context.approval("turn off MacUp's scheduled check", loaded.configuration)
+        let approval = await context.approval("turn off MacUp's scheduled check", loaded.configuration, paths: paths)
         guard approval.allowsChange else {
             context.printError("error: \(TerminalText.sanitize(approval.explanation ?? "MacUp did not get your approval."))")
             context.printError("Nothing was changed.")

@@ -42,8 +42,23 @@ struct CLIContext: Sendable {
     /// Asks the device owner to approve a change, when the configuration says
     /// to. Returns the outcome; the caller refuses the change unless it allows
     /// one, and explains why.
-    func approval(_ action: String, _ configuration: MacUpConfiguration) async -> ApprovalOutcome {
-        await ApprovalGate(settings: configuration.security, authorizer: authorizer).approve(action)
+    func approval(_ action: String, _ configuration: MacUpConfiguration, paths: MacUpPaths) async -> ApprovalOutcome {
+        await ApprovalGate(
+            settings: configuration.security,
+            authorizer: authorizer,
+            faceUnlock: faceUnlock(configuration, paths: paths)
+        ).approve(action)
+    }
+
+    /// MacUp's own camera face match, when the configuration asks for it.
+    /// `nil` otherwise, so the camera is never opened for someone who did not
+    /// turn it on.
+    func faceUnlock(_ configuration: MacUpConfiguration, paths: MacUpPaths) -> FaceUnlockService? {
+        guard configuration.security.faceUnlock else { return nil }
+        return FaceUnlockService(
+            store: FaceEnrollmentStore(paths: paths),
+            comparator: FaceComparator(threshold: Float(configuration.security.faceMatchThreshold))
+        )
     }
 
     func scheduler(paths: MacUpPaths) -> Scheduler {

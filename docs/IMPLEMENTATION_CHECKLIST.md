@@ -77,7 +77,7 @@ tests or an explicit manual verification step.
 
 ### Verification (Phase 1)
 
-- `scripts/test.sh`: 262 tests (218 core, 44 CLI), all passing; no test runs
+- `scripts/test.sh`: 272 tests (228 core, 44 CLI), all passing; no test runs
   a real provider binary.
 - `scripts/check-trust-invariants.sh`: passing.
 - Manual, read-only on the development Mac: `macup check`, `--verbose`,
@@ -149,8 +149,23 @@ still does: it is Phase 6, unchanged.
       governs, with the sensor named and the honest caption
 - [x] Documented as a confirmation, not a lock, in the CLI reference, the
       trust document, the README, and the UI itself
-- [ ] No camera-based face matching of MacUp's own. A photograph defeats it;
-      shipping it under the word "unlock" would misrepresent what it protects.
+- [x] A camera face match of MacUp's own, built at the owner's explicit
+      request after the limits were stated. Constrained so it cannot be
+      mistaken for security:
+  - [x] Named `cameraFace`, never `faceID`, everywhere it is reported
+  - [x] Approves early only; a mismatch falls through to macOS, so it can
+        never lock anyone out and never replaces the macOS check
+  - [x] Off by default, and the validator warns when it is on but approval is
+        not required
+  - [x] Stores numbers, not images, owner-only in the state directory; the
+        camera is open only for the moment of capture
+  - [x] Reports the spread of the enrolled samples, and says plainly when the
+        spread is wider than the threshold so matching cannot work
+  - [x] Every surface — CLI, app, README, trust document — says a photograph
+        of the enrolled person passes it
+- [ ] Face matching accuracy is untested against real faces. Vision's feature
+      prints were built for image similarity, not identity, so the default
+      threshold is a starting point rather than a tuned value.
 
 ### Verification (scheduling)
 

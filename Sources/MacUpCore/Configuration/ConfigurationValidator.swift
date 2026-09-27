@@ -30,7 +30,7 @@ public enum ConfigurationValidator {
     static let providerKeys: Set<String> = ["enabled", "policy", "executablePath"]
     static let itemKeys: Set<String> = ["policy"]
     static let scheduleKeys: Set<String> = ["enabled", "frequency", "time", "weekday", "refresh"]
-    static let securityKeys: Set<String> = ["requireApproval", "allowPasswordFallback"]
+    static let securityKeys: Set<String> = ["requireApproval", "allowPasswordFallback", "faceUnlock", "faceMatchThreshold"]
     static let privacyKeys: Set<String> = ["telemetry"]
 
     /// Executable file names that a configured `executablePath` must end in.
@@ -137,6 +137,22 @@ public enum ConfigurationValidator {
                 .error,
                 "schedule.time",
                 "Use 24-hour HH:mm, for example 23:00; found '\(TerminalText.sanitize(configuration.schedule.time))'."
+            ))
+        }
+
+        let threshold = configuration.security.faceMatchThreshold
+        if !(threshold > 0 && threshold <= 5) {
+            issues.append(ConfigurationIssue(
+                .error,
+                "security.faceMatchThreshold",
+                "Use a distance greater than 0 and no more than 5; found \(threshold)."
+            ))
+        }
+        if configuration.security.faceUnlock && !configuration.security.requireApproval {
+            issues.append(ConfigurationIssue(
+                .warning,
+                "security.faceUnlock",
+                "Face match is on but approval is not required, so MacUp never asks for it."
             ))
         }
 

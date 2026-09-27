@@ -16,6 +16,17 @@ MacUp follows Semantic Versioning once releases begin.
   the app, so the execution engine cannot skip it later. Approval that could
   not be obtained is a refusal (exit status 77), never a pass. Documented as a
   confirmation, not a lock: MacUp runs as you, and so do brew, npm, and mise.
+- A camera face match of MacUp's own, off by default: `macup security face
+  enroll|status|forget`, and Enroll/Forget in the app under Settings →
+  Approval. No Mac has a Face ID sensor and macOS exposes no face-recognition
+  API, so this crops to the face and compares Vision image feature prints —
+  how alike two pictures look. A photograph of the enrolled person passes it,
+  which the CLI, the app, the README, and `docs/TRUST_AND_SECURITY.md` all say
+  plainly. It can only approve early: a face that does not match falls through
+  to the macOS prompt, so it can never lock anyone out, and it reports
+  `cameraFace` rather than `faceID` so it is never mistaken for a sensor.
+  Enrolment stores numbers, not images, owner-only, and reports how far apart
+  your own samples are so the threshold can be judged.
 - Scheduled read-only checks: `macup schedule enable`, `macup schedule
   disable`, and `macup schedule status [--json]`. Enabling installs a launchd
   **user agent** (`com.macup.check`) that runs `macup check --save-state` at

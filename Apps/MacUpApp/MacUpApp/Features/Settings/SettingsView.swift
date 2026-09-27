@@ -258,6 +258,8 @@ private struct SecuritySection: View {
                     .foregroundStyle(.red)
             }
 
+            faceRows
+
             HStack {
                 Button("Apply") { Task { await model.applySecurity(draft) } }
                     .disabled(!canApply)
@@ -268,8 +270,49 @@ private struct SecuritySection: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
-        .onAppear { reload() }
+        .onAppear {
+            reload()
+            model.loadFaceEnrollment()
+        }
         .onChange(of: model.configuration?.configuration.security) { reload() }
+    }
+
+    /// MacUp's own camera check. Presented apart from the macOS sensors above,
+    /// and labelled for what it is, because it is not one of them.
+    @ViewBuilder
+    private var faceRows: some View {
+        LabeledContent("Face match (camera)", value: faceStateText)
+        if let spread = model.faceEnrollment?.sampleSpread {
+            let threshold = model.securitySettings.faceMatchThreshold
+            Text(String(format: "Your own samples differ by up to %.2f; the threshold is %.2f.", spread, threshold))
+                .font(.caption)
+                .foregroundStyle(Double(spread) >= threshold ? AnyShapeStyle(.red) : AnyShapeStyle(.secondary))
+        }
+        if let problem = model.faceProblem {
+            Label(problem.displaySafe, systemImage: "exclamationmark.triangle")
+        }
+        HStack {
+            Button(model.faceEnrollment == nil ? "Enroll Face…" : "Enroll Again…") {
+                Task { await model.enrollFace() }
+            }
+            .disabled(!model.cameraPresent || model.isEnrollingFace)
+            Button("Forget Face") { model.forgetFace() }
+                .disabled(model.faceEnrollment == nil || model.isEnrollingFace)
+            if model.isEnrollingFace {
+                ProgressView().controlSize(.small)
+                Text("Look at the camera…").font(.caption).foregroundStyle(.secondary)
+            }
+        }
+        Text("A photograph of you passes this check, so it is a shortcut and not a lock. When the face does not match, MacUp still asks macOS, so it cannot lock you out. No image is stored and nothing leaves this Mac.")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+    }
+
+    private var faceStateText: String {
+        guard model.cameraPresent else { return "No camera found" }
+        guard let enrollment = model.faceEnrollment else { return "Not enrolled" }
+        let samples = "\(enrollment.signatures.count) samples"
+        return model.securitySettings.faceUnlock ? "On · \(samples)" : "Enrolled, turned off · \(samples)"
     }
 
     private func reload() {

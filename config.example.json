@@ -41,6 +41,8 @@
   },
   "security": {
     "requireApproval": false,
-    "allowPasswordFallback": true
+    "allowPasswordFallback": true,
+    "faceUnlock": false,
+    "faceMatchThreshold": 0.6
   }
 }

@@ -89,6 +89,98 @@ final class AppModel {
     }
 
     private(set) var securityProblem: String?
+    private(set) var faceEnrollment: FaceEnrollment?
+    private(set) var isEnrollingFace = false
+    /// What enrolling or reading the enrolment went wrong with, if anything.
+    private(set) var faceProblem: String?
+
+    var cameraPresent: Bool { FaceCamera.hasCamera }
+
+    /// The camera face match, when the configuration asks for it. `nil`
+    /// otherwise, so the camera is never opened for someone who did not turn
+    /// it on.
+    private func faceUnlock(_ configuration: MacUpConfiguration, paths: MacUpPaths) -> FaceUnlockService? {
+        guard configuration.security.faceUnlock else { return nil }
+        return FaceUnlockService(
+            store: FaceEnrollmentStore(paths: paths),
+            comparator: FaceComparator(threshold: Float(configuration.security.faceMatchThreshold))
+        )
+    }
+
+    /// Reads the stored enrolment. Opens no camera and shows no prompt.
+    func loadFaceEnrollment() {
+        faceProblem = nil
+        guard let paths = try? resolvedPaths() else { return }
+        do {
+            faceEnrollment = try FaceEnrollmentStore(paths: paths).load()
+        } catch let error as MacUpError {
+            faceEnrollment = nil
+            faceProblem = error.message
+        } catch {
+            faceEnrollment = nil
+        }
+    }
+
+    /// Takes a few pictures and remembers what they look like. Replacing an
+    /// enrolment is a change, so it goes through the same gate.
+    func enrollFace() async {
+        guard !isEnrollingFace else { return }
+        isEnrollingFace = true
+        defer { isEnrollingFace = false }
+        faceProblem = nil
+
+        let loaded = loadConfiguration()
+        guard !loaded.hasErrors, let paths = try? resolvedPaths() else {
+            faceProblem = "MacUp will not change a configuration it cannot read."
+            return
+        }
+        let approval = await ApprovalGate(
+            settings: loaded.configuration.security,
+            authorizer: authorizer,
+            faceUnlock: faceUnlock(loaded.configuration, paths: paths)
+        ).approve("enroll a face on this Mac")
+        guard approval.allowsChange else {
+            faceProblem = approval.explanation
+            return
+        }
+
+        let service = FaceUnlockService(
+            store: FaceEnrollmentStore(paths: paths),
+            comparator: FaceComparator(threshold: Float(loaded.configuration.security.faceMatchThreshold))
+        )
+        do {
+            faceEnrollment = try await service.enroll()
+            var configuration = loaded.configuration
+            configuration.security.faceUnlock = true
+            try ConfigurationStore(paths: paths).save(configuration)
+            self.configuration = loadConfiguration()
+        } catch let error as MacUpError {
+            faceProblem = [error.message, error.recoverySuggestion].compactMap { $0 }.joined(separator: " ")
+        } catch {
+            faceProblem = "MacUp could not enroll a face."
+        }
+    }
+
+    /// Deletes the enrolment and turns the camera check off.
+    func forgetFace() {
+        faceProblem = nil
+        guard let paths = try? resolvedPaths() else { return }
+        do {
+            try FaceEnrollmentStore(paths: paths).remove()
+            faceEnrollment = nil
+            let loaded = loadConfiguration()
+            if !loaded.hasErrors && loaded.configuration.security.faceUnlock {
+                var configuration = loaded.configuration
+                configuration.security.faceUnlock = false
+                try ConfigurationStore(paths: paths).save(configuration)
+                self.configuration = loadConfiguration()
+            }
+        } catch let error as MacUpError {
+            faceProblem = error.message
+        } catch {
+            faceProblem = "The enrolled face could not be deleted."
+        }
+    }
 
     /// Turns the approval requirement on or off. Changing it is itself a
     /// change, so it goes through the gate that is in force now.
@@ -103,8 +195,11 @@ final class AppModel {
             securityProblem = "MacUp will not change a configuration it cannot read. Fix the errors above first."
             return
         }
-        let approval = await ApprovalGate(settings: loaded.configuration.security, authorizer: authorizer)
-            .approve("change when MacUp asks for your approval")
+        let approval = await ApprovalGate(
+            settings: loaded.configuration.security,
+            authorizer: authorizer,
+            faceUnlock: (try? resolvedPaths()).flatMap { faceUnlock(loaded.configuration, paths: $0) }
+        ).approve("change when MacUp asks for your approval")
         guard approval.allowsChange else {
             securityProblem = approval.explanation
             return
@@ -169,8 +264,11 @@ final class AppModel {
             return
         }
 
-        let approval = await ApprovalGate(settings: loaded.configuration.security, authorizer: authorizer)
-            .approve("change MacUp's scheduled check")
+        let approval = await ApprovalGate(
+            settings: loaded.configuration.security,
+            authorizer: authorizer,
+            faceUnlock: faceUnlock(loaded.configuration, paths: paths)
+        ).approve("change MacUp's scheduled check")
         guard approval.allowsChange else {
             scheduleProblem = approval.explanation
             return

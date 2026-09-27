@@ -10,6 +10,10 @@ public enum BiometryKind: String, Sendable, Hashable, Codable, CaseIterable {
     case touchID
     case faceID
     case opticID
+    /// MacUp's own camera face match. Not a macOS biometric: it compares how
+    /// alike two pictures look, so a photograph of the enrolled person passes.
+    /// Named separately so it is never mistaken for the sensors above.
+    case cameraFace
     /// No biometric sensor, or one macOS did not name.
     case none
 
@@ -18,6 +22,7 @@ public enum BiometryKind: String, Sendable, Hashable, Codable, CaseIterable {
         case .touchID: return "Touch ID"
         case .faceID: return "Face ID"
         case .opticID: return "Optic ID"
+        case .cameraFace: return "Face match (camera)"
         case .none: return "No biometric sensor"
         }
     }
@@ -208,19 +213,35 @@ public struct ApprovalGate: Sendable {
     public var settings: MacUpConfiguration.SecuritySettings
     public var authorizer: any BiometricAuthorizing
 
-    public init(settings: MacUpConfiguration.SecuritySettings, authorizer: any BiometricAuthorizing = LocalAuthenticator()) {
+    public init(
+        settings: MacUpConfiguration.SecuritySettings,
+        authorizer: any BiometricAuthorizing = LocalAuthenticator(),
+        faceUnlock: FaceUnlockService? = nil
+    ) {
         self.settings = settings
         self.authorizer = authorizer
+        self.faceUnlock = faceUnlock
     }
 
     public var capability: BiometricCapability {
         authorizer.capability(allowsFallback: settings.allowPasswordFallback)
     }
 
+    /// MacUp's own camera face match, when one is configured. Tried before
+    /// macOS, and only ever as a shortcut: if it does not approve, the macOS
+    /// prompt still runs, so a bad match can never lock anyone out.
+    public var faceUnlock: FaceUnlockService?
+
     /// - Parameter action: MacUp's own description of the change, completing
     ///   the sentence macOS shows: "MacUp is trying to <action>."
     public func approve(_ action: String) async -> ApprovalOutcome {
         guard settings.requireApproval else { return .notRequired }
+        if settings.faceUnlock, let faceUnlock, faceUnlock.isEnrolled {
+            let outcome = await faceUnlock.verify()
+            if case .approved = outcome { return .approved(.cameraFace) }
+            // Anything else falls through to macOS rather than refusing: the
+            // camera is a shortcut, never the only way in.
+        }
         return await authorizer.approve(reason: action, allowsFallback: settings.allowPasswordFallback)
     }
 }
