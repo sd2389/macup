@@ -127,10 +127,16 @@ refuses to write. Nothing is changed until the configuration is fixed.
 ## Editing policy through `PolicyEditor`
 
 `PolicyEditor` is the one place MacUp changes a rule. `macup policy set`,
-`macup policy clear`, `macup provider enable`, `macup provider disable`, and
-the app's policy controls all go through it, so there is a single source of
-truth for what a policy edit is allowed to do (CLAUDE.md §12). It refuses
-more than it accepts, and the refusals are the interesting part.
+`macup policy clear`, `macup exclude` (which is `policy set … ignore` on the
+same path), `macup provider enable`, `macup provider disable`, and the app's
+policy controls all go through it, so there is a single source of truth for
+what a policy edit is allowed to do (CLAUDE.md §12). It refuses more than it
+accepts, and the refusals are the interesting part.
+
+Changing a rule is itself a change, so when `security.requireApproval` is on
+it asks the device owner first, exactly as changing a package does. Deciding
+which items MacUp may update is the decision every later decision rests on,
+and it would be odd to guard the update while leaving the rule open.
 
 ### A package ID is validated before anything is written
 

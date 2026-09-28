@@ -60,6 +60,42 @@ jobs:
           # deliberately never run in CI.
           "$macup" schedule status
           "$macup" schedule status --json
+          # Reading only: `plan` and `doctor` describe and diagnose, and
+          # `policy list` and `history` print what is already stored. The one
+          # command that changes packages, `macup update`, is never run here.
+          "$macup" policy list
+          "$macup" policy list --json
+          "$macup" history
+          "$macup" history --json
+
+      # Planning and diagnosing on the disposable runner. Both describe
+      # rather than act, so a non-zero exit (a provider hiccup, or Doctor
+      # finding something to say about a CI image) is tolerated; what must
+      # hold is that the output is valid schema-1 JSON and that a dry run
+      # launched nothing.
+      - name: Plan, diagnose, and dry-run on the runner
+        run: |
+          set +e
+          "$MACUP" plan --json > "$RUNNER_TEMP/plan.json"; echo "plan exited $?"
+          "$MACUP" doctor --json > "$RUNNER_TEMP/doctor.json"; echo "doctor exited $?"
+          "$MACUP" update --dry-run --json > "$RUNNER_TEMP/dry-run.json"; echo "dry run exited $?"
+          set -e
+          python3 - <<'EOF'
+          import json, os
+          temp = os.environ["RUNNER_TEMP"]
+          plan = json.load(open(temp + "/plan.json"))
+          assert plan["schemaVersion"] == 1 and plan["kind"] == "plan", plan["kind"]
+          doctor = json.load(open(temp + "/doctor.json"))
+          assert doctor["schemaVersion"] == 1 and doctor["kind"] == "doctor", doctor["kind"]
+          run = json.load(open(temp + "/dry-run.json"))
+          assert run["schemaVersion"] == 1 and run["kind"] == "update", run["kind"]
+          # The Phase 2 exit criterion, checked on a real machine: a dry run
+          # attempts nothing at all.
+          assert run["dryRun"] is True
+          assert run["executed"] == [], run["executed"]
+          assert run["summary"]["attempted"] == 0, run["summary"]
+          print("plan, doctor, and dry run are schema-1 and changed nothing")
+          EOF
 
       # A real, read-only check on the disposable runner. Exit status 2
       # (a provider failed, for example a registry hiccup) is tolerated; the
