@@ -23,7 +23,9 @@ public enum MiseConfigScope: String, Sendable, Hashable, Codable {
 /// Read-only commands: `mise --version`, `mise ls --json`, `mise outdated --json`.
 public struct MiseProvider: UpdateProvider {
     public let id = ProviderID.mise
-    public let capabilities: Set<ProviderCapability> = [.detect, .inventory, .outdated]
+    public let capabilities: Set<ProviderCapability> = [
+        .detect, .inventory, .outdated, .planUpdates, .verifyUpdates,
+    ]
     /// Absolute paths; `~` is expanded against the user's home directory.
     public var standardLocations: [String]
 
@@ -190,7 +192,7 @@ public struct MiseProvider: UpdateProvider {
         return .project
     }
 
-    private func parserContext(_ installation: ProviderInstallation, context: ProviderContext, command: String) -> MiseParsers.Context {
+    func parserContext(_ installation: ProviderInstallation, context: ProviderContext, command: String) -> MiseParsers.Context {
         MiseParsers.Context(
             homeDirectory: context.homeDirectory,
             directories: Self.directories(environment: context.environment, homeDirectory: context.homeDirectory),
@@ -203,7 +205,7 @@ public struct MiseProvider: UpdateProvider {
         )
     }
 
-    private func run(
+    func run(
         _ arguments: [String],
         _ installation: ProviderInstallation,
         context: ProviderContext,

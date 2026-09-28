@@ -5,8 +5,9 @@
 #      login-shell environment probe, which runs the user's own shell with a
 #      fixed script (see Sources/MacUpCore/Execution/LoginShellEnvironment.swift);
 #   2. process launching outside ProcessCommandRunner;
-#   3. modifying provider verbs — MacUp is read-only until Phase 3 adds an
-#      execution engine, at which point this rule moves to that engine's files;
+#   3. modifying provider verbs anywhere but the four files that plan them —
+#      one rules file and one planning file per provider, so a modifying
+#      command can only be named where it has been reviewed;
 #   4. scheduling that is not a per-user LaunchAgent running only `macup check`.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -31,8 +32,20 @@ if [[ -n "$launches" ]]; then
     fail "external processes must be launched through ProcessCommandRunner"
 fi
 
-if grep -rnE '"(upgrade|install|reinstall|uninstall|remove|rm|cleanup|autoremove|prune|self-update|use|--install|--download|--bump|--all)"' Sources Apps; then
-    fail "modifying provider command found during the read-only phases"
+# Only these files may name a modifying provider verb: the one reviewable
+# list of allowed commands, and the one planning file per provider. Every
+# other file — the CLI, the app, discovery, scheduling — must not.
+planning_files='^Sources/MacUpCore/Execution/ModifyingCommandRules\.swift:|^Sources/MacUpCore/Providers/(Homebrew/Homebrew|Npm/Npm|Mise/Mise)UpdatePlan\.swift:'
+verbs=$(grep -rnE '"(upgrade|install|reinstall|uninstall|remove|rm|cleanup|autoremove|prune|self-update|use|--install|--download|--bump|--all)"' Sources Apps \
+    | grep -vE "$planning_files" || true)
+if [[ -n "$verbs" ]]; then
+    echo "$verbs" >&2
+    fail "modifying provider command found outside the reviewed planning files"
+fi
+
+# --bump would move the version the user requested, so it may appear nowhere.
+if grep -rn -- '"--bump"' Sources Apps; then
+    fail "mise --bump must never appear: it rewrites the user's requested version"
 fi
 
 daemons=$(grep -rnE 'LaunchDaemons|"system/|"bootstrap", *"system' Sources Apps || true)

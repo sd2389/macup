@@ -1,0 +1,34 @@
+{
+  "node": [
+    {
+      "version": "24.19.0",
+      "install_path": "/Users/example/.local/share/mise/installs/node/24.19.0",
+      "installed": true,
+      "active": false
+    },
+    {
+      "version": "24.21.0",
+      "requested_version": "24",
+      "install_path": "/Users/example/.local/share/mise/installs/node/24.21.0",
+      "source": {
+        "type": "mise.toml",
+        "path": "/Users/example/.config/mise/config.toml"
+      },
+      "installed": true,
+      "active": true
+    }
+  ],
+  "python": [
+    {
+      "version": "3.12.13",
+      "requested_version": "3.12",
+      "install_path": "/Users/example/.local/share/mise/installs/python/3.12.13",
+      "source": {
+        "type": "mise.toml",
+        "path": "/Users/example/.config/mise/config.toml"
+      },
+      "installed": true,
+      "active": true
+    }
+  ]
+}

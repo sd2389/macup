@@ -13,7 +13,9 @@ import Foundation
 /// `npm root -g`, `npm ls -g --json --depth=0`, `npm outdated -g --json`.
 public struct NpmProvider: UpdateProvider {
     public let id = ProviderID.npm
-    public let capabilities: Set<ProviderCapability> = [.detect, .inventory, .outdated]
+    public let capabilities: Set<ProviderCapability> = [
+        .detect, .inventory, .outdated, .planUpdates, .verifyUpdates,
+    ]
     public var standardLocations: [String]
 
     public init(standardLocations: [String] = ["/opt/homebrew/bin/npm", "/usr/local/bin/npm"]) {
@@ -202,7 +204,7 @@ public struct NpmProvider: UpdateProvider {
         return nil
     }
 
-    private func childSearchPath(_ installation: ProviderInstallation, context: ProviderContext) -> [String] {
+    func childSearchPath(_ installation: ProviderInstallation, context: ProviderContext) -> [String] {
         let nodeDirectory = installation.fact(FactKey.nodePath).map { ($0 as NSString).deletingLastPathComponent }
         return SearchPath.combine(
             [nodeDirectory, installation.executable.directory, installation.executable.canonicalDirectory].compactMap { $0 },
@@ -213,7 +215,7 @@ public struct NpmProvider: UpdateProvider {
 
     /// The base policy plus any variables the user's npmrc files reference as
     /// `${NAME}` — npm fails to start if such a variable is missing.
-    private func environmentPolicy(_ installation: ProviderInstallation, context: ProviderContext) -> EnvironmentPolicy {
+    func environmentPolicy(_ installation: ProviderInstallation, context: ProviderContext) -> EnvironmentPolicy {
         var files = [context.environment["npm_config_userconfig"] ?? context.environment["NPM_CONFIG_USERCONFIG"] ?? context.homeDirectory + "/.npmrc"]
         if let nodePath = installation.fact(FactKey.nodePath) {
             let canonicalNode = context.fileSystem.canonicalPath(ofPath: nodePath) ?? nodePath
@@ -253,7 +255,7 @@ public struct NpmProvider: UpdateProvider {
         return names
     }
 
-    private func run(
+    func run(
         _ arguments: [String],
         _ installation: ProviderInstallation,
         context: ProviderContext,

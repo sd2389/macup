@@ -14,7 +14,9 @@ import Foundation
 /// `brew cleanup`, and never unpins anything.
 public struct HomebrewProvider: UpdateProvider {
     public let id = ProviderID.homebrew
-    public let capabilities: Set<ProviderCapability> = [.detect, .inventory, .outdated, .refreshMetadata]
+    public let capabilities: Set<ProviderCapability> = [
+        .detect, .inventory, .outdated, .refreshMetadata, .planUpdates, .verifyUpdates,
+    ]
     public var standardLocations: [String]
 
     public init(standardLocations: [String] = ["/opt/homebrew/bin/brew", "/usr/local/bin/brew"]) {
@@ -42,11 +44,11 @@ public struct HomebrewProvider: UpdateProvider {
         )
     }
 
-    private func childSearchPath(_ executable: ResolvedExecutable) -> [String] {
+    func childSearchPath(_ executable: ResolvedExecutable) -> [String] {
         SearchPath.combine([executable.directory], SearchPath.system)
     }
 
-    private func run(
+    func run(
         _ arguments: [String],
         _ installation: ProviderInstallation,
         context: ProviderContext,

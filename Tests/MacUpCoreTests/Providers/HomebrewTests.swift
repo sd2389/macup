@@ -304,13 +304,26 @@ struct HomebrewProviderTests {
         #expect(update.effect == .metadataRefresh)
     }
 
-    @Test("Planning is not available in the read-only engine")
-    func noPlanning() async throws {
+    @Test("A planned upgrade can never run as part of a read-only check")
+    func plannedUpgradeIsRefusedByTheReadOnlyGuard() async throws {
         let harness = harnessWithBrew()
         let context = try await harness.detectedContext(provider)
         let candidate = UpdateCandidate(id: try PackageID(parsing: "brew:git"), kind: .formula, displayName: "git",
                                         installedVersion: "1", availableVersion: "2")
-        let error = await #expect(throws: MacUpError.self) { try await provider.makePlan(for: candidate, context: context) }
-        #expect(error?.kind == .unsupported)
+        let plan = try await provider.makePlan(for: candidate, context: context)
+        let step = try #require(plan.steps.first)
+        #expect(step.effect == .modifying)
+
+        // The read-only guard is what a check runs commands through, so
+        // reaching it with a plan's own command must be refused.
+        let refused = await #expect(throws: MacUpError.self) {
+            try await context.runner.run(CommandRequest(
+                executable: URL(fileURLWithPath: step.invocation.executable),
+                arguments: step.invocation.arguments,
+                effect: step.effect
+            ))
+        }
+        #expect(refused?.kind == .policyDenied)
+        #expect(!harness.arguments(for: "brew").contains(["upgrade", "--formula", "--yes", "git"]))
     }
 }
