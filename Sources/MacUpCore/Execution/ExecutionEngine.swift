@@ -305,6 +305,16 @@ public struct ExecutionEngine: Sendable {
                 environment: environment
             )
 
+            guard provider.capabilities.contains(.updateSelectedItems) else {
+                // A provider may know how to describe a change without being
+                // able to carry one out. Saying so is the point of declaring
+                // capabilities at all (CLAUDE.md §7).
+                skip(
+                    "\(provider.displayName) can report this update but cannot apply it, so MacUp changed nothing.",
+                    decision: decision
+                )
+                continue
+            }
             guard providerContext.installation != nil else {
                 skip(
                     "MacUp could not find the \(provider.displayName) installation this plan was built against, so it changed nothing.",

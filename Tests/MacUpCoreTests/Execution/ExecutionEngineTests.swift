@@ -75,6 +75,19 @@ final class ExecutionHarness: @unchecked Sendable {
     }
 }
 
+/// A provider that can describe a change but not carry one out.
+private struct DescribeOnlyProvider: UpdateProvider {
+    let id = ProviderID.homebrew
+    let capabilities: Set<ProviderCapability> = [.detect, .planUpdates]
+
+    func detect(context: ProviderContext) async -> ProviderStatus {
+        ProviderStatus(provider: id, availability: .available, installation: ScriptedUpdateProvider.stubInstallation)
+    }
+
+    func inventory(context: ProviderContext) async throws -> ProviderListing<ManagedItem> { ProviderListing() }
+    func outdated(context: ProviderContext) async throws -> ProviderListing<UpdateCandidate> { ProviderListing() }
+}
+
 /// A provider that states an environment of its own.
 ///
 /// Homebrew is the real case: `HOMEBREW_NO_INSTALL_CLEANUP` and
@@ -749,6 +762,24 @@ struct ExecutionEngineTests {
         #expect(report.executed.isEmpty)
         #expect(harness.runner.recordedRequests.isEmpty)
         #expect(report.skipped.first?.reason.contains("Homebrew") == true)
+    }
+
+    @Test("A provider that cannot apply updates has none of its plans run")
+    func providerWithoutTheCapabilityIsNeverRun() async throws {
+        let harness = try ExecutionHarness()
+        harness.registerBrewUpgrade()
+        let loaded = try harness.save(configuration(["brew:git": .auto]))
+
+        let report = await harness.engine(providers: [DescribeOnlyProvider()]).run(
+            PlannedUpdateFactory.report([gitPlan()]),
+            configuration: loaded,
+            options: ExecutionOptions(origin: .cli),
+            environment: harness.environment
+        )
+
+        #expect(report.executed.isEmpty)
+        #expect(harness.runner.recordedRequests.isEmpty)
+        #expect(report.skipped.first?.reason.contains("cannot apply it") == true)
     }
 
     @Test("A provider MacUp can no longer find has none of its plans run")

@@ -15,7 +15,7 @@ import Foundation
 public struct HomebrewProvider: UpdateProvider {
     public let id = ProviderID.homebrew
     public let capabilities: Set<ProviderCapability> = [
-        .detect, .inventory, .outdated, .refreshMetadata, .planUpdates, .verifyUpdates,
+        .detect, .inventory, .outdated, .refreshMetadata, .planUpdates, .updateSelectedItems, .verifyUpdates,
     ]
     public var standardLocations: [String]
 

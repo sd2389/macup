@@ -24,7 +24,7 @@ public enum MiseConfigScope: String, Sendable, Hashable, Codable {
 public struct MiseProvider: UpdateProvider {
     public let id = ProviderID.mise
     public let capabilities: Set<ProviderCapability> = [
-        .detect, .inventory, .outdated, .planUpdates, .verifyUpdates,
+        .detect, .inventory, .outdated, .planUpdates, .updateSelectedItems, .verifyUpdates,
     ]
     /// Absolute paths; `~` is expanded against the user's home directory.
     public var standardLocations: [String]

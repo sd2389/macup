@@ -14,7 +14,7 @@ import Foundation
 public struct NpmProvider: UpdateProvider {
     public let id = ProviderID.npm
     public let capabilities: Set<ProviderCapability> = [
-        .detect, .inventory, .outdated, .planUpdates, .verifyUpdates,
+        .detect, .inventory, .outdated, .planUpdates, .updateSelectedItems, .verifyUpdates,
     ]
     public var standardLocations: [String]
 

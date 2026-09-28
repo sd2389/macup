@@ -28,7 +28,8 @@ public struct DiagnosticInput: Sendable {
 
 /// One deterministic diagnostic. Checks explain; they never fix (CLAUDE.md §13).
 public protocol DiagnosticCheck: Sendable {
-    /// Stable identifier, for example `homebrew.multipleInstallations`.
+    /// Stable identifier of the check, for example `homebrew.installations`.
+    /// The findings it reports have identifiers of their own.
     var id: String { get }
     /// What this check is looking for, in one line.
     var title: String { get }
