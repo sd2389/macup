@@ -10,7 +10,8 @@ import Foundation
 public struct ModifyingCommandRule: Sendable, Hashable {
     /// File name of the executable, for example `brew`.
     public var executableName: String
-    /// Arguments the command must start with, for example `["upgrade"]`.
+    /// Arguments the command must start with: the provider's own verb, and
+    /// any option that is part of the shape rather than of one request.
     public var leadingArguments: [String]
     /// Options that may appear after ``leadingArguments``.
     public var allowedOptions: Set<String>

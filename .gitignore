@@ -26,3 +26,6 @@ xcuserdata/
 *.cer
 *.mobileprovision
 .claude/launch.json
+
+# Agent worktrees created by the Claude Code desktop app.
+.claude/worktrees/
