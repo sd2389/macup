@@ -76,6 +76,11 @@ struct FaceEnrollmentSheet: View {
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: 320)
+
+            // A modal with no way out is a trap, and this one waits on
+            // hardware that can refuse to answer.
+            Button("Cancel", role: .cancel) { model.cancelFaceEnrollment() }
+                .keyboardShortcut(.cancelAction)
         }
         .padding(24)
         .frame(minWidth: 380)

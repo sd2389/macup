@@ -219,7 +219,7 @@ private struct ApprovalFeature: View {
             title: "Ask before changing anything",
             summary: "macOS asks you to confirm before MacUp changes a setting. It never sees your fingerprint or your password.",
             isOn: enabled,
-            isBusy: model.isChangingSchedule,
+            isBusy: model.isChangingSecurity,
             state: "This Mac: \(model.biometricCapability.kind.displayName)."
         ) {
             if let problem = model.securityProblem {
@@ -259,7 +259,7 @@ private struct FaceMatchFeature: View {
         ) {
             HStack {
                 Button(model.faceEnrollment == nil ? "Enroll Face…" : "Enroll Again…") {
-                    Task { await model.enrollFace() }
+                    model.startFaceEnrollment()
                 }
                 .disabled(!model.cameraPresent || model.isEnrollingFace)
                 Button("Forget Face") { model.forgetFace() }
@@ -296,7 +296,7 @@ private struct FaceMatchFeature: View {
             get: { model.securitySettings.faceUnlock && model.faceEnrollment != nil },
             set: { newValue in
                 if newValue && model.faceEnrollment == nil {
-                    Task { await model.enrollFace() }
+                    model.startFaceEnrollment()
                     return
                 }
                 if newValue {

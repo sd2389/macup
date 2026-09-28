@@ -9,6 +9,7 @@ import SwiftUI
 /// and policies arrives with update policies.
 struct SettingsView: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         let loaded = model.configuration
@@ -59,7 +60,13 @@ struct SettingsView: View {
             }
 
             Section {
-                Button("Open Features") { model.section = .features }
+                Button("Open Features") {
+                    // Settings is its own window, so changing the section is
+                    // invisible unless the main window is brought forward.
+                    model.section = .features
+                    openWindow(id: "main")
+                    NSApp.activate()
+                }
                 Text("Automatic checks, approval, and face match are on the Features screen. The rest is read-only in this version; to change it, edit the configuration file.")
                     .foregroundStyle(.secondary)
             }

@@ -95,6 +95,12 @@ final class AppModel {
     private(set) var securityProblem: String?
     private(set) var faceEnrollment: FaceEnrollment?
     private(set) var isEnrollingFace = false
+    /// The running enrolment, so it can be called off. Without a handle the
+    /// sheet has no honest Cancel.
+    private var faceTask: Task<Void, Never>?
+    /// Set apart from scheduling: enrolling a face must not appear to be
+    /// changing the schedule, nor disable its switch.
+    private(set) var isChangingSecurity = false
     /// The live camera session while enrolling, so the reader can see what
     /// the camera sees rather than watch a spinner.
     private(set) var faceCaptureSession: AVCaptureSession?
@@ -130,9 +136,27 @@ final class AppModel {
         }
     }
 
+    /// Starts enrolling. Held as a task so the sheet's Cancel can stop it.
+    func startFaceEnrollment() {
+        guard faceTask == nil else { return }
+        faceTask = Task { [weak self] in
+            await self?.enrollFace()
+            self?.faceTask = nil
+        }
+    }
+
+    /// Stops an enrolment in progress. The camera closes with it.
+    func cancelFaceEnrollment() {
+        faceTask?.cancel()
+        faceTask = nil
+        isEnrollingFace = false
+        faceStage = nil
+        faceCaptureSession = nil
+    }
+
     /// Takes a few pictures and remembers what they look like. Replacing an
     /// enrolment is a change, so it goes through the same gate.
-    func enrollFace() async {
+    private func enrollFace() async {
         guard !isEnrollingFace else { return }
         isEnrollingFace = true
         defer { isEnrollingFace = false }
@@ -179,6 +203,8 @@ final class AppModel {
             self.configuration = loadConfiguration()
         } catch let error as MacUpError {
             faceProblem = [error.message, error.recoverySuggestion].compactMap { $0 }.joined(separator: " ")
+        } catch is CancellationError {
+            faceProblem = nil
         } catch {
             faceProblem = "MacUp could not enroll a face."
         }
@@ -208,9 +234,9 @@ final class AppModel {
     /// Turns the approval requirement on or off. Changing it is itself a
     /// change, so it goes through the gate that is in force now.
     func applySecurity(_ settings: MacUpConfiguration.SecuritySettings) async {
-        guard !isChangingSchedule else { return }
-        isChangingSchedule = true
-        defer { isChangingSchedule = false }
+        guard !isChangingSecurity else { return }
+        isChangingSecurity = true
+        defer { isChangingSecurity = false }
         securityProblem = nil
 
         let loaded = loadConfiguration()
