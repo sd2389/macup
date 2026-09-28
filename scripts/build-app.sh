@@ -25,5 +25,13 @@ cp "$binary" "$app/Contents/MacOS/MacUp"
 cp "$cli" "$app/Contents/Helpers/macup"
 cp Apps/MacUpApp/MacUpApp/Resources/Info.plist "$app/Contents/Info.plist"
 cp build/MacUp.icns "$app/Contents/Resources/MacUp.icns"
-codesign --force --sign - "$app"
+
+# Ad-hoc, because there is no Developer ID here to sign with. The identifier is
+# pinned to the bundle identifier so the signature cannot drift from it, but an
+# ad-hoc signature still carries no team identifier, so macOS has no developer
+# to attribute the app to and will not grant it camera access — and the
+# signature's hash changes on every build, so it could not remember a decision
+# even if it made one. The app says so where someone meets it; see
+# Apps/MacUpApp/MacUpApp/App/CameraReadiness.swift.
+codesign --force --sign - --identifier dev.macup.MacUp "$app"
 echo "$app"

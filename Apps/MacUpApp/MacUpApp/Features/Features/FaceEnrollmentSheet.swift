@@ -64,7 +64,7 @@ struct FaceEnrollmentSheet: View {
                     .opacity(0.5)
             }
 
-            if let camera = FaceCamera.cameraName {
+            if let camera = model.cameraReadiness.cameraName {
                 Text("Using \(camera)")
                     .font(.caption)
                     .foregroundStyle(.secondary)
