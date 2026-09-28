@@ -40,7 +40,6 @@ final class StubPlanningProvider: UpdateProvider, @unchecked Sendable {
     init(
         id: ProviderID = .homebrew,
         candidates: [UpdateCandidate] = [],
-        supportsNativePin: Bool = false,
         canApplyUpdates: Bool = true
     ) {
         self.id = id
@@ -50,7 +49,6 @@ final class StubPlanningProvider: UpdateProvider, @unchecked Sendable {
         // A provider that reports updates without being able to apply them is
         // what macOS is: MacUp lists them and leaves installing to the user.
         if canApplyUpdates { capabilities.insert(.updateSelectedItems) }
-        if supportsNativePin { capabilities.insert(.nativePin) }
         self.capabilities = capabilities
         _candidates = candidates
         _installation = ProviderInstallation(

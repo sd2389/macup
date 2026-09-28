@@ -195,12 +195,9 @@ struct ItemPolicyPicker: View {
                 Text(UpdatePolicy.auto.displayName).tag(UpdatePolicy.auto)
                 Text(UpdatePolicy.ask.displayName).tag(UpdatePolicy.ask)
                 Text(UpdatePolicy.ignore.displayName).tag(UpdatePolicy.ignore)
-                // Pin is offered only where the provider has a pin of its
-                // own, so the menu never contains a word MacUp cannot act on
-                // (CLAUDE.md §13).
-                if model.supportsPin(item.provider) || rule == .pin {
-                    Text(UpdatePolicy.pin.displayName).tag(UpdatePolicy.pin)
-                }
+                // Pin is MacUp's own hold, enforced by the policy engine for
+                // every provider, exactly as `macup policy set <id> pin` is.
+                Text(UpdatePolicy.pin.displayName).tag(UpdatePolicy.pin)
             }
             .pickerStyle(.inline)
             .labelsHidden()
@@ -272,8 +269,8 @@ private struct UpdateDetail: View {
                     Text(decision.reason.displaySafe).foregroundStyle(.secondary)
                 }
                 LabeledContent("Rule for this item") { ItemPolicyPicker(item: update.id) }
-                if !model.supportsPin(update.provider) {
-                    Text("\(update.provider.displayName) has no pin of its own, so MacUp does not offer one here.")
+                if decision?.policy == .pin {
+                    Text("Pin is MacUp's own hold: MacUp will not update \(update.displayName.displaySafe). It does not pin the item in \(update.provider.displayName), so running \(update.provider.displayName) yourself can still update it.")
                         .font(.callout)
                         .foregroundStyle(.secondary)
                 }

@@ -129,23 +129,23 @@ struct AppModelPolicyTests {
         #expect(harness.authorizer.requestedReasons == ["set the rule for brew:git"])
     }
 
-    @Test("Pin is offered only where the provider has a pin of its own")
-    func pinFollowsTheProviderCapability() async throws {
-        let plain = try AppModelHarness(planning: StubPlanningProvider(
+    @Test("Pin from the app holds an item the way the CLI's pin does, with no pin of the provider's own")
+    func pinHoldsAnItemWithoutANativePin() async throws {
+        let harness = try AppModelHarness(planning: StubPlanningProvider(
             candidates: [PlannedUpdateFactory.candidate("brew:git")]
         ))
-        await plain.model.checkNow()
-        #expect(!plain.model.supportsPin(.homebrew))
+        await harness.model.checkNow()
+        #expect(!harness.model.capabilities(of: .homebrew).contains(.nativePin))
 
-        let pinning = try AppModelHarness(planning: StubPlanningProvider(
-            candidates: [PlannedUpdateFactory.candidate("brew:git")],
-            supportsNativePin: true
-        ))
-        await pinning.model.checkNow()
-        #expect(pinning.model.supportsPin(.homebrew))
+        await harness.model.setPolicy(.pin, for: Self.git)
 
-        // A provider that was never checked is not assumed to be able to pin.
-        #expect(!pinning.model.supportsPin(.mise))
+        #expect(harness.model.policyProblem == nil)
+        let decision = try #require(harness.model.decisions[Self.git])
+        #expect(decision.policy == .pin)
+        #expect(decision.action == .deny)
+        // Written where `macup policy list` reads it.
+        let listing = PolicyListing(ConfigurationStore(paths: harness.paths).load())
+        #expect(listing.rule(for: Self.git)?.policy == .pin)
     }
 
     @Test("A provider that only reports updates is not offered as one MacUp can apply")

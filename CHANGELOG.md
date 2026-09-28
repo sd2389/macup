@@ -37,6 +37,14 @@ claim that 0.4.0 has been released.
   belong to whichever Node runs npm. Doctor reports both installations, which
   one wins, and where the global packages actually live.
 
+### Fixed
+- The app now offers Pin for every item, as `macup policy set <id> pin`
+  always has. It used to hide Pin behind a provider capability no provider
+  declares, and said Homebrew had no pin of its own. Both surfaces now say
+  that Pin is MacUp's own hold and does not pin the item in its package
+  manager.
+- The Doctor and History toolbar buttons no longer share the Check Now icon.
+
 ### Security
 - Doctor issues exactly one command — reading the user's login shell — through
   the same `CommandRunning` abstraction as everything else, with effect

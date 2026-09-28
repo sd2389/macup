@@ -48,7 +48,7 @@ struct DoctorView: View {
                     Button {
                         Task { await model.runDoctor() }
                     } label: {
-                        Label("Run Again", systemImage: "arrow.clockwise")
+                        Label("Run Again", systemImage: "stethoscope")
                     }
                     .help("Run the diagnostics again. They only read.")
                 }

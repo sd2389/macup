@@ -39,6 +39,20 @@ struct PolicyCommandTests {
         #expect(run.standardOutput.contains("items.brew:postgresql.policy"))
     }
 
+    @Test("policy set pin says the hold is MacUp's own, not the package manager's")
+    func pinSaysItIsMacUpsOwnHold() async throws {
+        let harness = try CLIHarness()
+        harness.useTemporaryDirectories()
+
+        let run = try await harness.run(["policy", "set", "brew:git", "pin"])
+        #expect(run.exitCode == nil)
+        #expect(run.standardOutput.contains("Pin is MacUp's own hold"))
+
+        // Setting it again changes nothing, so there is nothing to explain.
+        let again = try await harness.run(["policy", "set", "brew:git", "pin"])
+        #expect(!again.standardOutput.contains("Pin is MacUp's own hold"))
+    }
+
     @Test("With nothing customized, policy list says so")
     func listSaysWhenNothingIsCustomized() async throws {
         let harness = try CLIHarness()

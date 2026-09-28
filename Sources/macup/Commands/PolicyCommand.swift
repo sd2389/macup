@@ -283,6 +283,10 @@ enum PolicyEditing {
             for warning in change.warnings {
                 context.print("  warning: " + style.text(warning))
             }
+            // The same words the app shows beside a pinned item.
+            if change.changed, change.newValue == UpdatePolicy.pin.rawValue {
+                context.print("  Pin is MacUp's own hold. It does not pin the item in its package manager, so running that tool yourself can still update it.")
+            }
         }
         if changes.contains(where: \.changed) {
             context.print(style.dim("Saved to " + style.path(loaded.path) + "."))

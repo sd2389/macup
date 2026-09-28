@@ -136,13 +136,6 @@ final class AppModel {
         Set(report?.providers.first { $0.provider == provider }?.capabilities ?? [])
     }
 
-    /// Whether Pin is a real thing for this provider, rather than a word in a
-    /// menu. MacUp offers it only where the provider has its own pin
-    /// mechanism (CLAUDE.md §13).
-    func supportsPin(_ provider: ProviderID) -> Bool {
-        capabilities(of: provider).contains(.nativePin)
-    }
-
     /// Whether MacUp can apply this provider's updates at all, as opposed to
     /// only reporting them. macOS updates are reported and never installed in
     /// this version, so the app does not offer a button that would only

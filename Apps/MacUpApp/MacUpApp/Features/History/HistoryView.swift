@@ -55,7 +55,7 @@ struct HistoryView: View {
                 Button {
                     model.loadHistory()
                 } label: {
-                    Label("Reload", systemImage: "arrow.clockwise")
+                    Label("Reload", systemImage: "arrow.triangle.2.circlepath")
                 }
                 .help("Read MacUp's history file again")
             }
