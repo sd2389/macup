@@ -86,6 +86,11 @@ extension MiseProvider {
             rationale += " Your mise configuration is not rewritten, though mise updates a lockfile if you have lockfiles enabled."
         }
         rationale += " MacUp resolves configuration from \(context.homeDirectory), so a project you happen to be in cannot change what this does."
+        // mise deletes unused versions only when someone runs `mise prune`,
+        // which is why that command exists separately. MacUp never runs it
+        // (CLAUDE.md §2.16, §9), so the old runtime stays where it is — worth
+        // saying, because it is also what makes going back easy.
+        rationale += " The version you have now stays installed; mise removes unused versions only when you ask it to, and MacUp never does."
         if signals.contains(.runtimeOrToolchain) {
             rationale += " This is a language runtime, so anything built against the old version may need attention."
         }

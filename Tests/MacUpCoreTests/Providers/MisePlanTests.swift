@@ -56,6 +56,10 @@ struct MisePlanTests {
         #expect(plan.proposedVersion == "24.21.0")
         #expect(plan.rationale.contains("your request \"24\""))
         #expect(plan.rationale.contains("no major version is bumped"))
+        // mise leaves the old version installed, which is what `mise prune`
+        // exists to clean up and what MacUp never runs.
+        #expect(plan.rationale.contains("stays installed"))
+        #expect(!plan.steps.contains { $0.invocation.arguments.contains("prune") })
         expectAllowedByRules(plan)
         #expect(harness.requests.count == before, "planning ran a command")
     }
