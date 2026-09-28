@@ -189,10 +189,9 @@ still does: it is Phase 6, unchanged.
 
 ## Phase 2 — policy + planning
 
-Core landed. The `macup` commands and the app controls for this phase are
-delivered by the accompanying surface work; `docs/CLI.md` is the reference
-for the exact commands and flags, and this checklist deliberately does not
-duplicate a syntax it does not own.
+Core and both surfaces landed. `docs/CLI.md` is the reference for the exact
+commands and flags, and this checklist deliberately does not duplicate a
+syntax it does not own.
 
 - [x] `PolicyEngine`: precedence per item, then provider, then global default,
       and never returns `inherit`
@@ -369,8 +368,9 @@ duplicate a syntax it does not own.
 
 ## Phase 5a — read-only desktop app (pulled forward at the owner's request)
 
-Built on the Phase 1 engine before Phases 2–4; the update and policy controls
-land with those phases' surface work.
+Built on the Phase 1 engine before Phases 2-4. The update, policy, Doctor and
+History controls those phases needed have since landed on top of it, and are
+listed under "Surfaces" below.
 
 - [x] Login-shell environment discovery so a Finder-launched app finds the
       same tools as the terminal (prompt hooks included)
@@ -388,6 +388,25 @@ land with those phases' surface work.
       bundle also carries the `macup` CLI at `Contents/Helpers/macup`
 - [x] `Tests/MacUpAppTests` — the app's model, plus a suite asserting that no
       test touches the host
+
+### Surfaces for Phases 2 to 4
+
+Every feature ships in both the `macup` CLI and the app, in the same piece of
+work (CLAUDE.md §26.13).
+
+- [x] CLI: `plan`, `update` (with `--dry-run`, `--yes`, `--stop-on-failure`),
+      `policy list|set|clear`, `exclude`, `provider enable|disable`,
+      `doctor`, `history`, each with `--json` where it makes sense, plus exit
+      codes 4 (an update failed) and 5 (Doctor found something)
+- [x] App: Updates with per-item policy controls and the exact command, the
+      execution review sheet, applying with per-item progress and a working
+      Stop, Doctor, History, and the Settings policy section
+- [x] Both surfaces put policy edits behind the approval gate when
+      `security.requireApproval` is on, because deciding what MacUp may
+      update is the decision every later one rests on
+- [x] Both take every decision from `MacUpCore`; neither builds a command,
+      resolves a policy, or judges risk of its own
+
 - [ ] Xcode project wrapping the same sources (waiting on Xcode)
 - [ ] SwiftUI previews (the preview macros ship with Xcode)
 - [ ] Asset catalog (needs Xcode). The icon itself is drawn from source by
