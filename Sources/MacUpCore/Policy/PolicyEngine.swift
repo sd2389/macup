@@ -1,18 +1,24 @@
 /// Decides what MacUp may do with an item, and can always say why.
 ///
-/// Precedence (CLAUDE.md §6): per-item rule, then provider rule, then the
-/// global default. Three things override the result of that precedence, and
-/// all three fail closed:
+/// Precedence (CLAUDE.md §6) is the per-item rule, then the provider rule,
+/// then the global default. Three things override whatever that precedence
+/// produced, and all three fail closed. A configuration MacUp could not read
+/// allows nothing, because the rules saying which items are excluded are
+/// exactly the ones it could not read. A provider turned off in the
+/// configuration allows nothing. An item the provider itself holds back
+/// (`brew pin`) allows nothing, so a MacUp update never silently unpins it.
 ///
-/// - a configuration MacUp could not read allows nothing, because the rules
-///   that say which items are excluded are exactly what it could not read
-/// - a provider turned off in the configuration allows nothing
-/// - an item the provider itself holds back (`brew pin`) allows nothing, so a
-///   MacUp update never silently unpins it
+/// Risk then raises the bar, because `auto` means "update this without asking
+/// me", not "decide anything on my behalf": see ``escalation(item:risk:signals:configuration:)``
+/// for the cases where an `auto` item still waits for a person. In an
+/// unattended run there is no person, so those items are not updated at all
+/// and come back as review items instead (CLAUDE.md §15).
 ///
-/// Risk then raises the bar: an `auto` item whose risk is high or unknown
-/// still needs a person to confirm it, and in an unattended run that means it
-/// is not updated at all.
+/// An unattended run updates only what resolves to `auto`, from whichever
+/// level set it. A global default of `auto` is as deliberate a choice as a
+/// per-item rule — the user wrote it into their configuration file, and the
+/// decision says which rule it came from — so the engine does not treat it as
+/// less explicit than the others.
 public struct PolicyEngine: Sendable {
     public var configuration: MacUpConfiguration
     /// False when the configuration file could not be trusted.
@@ -30,6 +36,15 @@ public struct PolicyEngine: Sendable {
         )
     }
 
+    /// Every rule the configuration sets, for `macup policy list` and the
+    /// app's Settings screen. Read-only.
+    public func rules() -> PolicyListing {
+        PolicyListing(
+            configuration: configuration,
+            automaticModificationsAllowed: allowsAutomaticModification
+        )
+    }
+
     /// The policy in effect for an item, and which rule supplied it.
     /// Never returns `.inherit`.
     public func effectivePolicy(for item: PackageID) -> (policy: UpdatePolicy, source: PolicyDecision.Source) {
@@ -44,6 +59,7 @@ public struct PolicyEngine: Sendable {
         return (global == .inherit ? .ask : global, .global)
     }
 
+    /// What policy says about one update candidate, and why.
     public func decide(_ candidate: UpdateCandidate, intent: PolicyIntent) -> PolicyDecision {
         decide(
             item: candidate.id,
@@ -53,6 +69,11 @@ public struct PolicyEngine: Sendable {
         )
     }
 
+    /// What policy says about one item, and why.
+    ///
+    /// Callers pass the risk and signals the provider reported, so the same
+    /// decision can be re-taken from a stored plan immediately before
+    /// execution (CLAUDE.md §2.20).
     public func decide(
         item: PackageID,
         risk: RiskAssessment,
@@ -67,7 +88,8 @@ public struct PolicyEngine: Sendable {
                 action: .deny,
                 policy: policy,
                 source: .configuration,
-                reason: "MacUp could not read its configuration, so it cannot tell which items you excluded. Nothing is changed until that is fixed."
+                reason: "MacUp left \(item.name) alone because it could not read its configuration, "
+                    + "so it cannot tell which items you excluded. Nothing is changed until that is fixed."
             )
         }
 
@@ -77,7 +99,7 @@ public struct PolicyEngine: Sendable {
                 action: .deny,
                 policy: policy,
                 source: .providerDisabled,
-                reason: "\(item.provider.displayName) is turned off in MacUp's configuration."
+                reason: "\(item.name) is not updated because \(item.provider.displayName) is turned off in MacUp's configuration."
             )
         }
 
@@ -120,7 +142,12 @@ public struct PolicyEngine: Sendable {
                     : reason
             )
         case .auto:
-            guard let escalation = Self.escalation(risk: risk, signals: signals, configuration: configuration) else {
+            guard let escalation = Self.escalation(
+                item: item,
+                risk: risk,
+                signals: signals,
+                configuration: configuration
+            ) else {
                 return PolicyDecision(
                     item: item,
                     action: .allow,
@@ -143,19 +170,52 @@ public struct PolicyEngine: Sendable {
     }
 
     /// Why an `auto` item still needs a person, or `nil` when it does not.
+    ///
+    /// Every rule but the last comes straight from the spec and cannot be
+    /// switched off: macOS updates, runtime major changes, and unknown risk
+    /// are always Ask First (CLAUDE.md §6, §10), MacUp never walks into an
+    /// administrator prompt or a restart on its own (CLAUDE.md §2.10, §2.19),
+    /// and it does not rewrite a config file or lockfile unasked
+    /// (CLAUDE.md §2.1, §9).
+    ///
+    /// `confirmMajorUpdates` governs only the last rule, an ordinary package's
+    /// major version bump. It is a preference about version numbers, so
+    /// turning it off does not buy past the rules above it.
     static func escalation(
+        item: PackageID,
         risk: RiskAssessment,
         signals: Set<RiskSignal>,
         configuration: MacUpConfiguration
     ) -> String? {
+        // Checked by provider, not only by signal: `softwareupdate` reports
+        // Safari and security updates without marking them as OS updates, and
+        // every macOS update is Ask First in v1 regardless.
+        if item.provider == .macos {
+            return "\(item.name) is a macOS update, and those always need your confirmation."
+        }
         if signals.contains(.operatingSystemUpdate) {
-            return "A macOS update always needs your confirmation."
+            return "Updating \(item.name) changes the operating system, which always needs your confirmation."
+        }
+        if signals.contains(.administratorAuthorizationMayBeRequired) {
+            return "Updating \(item.name) may ask for an administrator password, which MacUp never answers for you."
+        }
+        if signals.contains(.restartRequired) {
+            return "Updating \(item.name) may require a restart, so it needs your confirmation."
+        }
+        if signals.contains(.mayRewriteConfiguration) {
+            return "Updating \(item.name) would mean editing your configuration or lockfile, which MacUp never does on its own."
+        }
+        // A runtime change alone is only moderate risk, so high risk here
+        // means the version change itself is major, a pre-release, or a
+        // downgrade — the case CLAUDE.md §2.18 rules out doing automatically.
+        if signals.contains(.runtimeOrToolchain), risk.level == .high {
+            return "\(item.name) is a language runtime or toolchain, and this is a major change, so it needs your confirmation."
         }
         if risk.level == .unknown {
-            return "MacUp could not judge how risky this change is, so it asks first."
+            return "MacUp could not judge how risky updating \(item.name) is, so it asks first."
         }
         if risk.level == .high, configuration.global.confirmMajorUpdates {
-            return "This is a high-risk change (\(risk.reasons.first?.lowercased() ?? "reason unknown")), so it asks first."
+            return "Updating \(item.name) is a high-risk change (\(risk.reasons.first?.lowercased() ?? "reason unknown")), so it asks first."
         }
         return nil
     }
