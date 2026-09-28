@@ -109,10 +109,24 @@ public struct DoctorEngine: Sendable {
         self.checks = checks
     }
 
+    /// Every deterministic diagnostic MacUp ships, in the order they read
+    /// best: what was found, then what it is, then MacUp's own files.
     public static func standard() -> DoctorEngine {
         DoctorEngine(
             providers: [HomebrewProvider(), NpmProvider(), MiseProvider(), MacOSProvider()],
-            checks: []
+            checks: [
+                ProviderAvailabilityCheck(),
+                ProviderResultsCheck(),
+                HomebrewInstallationCheck(),
+                ExecutableArchitectureCheck(),
+                ShellEnvironmentCheck(),
+                RuntimeOwnershipCheck(),
+                NpmOwnershipCheck(),
+                ConfigurationCheck(),
+                StaleItemPolicyCheck(),
+                StateDirectoryCheck(),
+                ScheduleCheck(),
+            ]
         )
     }
 
@@ -140,11 +154,18 @@ public struct DoctorEngine: Sendable {
         for check in checks {
             findings += await check.run(input)
         }
+        // What the providers noticed while being checked is part of the
+        // diagnosis. A check that covers the same ground stands down, but two
+        // routes to the same observation are still collapsed here so nothing
+        // is said twice.
         findings += report.providers.flatMap(\.findings)
+        var seen: Set<DiagnosticFinding> = []
         return DoctorReport(
             startedAt: startedAt,
             finishedAt: environment.now(),
-            findings: findings.sorted { $0.severity == $1.severity ? $0.id < $1.id : $0.severity > $1.severity },
+            findings: findings
+                .filter { seen.insert($0).inserted }
+                .sorted(by: DiagnosticFinding.isOrderedBefore),
             providers: report.providers,
             configuration: ConfigurationSummary(configuration),
             checksRun: checks.count,
