@@ -11,7 +11,8 @@ MacUp is **conservative with changes and aggressive with information**. It is no
 ## Status
 
 Early development. v0.1.0 is the only tagged release; everything below marked
-done is in `main` and covered by tests.
+done is in `main` and covered by tests. The build reports 0.4.0, which is the
+version of the code rather than of a release.
 
 MacUp can now plan and perform **per-item** updates for Homebrew, npm, and
 mise — one named package at a time, from a plan you read first, with the

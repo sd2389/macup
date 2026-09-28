@@ -24,6 +24,14 @@ mkdir -p "$app/Contents/MacOS" "$app/Contents/Helpers" "$app/Contents/Resources"
 cp "$binary" "$app/Contents/MacOS/MacUp"
 cp "$cli" "$app/Contents/Helpers/macup"
 cp Apps/MacUpApp/MacUpApp/Resources/Info.plist "$app/Contents/Info.plist"
+# MacUpCore holds the version. Writing it into the bundle here means the app
+# and the CLI beside it can never claim to be different versions of MacUp.
+version="$(sed -n 's/.*static let version = "\(.*\)".*/\1/p' Sources/MacUpCore/MacUp.swift)"
+if [[ -z "$version" ]]; then
+    echo "error: could not read MacUp.version from Sources/MacUpCore/MacUp.swift" >&2
+    exit 1
+fi
+/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $version" "$app/Contents/Info.plist"
 cp build/MacUp.icns "$app/Contents/Resources/MacUp.icns"
 
 # Ad-hoc, because there is no Developer ID here to sign with. The identifier is

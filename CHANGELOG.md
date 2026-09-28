@@ -6,6 +6,9 @@ MacUp follows Semantic Versioning once releases begin.
 
 Nothing after 0.1.0 has been tagged. The sections below carry the version
 `docs/ROADMAP.md` assigns them and will be dated when they are released.
+The build itself reports 0.4.0 — `macup --version`, the app, and every
+`--json` payload — because that is the version of the code in `main`, not a
+claim that 0.4.0 has been released.
 
 ## [0.4.0] — unreleased
 

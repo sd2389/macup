@@ -18,8 +18,10 @@
 	<string>MacUp</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
+	<!-- Set from MacUpCore's MacUp.version by scripts/build-app.sh, so the
+	     app and the CLI can never report different versions. -->
 	<key>CFBundleShortVersionString</key>
-	<string>0.1.0</string>
+	<string>0.4.0</string>
 	<key>CFBundleVersion</key>
 	<string>1</string>
 	<key>LSApplicationCategoryType</key>
