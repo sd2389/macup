@@ -16,8 +16,8 @@ final class ExecutionHarness: @unchecked Sendable {
     /// Shapes of change the engine may run. Stated per test, because the
     /// shipping list belongs to the provider planning work.
     var modifyingRules: [ModifyingCommandRule] = [
-        ModifyingCommandRule("brew", ["upgrade"], options: ["--formula"], maximumPositionals: 1),
-        ModifyingCommandRule("npm", ["install"], options: ["-g"], maximumPositionals: 1),
+        ModifyingCommandRule("brew", ["upgrade"], options: ["--formula"], positionalCount: 1),
+        ModifyingCommandRule("npm", ["install"], options: ["-g"], positionalCount: 1),
     ]
 
     init() throws {
@@ -72,6 +72,46 @@ final class ExecutionHarness: @unchecked Sendable {
 
     func registerBrewUpgrade(_ response: FakeCommandRunner.Response = .success("Upgraded git")) {
         runner.register(path: "/opt/homebrew/bin/brew", ["upgrade", "--formula", "git"], response)
+    }
+}
+
+/// A provider that states an environment of its own.
+///
+/// Homebrew is the real case: `HOMEBREW_NO_INSTALL_CLEANUP` and
+/// `HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK` have no command-line flag, so two
+/// of the things a Homebrew plan promises exist only in the environment. If
+/// the engine assembled its own, a reviewed plan would run as something else.
+private struct EnvironmentStatingProvider: UpdateProvider {
+    let id = ProviderID.homebrew
+    let capabilities: Set<ProviderCapability> = [.detect, .planUpdates, .updateSelectedItems, .verifyUpdates]
+
+    func detect(context: ProviderContext) async -> ProviderStatus {
+        ProviderStatus(
+            provider: id,
+            availability: .available,
+            installation: ScriptedUpdateProvider.stubInstallation
+        )
+    }
+
+    func inventory(context: ProviderContext) async throws -> ProviderListing<ManagedItem> { ProviderListing() }
+    func outdated(context: ProviderContext) async throws -> ProviderListing<UpdateCandidate> { ProviderListing() }
+
+    func executionEnvironment(context: ProviderContext) -> [String: String] {
+        ["PATH": "/opt/homebrew/bin", "HOMEBREW_NO_INSTALL_CLEANUP": "1"]
+    }
+
+    func verify(
+        _ result: ExecutionResult,
+        for candidate: UpdateCandidate,
+        context: ProviderContext
+    ) async throws -> VerificationResult {
+        VerificationResult(
+            item: candidate.id,
+            outcome: .verified,
+            expectedVersion: candidate.availableVersion.raw,
+            observedVersion: candidate.availableVersion.raw,
+            message: "Confirmed."
+        )
     }
 }
 
@@ -672,8 +712,26 @@ struct ExecutionEngineTests {
         #expect(report.summary.unverified == 1)
     }
 
-    @Test("An item with no provider loaded is not confirmed either")
-    func missingProviderIsNotConfirmed() async throws {
+    @Test("A step runs with the environment its own provider states")
+    func stepsRunWithTheProvidersEnvironment() async throws {
+        let harness = try ExecutionHarness()
+        harness.registerBrewUpgrade()
+        let loaded = try harness.save(configuration(["brew:git": .auto]))
+
+        _ = await harness.engine(providers: [EnvironmentStatingProvider()]).run(
+            PlannedUpdateFactory.report([gitPlan()]),
+            configuration: loaded,
+            options: ExecutionOptions(origin: .cli),
+            environment: harness.environment
+        )
+
+        let request = try #require(harness.runner.recordedRequests.first)
+        #expect(request.environment["HOMEBREW_NO_INSTALL_CLEANUP"] == "1")
+        #expect(request.environment["GITHUB_TOKEN"] == nil)
+    }
+
+    @Test("An item whose provider MacUp does not have loaded is never run")
+    func missingProviderIsNeverRun() async throws {
         let harness = try ExecutionHarness()
         harness.registerBrewUpgrade()
         let loaded = try harness.save(configuration(["brew:git": .auto]))
@@ -685,8 +743,30 @@ struct ExecutionEngineTests {
             environment: harness.environment
         )
 
-        #expect(report.executed.first?.verification?.outcome == .notPerformed)
-        #expect(report.executed.first?.verification?.message.contains("Homebrew") == true)
+        // Without the provider there is nothing to say which environment the
+        // command needs, and nothing to read the new version back, so MacUp
+        // does not run it at all rather than run it half-understood.
+        #expect(report.executed.isEmpty)
+        #expect(harness.runner.recordedRequests.isEmpty)
+        #expect(report.skipped.first?.reason.contains("Homebrew") == true)
+    }
+
+    @Test("A provider MacUp can no longer find has none of its plans run")
+    func undetectableProviderIsNeverRun() async throws {
+        let harness = try ExecutionHarness()
+        harness.registerBrewUpgrade()
+        let loaded = try harness.save(configuration(["brew:git": .auto]))
+
+        let report = await harness.engine(providers: [ScriptedUpdateProvider.undetectable()]).run(
+            PlannedUpdateFactory.report([gitPlan()]),
+            configuration: loaded,
+            options: ExecutionOptions(origin: .cli),
+            environment: harness.environment
+        )
+
+        #expect(report.executed.isEmpty)
+        #expect(harness.runner.recordedRequests.isEmpty)
+        #expect(report.skipped.first?.reason.contains("could not find") == true)
     }
 
     @Test("Verification may read, and only what a check may read")

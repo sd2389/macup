@@ -3,9 +3,10 @@ import MacUpCore
 
 /// A provider whose verification answer a test writes in advance.
 ///
-/// The execution engine only ever asks a provider to confirm an update, so
-/// detection, inventory, and outdated are deliberately inert: a test that
-/// reaches them has gone somewhere the engine should not.
+/// The engine locates a provider before it changes anything with it, so
+/// detection answers with a stated installation. Set ``installation`` to nil
+/// for a provider MacUp can no longer find. Inventory and outdated stay
+/// inert: a test that reaches them has gone somewhere the engine should not.
 public struct ScriptedUpdateProvider: UpdateProvider {
     public let id: ProviderID
     public let capabilities: Set<ProviderCapability> = [
@@ -13,13 +14,40 @@ public struct ScriptedUpdateProvider: UpdateProvider {
     ]
     /// What `verify` answers, or throws.
     public var verification: @Sendable (ExecutionResult, UpdateCandidate, ProviderContext) async throws -> VerificationResult
+    /// What detection finds. Nil means MacUp cannot find the provider at all.
+    public var installation: ProviderInstallation?
 
     public init(
         id: ProviderID = .homebrew,
+        installation: ProviderInstallation? = ScriptedUpdateProvider.stubInstallation,
         verification: @escaping @Sendable (ExecutionResult, UpdateCandidate, ProviderContext) async throws -> VerificationResult
     ) {
         self.id = id
+        self.installation = installation
         self.verification = verification
+    }
+
+    /// A plausible installation with a path no test ever launches.
+    public static let stubInstallation = ProviderInstallation(
+        executable: ResolvedExecutable(
+            path: "/opt/homebrew/bin/brew",
+            canonicalPath: "/opt/homebrew/bin/brew",
+            source: .searchPath
+        ),
+        version: "4.0.0"
+    )
+
+    /// A provider MacUp can no longer find, so no plan of its may run.
+    public static func undetectable(_ id: ProviderID = .homebrew) -> ScriptedUpdateProvider {
+        ScriptedUpdateProvider(id: id, installation: nil) { _, candidate, _ in
+            VerificationResult(
+                item: candidate.id,
+                outcome: .notPerformed,
+                expectedVersion: nil,
+                observedVersion: nil,
+                message: "Never reached: MacUp cannot find this provider."
+            )
+        }
     }
 
     /// Answers that the planned version is now installed.
@@ -54,7 +82,8 @@ public struct ScriptedUpdateProvider: UpdateProvider {
     }
 
     public func detect(context: ProviderContext) async -> ProviderStatus {
-        ProviderStatus(provider: id, availability: .unavailable)
+        guard let installation else { return ProviderStatus(provider: id, availability: .unavailable) }
+        return ProviderStatus(provider: id, availability: .available, installation: installation)
     }
 
     public func inventory(context: ProviderContext) async throws -> ProviderListing<ManagedItem> {

@@ -148,22 +148,25 @@ public struct ExecutionEngine: Sendable {
     /// that the command was in the plan. Injected so a test can bound what it
     /// permits without touching the shipping list.
     public var modifyingRules: [ModifyingCommandRule]
-    /// Builds the environment one step's command runs with.
+    /// Overrides the environment a plan's commands run with. `nil`, and so
+    /// the owning provider's, everywhere but tests.
     ///
     /// A plan carries the exact executable and arguments — that is what the
     /// user reviewed — but not the environment they need, and only the
-    /// provider knows that: npm has to be handed the variables its `.npmrc`
-    /// references or it refuses to start, and Homebrew has to be told not to
-    /// update itself first. Until a plan can carry that, it is injected here,
-    /// and the default is the conservative base allowlist.
-    public var stepEnvironment: @Sendable (ExecutionStep, CheckEnvironment) -> [String: String]
+    /// provider knows that. Some of what a plan promises lives there and
+    /// nowhere else: `HOMEBREW_NO_INSTALL_CLEANUP` and
+    /// `HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK` have no command-line flag, so
+    /// an upgrade run without them would clean up after itself and upgrade
+    /// dependents the user never reviewed (CLAUDE.md §2.16, §2.17, §9). The
+    /// engine therefore asks the provider rather than assembling one itself.
+    public var stepEnvironment: (@Sendable (ExecutionPlan, CheckEnvironment) -> [String: String])?
 
     public init(
         providers: [any UpdateProvider],
         history: HistoryStore? = nil,
         configurationStore: ConfigurationStore? = nil,
         modifyingRules: [ModifyingCommandRule] = ModifyingCommandRules.all,
-        stepEnvironment: @escaping @Sendable (ExecutionStep, CheckEnvironment) -> [String: String] = ExecutionEngine.baseStepEnvironment
+        stepEnvironment: (@Sendable (ExecutionPlan, CheckEnvironment) -> [String: String])? = nil
     ) {
         self.providers = providers
         self.history = history
@@ -180,15 +183,19 @@ public struct ExecutionEngine: Sendable {
         )
     }
 
-    /// The base environment allowlist plus the step executable's own directory
+    /// The base environment allowlist plus the plan executable's own directory
     /// at the front of `PATH`, so a tool that shells out to its siblings finds
     /// the installation MacUp chose rather than another copy.
-    public static let baseStepEnvironment: @Sendable (ExecutionStep, CheckEnvironment) -> [String: String] = { step, environment in
-        let directory = (step.invocation.executable as NSString).deletingLastPathComponent
+    ///
+    /// Used only when no provider is loaded for the plan's item, which is
+    /// also a reason to refuse to run it; it exists so the fallback is
+    /// conservative rather than absent.
+    public static let baseStepEnvironment: @Sendable (ExecutionPlan, CheckEnvironment) -> [String: String] = { plan, environment in
+        let directories = plan.steps.map { ($0.invocation.executable as NSString).deletingLastPathComponent }
         return EnvironmentPolicy.base.environment(
             from: environment.processEnvironment,
             searchPath: SearchPath.combine(
-                [directory],
+                directories,
                 SearchPath.parse(environment.processEnvironment["PATH"]),
                 SearchPath.system
             )
@@ -210,6 +217,11 @@ public struct ExecutionEngine: Sendable {
         var anythingFailed = false
         // Set once the rest of the run is abandoned, and why.
         var halted: String?
+        // Detection is what tells a provider which installation it is acting
+        // on, and the environment a plan runs with depends on it. It is read
+        // once per provider per run: asking again between two items of the
+        // same provider would only invite them to disagree.
+        var detected: [ProviderID: ProviderContext] = [:]
 
         for planned in report.planned {
             func skip(_ reason: String, decision: PolicyDecision? = nil, inHistory: Bool = true) {
@@ -277,10 +289,45 @@ public struct ExecutionEngine: Sendable {
                 continue
             }
 
-            let result = await perform(planned.plan, environment: environment)
+            guard let provider = providers.first(where: { $0.id == planned.provider }) else {
+                skip(
+                    "MacUp has no \(planned.provider.displayName) provider loaded, so it did not run this plan.",
+                    decision: decision
+                )
+                continue
+            }
+            if detected[provider.id] == nil {
+                detected[provider.id] = await Self.detect(provider, configuration: current, environment: environment)
+            }
+            let providerContext = detected[provider.id] ?? Self.baseContext(
+                provider.id,
+                configuration: current,
+                environment: environment
+            )
+
+            guard providerContext.installation != nil else {
+                skip(
+                    "MacUp could not find the \(provider.displayName) installation this plan was built against, so it changed nothing.",
+                    decision: decision
+                )
+                continue
+            }
+
+            let result = await perform(
+                planned.plan,
+                environment: environment,
+                commandEnvironment: stepEnvironment?(planned.plan, environment)
+                    ?? provider.executionEnvironment(context: providerContext)
+            )
             var verification: VerificationResult?
             if result.outcome == .succeeded {
-                verification = await verify(planned, result: result, configuration: current, environment: environment)
+                verification = await verify(
+                    planned,
+                    result: result,
+                    provider: provider,
+                    providerContext: providerContext,
+                    environment: environment
+                )
             }
             executed.append(ExecutedUpdate(
                 item: planned.item,
@@ -325,7 +372,11 @@ public struct ExecutionEngine: Sendable {
     /// Steps run on the caller's task, so a cancelled `macup update` reaches
     /// the running command itself — the runner signals the child rather than
     /// leaving it to finish unwatched — and the loop stops before the next one.
-    private func perform(_ plan: ExecutionPlan, environment: CheckEnvironment) async -> ExecutionResult {
+    private func perform(
+        _ plan: ExecutionPlan,
+        environment: CheckEnvironment,
+        commandEnvironment: [String: String]
+    ) async -> ExecutionResult {
         let startedAt = environment.now()
         let runner = ExecutionGuard(base: environment.runner, plan: plan, modifyingRules: modifyingRules)
         let redactor = Redactor()
@@ -358,7 +409,7 @@ public struct ExecutionEngine: Sendable {
             let request = CommandRequest(
                 executable: URL(fileURLWithPath: step.invocation.executable),
                 arguments: step.invocation.arguments,
-                environment: stepEnvironment(step, environment),
+                environment: commandEnvironment,
                 workingDirectory: URL(fileURLWithPath: environment.homeDirectory, isDirectory: true),
                 timeout: .seconds(step.timeoutSeconds),
                 effect: step.effect
@@ -437,39 +488,60 @@ public struct ExecutionEngine: Sendable {
     /// An update MacUp could not confirm is reported as unconfirmed, never as
     /// confirmed: claiming otherwise would make the one field a user checks
     /// afterwards worthless (CLAUDE.md §25).
-    private func verify(
-        _ planned: PlannedUpdate,
-        result: ExecutionResult,
+    /// Locates the provider again before MacUp changes anything with it.
+    ///
+    /// The environment a plan needs depends on which installation it is
+    /// acting on — Homebrew's own variables, the Node that owns a global npm
+    /// package — and only the provider can say. Detection reads: its runner
+    /// allows nothing but the read-only allowlist, so looking the provider up
+    /// cannot change it.
+    private static func detect(
+        _ provider: any UpdateProvider,
         configuration: LoadedConfiguration,
         environment: CheckEnvironment
-    ) async -> VerificationResult {
-        let expected = planned.plan.proposedVersion.raw
-        guard let provider = providers.first(where: { $0.id == planned.provider }) else {
-            return VerificationResult(
-                item: planned.item,
-                outcome: .notPerformed,
-                expectedVersion: expected,
-                observedVersion: nil,
-                message: "MacUp has no \(planned.provider.displayName) provider loaded, so it could not confirm the new version."
-            )
-        }
-        // Verification reads; it never changes anything. The guard is given no
-        // modifying rules at all, and the read-only allowlist on top of the
-        // plan's own verification commands so the provider can locate itself
-        // again first.
-        let context = ProviderContext(
-            runner: ExecutionGuard(
-                base: environment.runner,
-                plan: planned.plan,
-                modifyingRules: [],
-                readOnlyRules: CommandAllowlist.readOnlyCheck
-            ),
+    ) async -> ProviderContext {
+        var context = baseContext(provider.id, configuration: configuration, environment: environment)
+        context.runner = ReadOnlyCommandGuard(base: environment.runner, rules: CommandAllowlist.readOnlyCheck)
+        context.installation = await provider.detect(context: context).installation
+        return context
+    }
+
+    private static func baseContext(
+        _ provider: ProviderID,
+        configuration: LoadedConfiguration,
+        environment: CheckEnvironment
+    ) -> ProviderContext {
+        ProviderContext(
+            runner: environment.runner,
             fileSystem: environment.fileSystem,
             environment: environment.processEnvironment,
             homeDirectory: PathDisplay.standardized(environment.homeDirectory),
             searchPath: SearchPath.parse(environment.processEnvironment["PATH"]),
-            settings: configuration.configuration.settings(for: planned.provider),
-            system: environment.system
+            settings: configuration.configuration.settings(for: provider),
+            system: environment.system,
+            now: environment.now
+        )
+    }
+
+    private func verify(
+        _ planned: PlannedUpdate,
+        result: ExecutionResult,
+        provider: any UpdateProvider,
+        providerContext: ProviderContext,
+        environment: CheckEnvironment
+    ) async -> VerificationResult {
+        let expected = planned.plan.proposedVersion.raw
+        // Verification reads; it never changes anything. The guard is given no
+        // modifying rules at all, and the read-only allowlist on top of the
+        // plan's own verification commands so the provider can locate itself
+        // again first. The installation is the one detection already chose, so
+        // the version MacUp reads back comes from the copy it just changed.
+        var context = providerContext
+        context.runner = ExecutionGuard(
+            base: environment.runner,
+            plan: planned.plan,
+            modifyingRules: [],
+            readOnlyRules: CommandAllowlist.readOnlyCheck
         )
         do {
             return try await provider.verify(result, for: planned.candidate, context: context)

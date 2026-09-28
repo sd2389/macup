@@ -81,12 +81,32 @@ struct ModifyingCommandRulesTests {
         }
     }
 
-    @Test("Every rule is a modifying command that names at most two arguments")
+    @Test("A command with its item left off matches no rule")
+    func namingNothingMatchesNoRule() {
+        // `npm install -g` with no package installs the working directory as
+        // a global package; `brew upgrade` with no formula upgrades the lot.
+        let bare = [
+            ("npm", ["install", "-g"]),
+            ("brew", ["upgrade", "--formula", "--yes"]),
+            ("brew", ["upgrade", "--cask", "--yes"]),
+        ]
+        for (executable, arguments) in bare {
+            let request = CommandRequest(
+                executable: URL(fileURLWithPath: "/opt/homebrew/bin/" + executable),
+                arguments: arguments,
+                effect: .modifying
+            )
+            #expect(!ModifyingCommandRules.all.contains { $0.matches(request) }, "\(executable) \(arguments)")
+        }
+    }
+
+    @Test("Every rule is a modifying command that names what it changes")
     func rulesStayNarrow() {
         #expect(ModifyingCommandRules.all.count == 4, "adding a rule is a trust decision")
         for rule in ModifyingCommandRules.all {
             #expect(rule.effect == .modifying)
-            #expect(rule.maximumPositionals >= 1 && rule.maximumPositionals <= 2)
+            // Never zero: a command that names nothing acts on everything.
+            #expect(rule.positionalCount >= 1 && rule.positionalCount <= 2)
             #expect(!rule.leadingArguments.isEmpty)
             #expect(!rule.leadingArguments.contains("--bump"))
             #expect(["brew", "npm", "mise"].contains(rule.executableName))

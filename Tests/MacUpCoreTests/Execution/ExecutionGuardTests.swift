@@ -9,7 +9,7 @@ struct ExecutionGuardTests {
     /// `ModifyingCommandRules.all` is populated by the provider planning work,
     /// so the rules a test needs are stated here rather than assumed.
     let rules = [
-        ModifyingCommandRule("brew", ["upgrade"], options: ["--formula"], maximumPositionals: 1),
+        ModifyingCommandRule("brew", ["upgrade"], options: ["--formula"], positionalCount: 1),
     ]
 
     let candidate = PlannedUpdateFactory.candidate("brew:git", installed: "2.50.0", available: "2.51.0")

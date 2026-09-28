@@ -154,7 +154,15 @@ extension UpdateProvider {
     /// The base allowlist only. A provider that runs modifying commands
     /// overrides this with the environment its own commands need.
     public func executionEnvironment(context: ProviderContext) -> [String: String] {
-        EnvironmentPolicy.base.environment(from: context.environment, searchPath: SearchPath.system)
+        // A provider that states nothing of its own still needs to find the
+        // tools beside it: a package manager usually shells out to siblings
+        // in its own prefix, and the installation MacUp chose is the one
+        // those should come from.
+        let directory = context.installation.map { [$0.executable.directory] } ?? []
+        return EnvironmentPolicy.base.environment(
+            from: context.environment,
+            searchPath: SearchPath.combine(directory, SearchPath.system)
+        )
     }
 
     /// The installation chosen at detection, or a fresh detection when a

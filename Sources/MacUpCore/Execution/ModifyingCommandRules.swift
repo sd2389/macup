@@ -15,22 +15,27 @@ public struct ModifyingCommandRule: Sendable, Hashable {
     public var leadingArguments: [String]
     /// Options that may appear after ``leadingArguments``.
     public var allowedOptions: Set<String>
-    /// How many positional arguments (package names) may follow. Every
-    /// MacUp plan names one item, so this is 1 for per-item upgrades.
-    public var maximumPositionals: Int
+    /// How many positional arguments must follow — exactly that many, not at
+    /// most.
+    ///
+    /// The count is exact because the dangerous case is naming too few:
+    /// `npm install -g` with no package installs the current directory as a
+    /// global package, and `brew upgrade` with no formula upgrades
+    /// everything, walking straight past the items the user excluded.
+    public var positionalCount: Int
     public var effect: CommandEffect
 
     public init(
         _ executableName: String,
         _ leadingArguments: [String],
         options: Set<String> = [],
-        maximumPositionals: Int = 0,
+        positionalCount: Int = 0,
         effect: CommandEffect = .modifying
     ) {
         self.executableName = executableName
         self.leadingArguments = leadingArguments
         self.allowedOptions = options
-        self.maximumPositionals = maximumPositionals
+        self.positionalCount = positionalCount
         self.effect = effect
     }
 
@@ -47,7 +52,7 @@ public struct ModifyingCommandRule: Sendable, Hashable {
             guard Self.isAcceptablePositional(argument) else { return false }
             positionals += 1
         }
-        return positionals <= maximumPositionals
+        return positionals == positionalCount
     }
 
     /// Whether an argument is safe to pass as a positional.
@@ -90,17 +95,17 @@ public enum ModifyingCommandRules {
         // reviewed. `--yes` answers Homebrew's own confirmation prompt, which
         // is on by default and which MacUp's subprocesses have no terminal to
         // answer; the user already confirmed the plan in MacUp.
-        ModifyingCommandRule("brew", ["upgrade", "--formula", "--yes"], maximumPositionals: 1),
-        ModifyingCommandRule("brew", ["upgrade", "--cask", "--yes"], maximumPositionals: 1),
+        ModifyingCommandRule("brew", ["upgrade", "--formula", "--yes"], positionalCount: 1),
+        ModifyingCommandRule("brew", ["upgrade", "--cask", "--yes"], positionalCount: 1),
 
         // npm, global scope only, with the version named as part of the
         // package spec so the plan and the install agree.
-        ModifyingCommandRule("npm", ["install", "-g"], maximumPositionals: 1),
+        ModifyingCommandRule("npm", ["install", "-g"], positionalCount: 1),
 
         // mise. `--bump` is deliberately absent: without it mise keeps the
         // version the user requested. `--cd` pins the directory mise reads
         // configuration from, so the command means the same thing wherever
         // MacUp was started; its value is the second positional.
-        ModifyingCommandRule("mise", ["upgrade", "--cd"], maximumPositionals: 2),
+        ModifyingCommandRule("mise", ["upgrade", "--cd"], positionalCount: 2),
     ]
 }
