@@ -162,6 +162,12 @@ struct CheckRenderer {
                          + TextStyle.pad(versions[index], to: versionWidth) + "  "
                          + style.risk(update.risk.level) + style.dim(" · " + flags.joined(separator: " · ")))
             if verbose {
+                if let difference = update.versionDifference {
+                    lines.append("      " + style.dim("Changes: " + style.text(difference.summary)))
+                }
+                if let link = update.releaseInfoLink {
+                    lines.append("      " + style.dim(style.text(link.title) + ": " + style.safe(link.url.absoluteString)))
+                }
                 if let ownership = update.ownership {
                     lines.append("      " + style.dim("Managed by: " + style.text(ownership.summary)))
                 }

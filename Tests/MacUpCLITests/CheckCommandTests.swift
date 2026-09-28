@@ -61,6 +61,7 @@ struct CheckCommandTests {
         #expect(run.standardOutput.contains("/usr/sbin/softwareupdate --list --no-scan"))
         #expect(run.standardOutput.contains("Managed by: Homebrew"))
         #expect(run.standardOutput.contains("Risk: Major version change"))
+        #expect(run.standardOutput.contains("Changes: Minor 43 → 44."))
         #expect(!run.standardOutput.contains("For details on each update"), "no hint when details are already shown")
     }
 

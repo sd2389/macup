@@ -178,7 +178,10 @@ public struct HomebrewProvider: UpdateProvider {
             if item.details["disabled"] == "true" {
                 notes.append("Disabled in Homebrew.")
             }
-            return candidate.adding(signals: signals, notes: notes)
+            var refined = candidate.adding(signals: signals, notes: notes)
+            // Kept verbatim; ``UpdateCandidate/releaseInfoLink`` decides whether it is safe to offer.
+            if let homepage = item.details["homepage"] { refined.details["homepage"] = homepage }
+            return refined
         }
     }
 

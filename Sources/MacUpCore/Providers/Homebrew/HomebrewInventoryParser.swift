@@ -4,8 +4,8 @@ import Foundation
 ///
 /// Only a few documented fields are used: `full_name`, `installed[].version`,
 /// `installed[].installed_on_request`, `linked_keg`, `pinned`, `tap`, `desc`,
-/// `deprecated`, `disabled` for formulae; `token`, `name`, `installed`,
-/// `pinned`, `auto_updates`, `artifacts` for casks. Everything else is ignored.
+/// `deprecated`, `disabled`, `homepage` for formulae; `token`, `name`,
+/// `installed`, `pinned`, `auto_updates`, `artifacts`, `homepage` for casks. Everything else is ignored.
 enum HomebrewInventoryParser {
     static func parse(_ data: Data, ownership: OwnershipChain?, command: String? = nil) throws -> ProviderListing<ManagedItem> {
         guard let document = JSONValue.parse(data) else {
@@ -30,6 +30,7 @@ enum HomebrewInventoryParser {
             var details: [String: String] = [:]
             details["tap"] = entry["tap"]?.stringValue
             details["description"] = entry["desc"]?.stringValue
+            details["homepage"] = entry["homepage"]?.stringValue
             if let onRequest = installed.last?["installed_on_request"]?.boolValue {
                 details["installedOnRequest"] = String(onRequest)
             }
@@ -59,6 +60,7 @@ enum HomebrewInventoryParser {
             var details: [String: String] = [:]
             details["tap"] = entry["tap"]?.stringValue
             details["description"] = entry["desc"]?.stringValue
+            details["homepage"] = entry["homepage"]?.stringValue
             if entry["auto_updates"]?.boolValue == true { details["autoUpdates"] = "true" }
             if usesInstallerPackage(entry["artifacts"]) { details["usesInstallerPackage"] = "true" }
             listing.elements.append(ManagedItem(

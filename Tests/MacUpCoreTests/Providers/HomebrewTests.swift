@@ -286,6 +286,10 @@ struct HomebrewProviderTests {
         #expect(refined[0].risk.level == .high)
         #expect(refined[1].signals.contains(.mayAffectDependents))
         #expect(refined[1].notes.contains("Installed as a dependency of other formulae."))
+        // The homepage travels from the inventory, and is offered only when safe.
+        #expect(refined[0].releaseInfoLink?.url.absoluteString == "https://www.zoom.us/")
+        #expect(refined[1].details["homepage"] == "javascript:alert(1)")
+        #expect(refined[1].releaseInfoLink == nil)
     }
 
     @Test("--refresh runs brew update as a metadata refresh, and only then")

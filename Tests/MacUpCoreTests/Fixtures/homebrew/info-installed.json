@@ -3,6 +3,7 @@
     {
       "name": "git",
       "full_name": "git",
+      "homepage": "https://git-scm.com",
       "tap": "homebrew/core",
       "desc": "Distributed revision control system",
       "installed": [
@@ -27,6 +28,7 @@
     {
       "name": "abseil",
       "full_name": "abseil",
+      "homepage": "javascript:alert(1)",
       "tap": "homebrew/core",
       "desc": "C++ Common Libraries",
       "installed": [
@@ -104,6 +106,7 @@
     },
     {
       "token": "zoom",
+      "homepage": "https://www.zoom.us/",
       "full_token": "zoom",
       "tap": "homebrew/cask",
       "name": [

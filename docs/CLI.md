@@ -64,7 +64,7 @@ macup --generate-completion-script zsh > ~/.zsh/completions/_macup
 | `macup check --json` | Machine-readable report (schema version 1). |
 | `macup check --provider <id>` | Checks only `homebrew`, `npm`, `mise`, or `macos`. Repeatable. |
 | `macup check --inventory` | Also lists installed items. |
-| `macup check --verbose` | Adds ownership chains, risk reasons, notes, and every command MacUp ran. |
+| `macup check --verbose` | Adds what changes between the two versions, a link to read about the release where the provider gives one, ownership chains, risk reasons, notes, and every command MacUp ran. |
 | `macup check --save-state` | Also writes the report to `~/.local/state/macup/last-check.json`. This is how a scheduled check leaves its result behind. |
 | `macup plan [<package-id>…] [--refresh] [--json] [--verbose]` | Shows what `macup update` would do: current → proposed version, provider, effective policy, risk and its reason, and the exact executable and arguments — plus every item it would leave alone, with the reason. Launches nothing. |
 | **`macup update [<package-id>…]`** | **The only command that changes packages.** Flags below. |
