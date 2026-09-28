@@ -1,0 +1,66 @@
+{
+  "formulae": [
+    {
+      "name": "git",
+      "full_name": "git",
+      "tap": "homebrew/core",
+      "desc": "Distributed revision control system",
+      "installed": [
+        {
+          "version": "2.43.0",
+          "installed_on_request": true
+        },
+        {
+          "version": "2.44.0",
+          "installed_on_request": true
+        }
+      ],
+      "linked_keg": "2.44.0",
+      "pinned": false,
+      "outdated": false,
+      "versions": {
+        "stable": "2.44.0",
+        "bottle": true
+      }
+    },
+    {
+      "name": "postgresql@16",
+      "full_name": "postgresql@16",
+      "tap": "homebrew/core",
+      "desc": "Object-relational database system",
+      "installed": [
+        {
+          "version": "16.1",
+          "installed_on_request": true
+        }
+      ],
+      "linked_keg": null,
+      "keg_only": true,
+      "pinned": true,
+      "outdated": true
+    }
+  ],
+  "casks": [
+    {
+      "token": "firefox",
+      "full_token": "firefox",
+      "tap": "homebrew/cask",
+      "name": [
+        "Mozilla Firefox"
+      ],
+      "desc": "Web browser",
+      "installed": "124.0.1",
+      "version": "124.0.1",
+      "outdated": false,
+      "auto_updates": true,
+      "pinned": false,
+      "artifacts": [
+        {
+          "app": [
+            "Firefox.app"
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -18,6 +18,9 @@ public struct ProviderContext: Sendable {
     /// Set by the check engine after successful detection so every command
     /// in one check uses the same installation.
     public var installation: ProviderInstallation?
+    /// The clock a plan is stamped with, injected so a plan built from the
+    /// same check twice is the same plan.
+    public var now: @Sendable () -> Date
 
     public init(
         runner: any CommandRunning,
@@ -28,7 +31,8 @@ public struct ProviderContext: Sendable {
         settings: MacUpConfiguration.ProviderSettings = .init(),
         refreshMetadata: Bool = false,
         system: SystemInfo,
-        installation: ProviderInstallation? = nil
+        installation: ProviderInstallation? = nil,
+        now: @escaping @Sendable () -> Date = { Date() }
     ) {
         self.runner = runner
         self.fileSystem = fileSystem
@@ -39,6 +43,7 @@ public struct ProviderContext: Sendable {
         self.refreshMetadata = refreshMetadata
         self.system = system
         self.installation = installation
+        self.now = now
     }
 
     public var resolver: ExecutableResolver { ExecutableResolver(fileSystem: fileSystem) }
@@ -95,15 +100,27 @@ public protocol UpdateProvider: Sendable {
     /// installer package) to the candidates.
     func refine(_ candidates: [UpdateCandidate], using inventory: [ManagedItem]) -> [UpdateCandidate]
 
-    /// Builds an exact execution plan. Phase 2.
+    /// Builds an exact execution plan, running nothing.
     func makePlan(for candidate: UpdateCandidate, context: ProviderContext) async throws -> ExecutionPlan
 
-    /// Confirms an update reached its target. Phase 3.
+    /// Confirms an update reached its target, using read-only commands.
     func verify(
         _ result: ExecutionResult,
         for candidate: UpdateCandidate,
         context: ProviderContext
     ) async throws -> VerificationResult
+
+    /// The complete environment the steps of a plan must be launched with.
+    ///
+    /// An ``ExecutionStep`` carries the exact executable and arguments; this
+    /// is the other half of what a plan promises. Some of MacUp's guarantees
+    /// exist only in the environment: Homebrew, for instance, offers no flag
+    /// to stop `brew cleanup` running after an upgrade or to stop it pulling
+    /// in installed dependents, so a plan that promised neither would be
+    /// broken by running its command with the wrong environment
+    /// (CLAUDE.md §2.16, §2.17). Whatever launches a plan asks the owning
+    /// provider for this rather than assembling an environment itself.
+    func executionEnvironment(context: ProviderContext) -> [String: String]
 }
 
 extension UpdateProvider {
@@ -115,9 +132,9 @@ extension UpdateProvider {
         candidates
     }
 
-    // Fail closed until planning and execution exist for this provider.
+    // Fail closed for a provider that has no reviewed, tested plan of its own.
     public func makePlan(for candidate: UpdateCandidate, context: ProviderContext) async throws -> ExecutionPlan {
-        throw MacUpError(.unsupported, "\(displayName) cannot plan updates yet; MacUp is read-only in this version.")
+        throw MacUpError(.unsupported, "\(displayName) cannot plan updates; MacUp only reports them.")
     }
 
     public func verify(
@@ -125,7 +142,19 @@ extension UpdateProvider {
         for candidate: UpdateCandidate,
         context: ProviderContext
     ) async throws -> VerificationResult {
-        throw MacUpError(.unsupported, "\(displayName) cannot verify updates yet; MacUp is read-only in this version.")
+        VerificationResult(
+            item: candidate.id,
+            outcome: .notPerformed,
+            expectedVersion: candidate.availableVersion.raw,
+            observedVersion: nil,
+            message: "\(displayName) has no verification step in MacUp, so nothing was checked."
+        )
+    }
+
+    /// The base allowlist only. A provider that runs modifying commands
+    /// overrides this with the environment its own commands need.
+    public func executionEnvironment(context: ProviderContext) -> [String: String] {
+        EnvironmentPolicy.base.environment(from: context.environment, searchPath: SearchPath.system)
     }
 
     /// The installation chosen at detection, or a fresh detection when a

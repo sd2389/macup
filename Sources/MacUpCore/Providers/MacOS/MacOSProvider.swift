@@ -44,6 +44,39 @@ public struct MacOSProvider: UpdateProvider {
     /// `context.refreshMetadata` is set; there is no separate step.
     public func refreshMetadata(context: ProviderContext) async throws -> [DiagnosticFinding] { [] }
 
+    /// Refuses, and says why.
+    ///
+    /// This is not an unfinished feature standing in for a plan MacUp will
+    /// produce later. Applying a macOS update means downloading gigabytes,
+    /// authorizing as an administrator, and restarting the Mac, and MacUp
+    /// will not hold a password, hide an authorization prompt, or restart a
+    /// machine someone is working on (CLAUDE.md §2.9, §2.10, §2.19). There is
+    /// no `.planUpdates` capability for this provider for the same reason.
+    public func makePlan(for candidate: UpdateCandidate, context: ProviderContext) async throws -> ExecutionPlan {
+        throw MacUpError(
+            .unsupported,
+            "MacUp reports macOS updates but does not apply them.",
+            detail: "Installing \(candidate.displayName) needs administrator authorization and usually a restart. "
+                + "MacUp asks for neither and never restarts your Mac.",
+            recoverySuggestion: "Install it from System Settings → General → Software Update."
+        )
+    }
+
+    /// Nothing was run, so there is nothing to confirm.
+    public func verify(
+        _ result: ExecutionResult,
+        for candidate: UpdateCandidate,
+        context: ProviderContext
+    ) async throws -> VerificationResult {
+        VerificationResult(
+            item: candidate.id,
+            outcome: .notPerformed,
+            expectedVersion: candidate.availableVersion.raw,
+            observedVersion: nil,
+            message: "MacUp does not apply macOS updates, so there is nothing for it to confirm."
+        )
+    }
+
     public func inventory(context: ProviderContext) async throws -> ProviderListing<ManagedItem> {
         ProviderListing()
     }

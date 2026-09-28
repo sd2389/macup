@@ -71,8 +71,35 @@ public struct ModifyingCommandRule: Sendable, Hashable {
 /// trust decision (CLAUDE.md §2, §26). ``ExecutionGuard`` enforces it, on top
 /// of requiring that the command was in the plan the user reviewed.
 public enum ModifyingCommandRules {
-    /// Populated by the provider planning work; empty means MacUp can run
-    /// nothing modifying, which is the right answer until a provider's
-    /// commands have been reviewed and tested.
-    public static let all: [ModifyingCommandRule] = []
+    /// The four shapes MacUp's providers plan, and nothing else.
+    ///
+    /// Each was confirmed against the installed tool's own help
+    /// (docs/PROVIDER_NOTES.md records which). Every one names a single item,
+    /// because an upgrade that names nothing upgrades everything and would
+    /// walk past the items a user excluded.
+    ///
+    /// These rules bound the arguments. The other half of what a plan
+    /// promises is the environment, which some guarantees live in and only
+    /// in — `HOMEBREW_NO_INSTALL_CLEANUP`, for instance, has no flag — so
+    /// whatever runs a step takes the environment from the owning provider's
+    /// `executionEnvironment(context:)` rather than assembling one.
+    public static let all: [ModifyingCommandRule] = [
+        // Homebrew. `--formula` and `--cask` are explicit because one word
+        // can be both, and MacUp does not let Homebrew pick which the user
+        // reviewed. `--yes` answers Homebrew's own confirmation prompt, which
+        // is on by default and which MacUp's subprocesses have no terminal to
+        // answer; the user already confirmed the plan in MacUp.
+        ModifyingCommandRule("brew", ["upgrade", "--formula", "--yes"], maximumPositionals: 1),
+        ModifyingCommandRule("brew", ["upgrade", "--cask", "--yes"], maximumPositionals: 1),
+
+        // npm, global scope only, with the version named as part of the
+        // package spec so the plan and the install agree.
+        ModifyingCommandRule("npm", ["install", "-g"], maximumPositionals: 1),
+
+        // mise. `--bump` is deliberately absent: without it mise keeps the
+        // version the user requested. `--cd` pins the directory mise reads
+        // configuration from, so the command means the same thing wherever
+        // MacUp was started; its value is the second positional.
+        ModifyingCommandRule("mise", ["upgrade", "--cd"], maximumPositionals: 2),
+    ]
 }
