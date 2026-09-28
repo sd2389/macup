@@ -4,7 +4,230 @@ All notable changes to MacUp are recorded here, grouped as described in
 `docs/RELEASE.md` (Added, Changed, Fixed, Security, Provider compatibility).
 MacUp follows Semantic Versioning once releases begin.
 
-## [Unreleased]
+Nothing after 0.1.0 has been tagged. The sections below carry the version
+`docs/ROADMAP.md` assigns them and will be dated when they are released.
+
+## [0.4.0] — unreleased
+
+### Added
+- **Doctor**: eleven deterministic diagnostics that read the result of one
+  read-only check and say what they saw. Provider availability and results;
+  multiple Homebrew installations and a non-standard prefix; executable
+  architecture; the login shell's `PATH` against MacUp's own; runtime
+  ownership; which Node owns the global npm packages; configuration problems
+  and item policies that no longer name installed software; whether MacUp's
+  own directories are usable and private; and whether a configured schedule
+  is really installed and loaded. Available in both surfaces.
+- Findings carry stable, namespaced identifiers (`homebrew.multipleInstallations`,
+  `paths.directoryWritableByOthers`) because scripts will match on them, and
+  are ordered deterministically — most severe first, then by identifier, then
+  title, then detail — so two runs over one machine agree.
+- Binary architecture is read from the Mach-O header directly rather than
+  through `lipo` or `file`: Doctor does not depend on another tool being
+  present or on parsing its prose, and only the header is read, never the
+  megabytes behind it. A header MacUp cannot interpret — a script, a Java
+  class file that shares the universal magic, an unknown CPU type — is
+  reported as undetermined and produces no finding.
+- The runtime ownership checks exist because "which version is active" has
+  two true answers on a real developer's Mac: mise can report node 24 active
+  while an earlier `PATH` entry runs node 22, and the global npm packages
+  belong to whichever Node runs npm. Doctor reports both installations, which
+  one wins, and where the global packages actually live.
+
+### Security
+- Doctor issues exactly one command — reading the user's login shell — through
+  the same `CommandRunning` abstraction as everything else, with effect
+  `readOnly`. The captured environment is compared and dropped rather than
+  logged. Everything else is read from bytes or from `stat`.
+- Everything that reaches a finding is redacted and sanitized first: the home
+  directory becomes `~` so a pasted report carries no username, and no finding
+  prints an environment variable's value. A test plants `GITHUB_TOKEN`,
+  `AWS_SECRET_ACCESS_KEY`, and `NODE_OPTIONS` and asserts that none of their
+  values appear.
+- Doctor explains. It has no fix action, not even an opt-in one.
+
+## [0.3.0] — unreleased
+
+Controlled updates: MacUp can change the machine, one named item at a time,
+from a plan the user read first.
+
+### Added
+- Per-item updates for Homebrew formulae and casks, npm global packages, and
+  mise-managed runtimes, through `macup update` and the app's Updates screen.
+  `macup update --dry-run` describes everything and runs nothing.
+- Verification by the owning provider after every successful update, using
+  read-only commands that name no package. A version that did not move is
+  reported as not reached and output MacUp could not parse as failed; neither
+  is rounded up to success.
+- Update history at `~/.local/state/macup/history.jsonl`, one JSON object per
+  line: when, where the run came from, the item, the versions before, targeted
+  and observed, the exact commands as displayed, the outcome, the verification
+  outcome, an error summary, and the duration. Read it with `macup history`
+  and on the app's History screen.
+- Every skip is recorded with its reason. An item MacUp decided not to change
+  is part of what it did, and the reason is the useful half.
+- Cancellation reaches the running command rather than leaving it to finish
+  unwatched.
+- Providers answer for the environment their own commands need
+  (`UpdateProvider.executionEnvironment`). A plan carries the exact executable
+  and arguments — that is what a person reviews — but two of a Homebrew plan's
+  promises have no command-line flag and live only in the environment.
+
+### Security
+- `ExecutionGuard` wraps the command runner for the length of one plan and
+  compares every invocation against that plan's own steps and verification
+  commands, by executable, argument array, and effect. A change must match a
+  reviewed `ModifyingCommandRule` as well, so being listed in a plan is not by
+  itself permission to run a shape of command nobody vetted. Anything else is
+  refused before it reaches the operating system, and the refusal names the
+  command. "MacUp only runs what it showed you" is now a property of the code.
+- `ModifyingCommandRules` lists the four shapes MacUp may ever run, in one
+  reviewable place. Positional arguments are allowed — a modifying command
+  names the thing it changes — and then checked rather than trusted: no
+  leading `-`, no control or bidirectional-override characters, and an
+  **exact** count, because naming too few is the dangerous case. `npm install
+  -g` with no package installs the working directory as a global package, and
+  `brew upgrade` with no formula upgrades everything, walking past every
+  exclusion.
+- The configuration file is re-read and policy re-asked immediately before
+  each item. The copy planning used may be minutes old, and the rule the user
+  changed in between is the one that should win.
+- A decision needing confirmation runs only for an item the caller confirmed,
+  and only when somebody was there to confirm it. A scheduled run therefore
+  touches nothing but Auto Update items, and skips anything that might ask for
+  a password or a restart.
+- Items run strictly one at a time. Two package managers rewriting the same
+  machine at once is not something MacUp could reason about afterwards, let
+  alone explain.
+- A failed step ends that item, and a failure ends the run's appetite for
+  high-risk and unjudged changes: after a failure MacUp no longer knows the
+  state of the machine as well as it did when the plan was written.
+- `HOMEBREW_NO_INSTALL_CLEANUP` and `HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK`
+  are set for every Homebrew upgrade. Neither has a command-line flag, and
+  without them an upgrade cleans up afterwards — which MacUp never does on its
+  own — and upgrades installed dependents, which are packages the user never
+  reviewed and may have excluded.
+- Verification is given no modifying rules at all, and only the read-only
+  rules — not the metadata-refresh one. `brew update` is on the check
+  allowlist for `macup check --refresh`, and an update the user reviewed never
+  said it would refresh anything.
+- Detection runs once per provider per run, through a runner that allows
+  nothing but the read-only allowlist, and its result is reused for
+  verification, so the version MacUp reads back comes from the installation it
+  just changed. A provider MacUp cannot find, or does not have loaded, means
+  the plan does not run.
+- Steps run with the home directory as the working directory, never the
+  directory MacUp happened to be started in, so a tool that reads
+  project-local configuration cannot pick up whichever project the shell was
+  sitting in.
+- History is held to the configuration file's rules: owner-only, never written
+  through a symlink, never into a directory somebody else could change, one
+  redacted JSON object per line, trimmed by atomic replace so a crash during a
+  trim cannot lose the entries it was keeping. A line it cannot decode is
+  skipped and reported rather than guessed at. Entries are redacted by the
+  engine and again by the store, so a caller that forgets cannot put a secret
+  in the audit log. A dry run records nothing, because it attempted nothing.
+- `scripts/check-trust-invariants.sh` previously banned modifying provider
+  verbs everywhere. It now permits them only in the one rules file and the one
+  planning file per provider, and still fails for the CLI, the app, discovery,
+  and scheduling. `--bump` may appear nowhere at all.
+
+### Provider compatibility
+- Command shapes were confirmed against each tool's own help — `brew help
+  upgrade`, `mise upgrade --help`, `npm help install` — rather than from
+  memory, and reading that help changed real decisions, which
+  `docs/PROVIDER_NOTES.md` records next to each command.
+- Homebrew: `brew upgrade --formula --yes <name>` and `brew upgrade --cask
+  --yes <token>`. `--yes` because Homebrew's ask mode is now the default and
+  MacUp's subprocesses have no terminal to answer from; the confirmation
+  belongs in MacUp, where the user saw the plan. `--formula` and `--cask` are
+  always explicit, because one word can be both and MacUp does not let
+  Homebrew pick which one the user reviewed.
+- mise: `mise upgrade --cd <home> <tool>`. `--bump` never appears, so the
+  requested range is preserved and no major version is bumped. `--cd` pins the
+  directory mise resolves configuration from, so the command means the same
+  thing wherever MacUp was started and the reviewer can see which directory
+  that is. Every mise plan says a lockfile may change, because mise updates
+  `mise.lock` when lockfiles are enabled and MacUp cannot see that setting
+  from the outside. Every mise plan also says the version you have now stays
+  installed: mise removes unused versions only when asked, and MacUp never
+  asks — which is also what makes going back easy, given that MacUp promises
+  no rollback.
+- npm: `npm install -g <name>@<version>`, with the version named as part of
+  the package spec so the plan and the install agree. Anything in that
+  position that is not plainly a published version is refused, because
+  `pkg@next` is a different request from the one the user approved.
+- macOS refuses to plan and says why. That is not an unfinished feature:
+  applying an OS update needs an administrator and usually a restart, and
+  MacUp holds no password and restarts nothing.
+
+## [0.2.0] — unreleased
+
+### Added
+- **Policy**: Auto Update, Ask First, Ignore, Pin, and Inherit, resolved per
+  item, then per provider, then from the global default. `macup policy list`,
+  `macup policy set <package-id> <policy>`, `macup policy clear <package-id>`,
+  `macup provider enable|disable <provider>`, and the same controls in the
+  app. Every decision carries a human-readable reason naming the item, so a
+  plan that lists twenty skips says which item each line is about.
+- **Planning**: `macup plan` and `macup update --dry-run` produce every change
+  MacUp would make, with the exact executable and argument array, alongside
+  every change it would not and why. A plan runs nothing to produce itself:
+  the planner reuses the installation the read-only check already chose and
+  hands providers a runner wrapped in the read-only guard, so a provider that
+  tried to run something while describing a plan would be refused.
+- A plan states whether network is expected, whether privilege may be
+  required, whether a restart may be required, whether user configuration may
+  change, how it will be verified, and whether it can be rolled back.
+- `PolicyEditor` is the single door for changing a rule, so the CLI and the
+  app's controls cannot drift apart.
+- `PolicyListing` answers "what are my rules?" and resolves inheritance
+  through the policy engine, so a listing can never disagree with the decision
+  the user will actually get. Item keys it could not parse are reported rather
+  than quietly dropped.
+
+### Changed
+- `auto` no longer means "decide anything the risk model rates below high".
+  macOS updates, runtime major changes, and unknown risk are always Ask First;
+  MacUp never walks into an administrator prompt or a restart on its own, and
+  it does not edit a config file or lockfile unasked. Those rules hold
+  regardless of `confirmMajorUpdates`, which now governs only the case it was
+  written for — an ordinary package's major version bump.
+- The macOS rule checks the provider rather than the OS-update signal, because
+  `softwareupdate` reports Safari and security updates without marking them as
+  OS updates.
+
+### Security
+- A configuration MacUp could not read allows nothing, because the rules
+  saying which items are excluded are exactly the ones it could not read.
+- A provider turned off in the configuration allows nothing, and an item the
+  provider itself pins allows nothing — MacUp never unpins something you
+  pinned in Homebrew.
+- Every provider plan names the single item it would change. `brew upgrade`
+  and `mise upgrade` with no arguments touch everything the tool considers
+  outdated, which would walk straight past the items a user excluded, so
+  naming the item is what makes an exclusion mean anything.
+- A candidate policy refused becomes a recorded skip and never reaches the
+  planned list, so an ignored or pinned item cannot end up in something a bulk
+  action would run. A candidate whose provider cannot produce a plan becomes a
+  skip carrying the provider's error, never a guess.
+- A provider MacUp has no plan for is refused by capability rather than by
+  hoping its planning method throws.
+- `PolicyEditor` refuses more than it accepts: a package ID is validated
+  before anything is written; a configuration with errors is never rewritten,
+  because MacUp saves the file by re-encoding what it understood and
+  rewriting a file it misread could drop the exclusions the user is relying
+  on; and an edit validates its own result, so `pin` cannot land on a whole
+  provider. That refusal is also what keeps keys MacUp does not know — an
+  unrecognized key is already a configuration error, so the file is left
+  exactly as the user wrote it.
+- No plan claims rollback, because none has a tested strategy.
+
+## [0.1.1] — unreleased
+
+Scheduled read-only checks, and optional approval before a change. A
+scheduled *check* needs neither the policy engine nor the execution engine,
+so it did not have to wait for them.
 
 ### Added
 - Optional approval before MacUp changes anything: `macup security require on`
@@ -32,8 +255,9 @@ MacUp follows Semantic Versioning once releases begin.
   **user agent** (`com.macup.check`) that runs `macup check --save-state` at
   the chosen time. It runs as you, needs no administrator authorization,
   leaves no process running between checks, and `disable` removes it
-  completely. There is no scheduled updating: this version still cannot
-  modify a package.
+  completely. The scheduled job can only ever run a read-only check, which a
+  static invariant enforces; scheduled *updating* is still not implemented
+  (see `docs/ROADMAP.md`, v0.6.0).
 - A **Features** screen in the app's navigation: one row per feature, one
   switch each, in plain language — automatic checks, approval, and face match.
   The switches moved there from Settings, which goes back to being the
@@ -139,5 +363,8 @@ Read-only alpha: MacUp reports what is outdated and never changes anything.
 - Verified against Homebrew 7.0.6, npm 10.9.8/11.17.0, mise 2026.7.3, and
   `softwareupdate` on macOS 27.0; parsers accept older output shapes.
 
-[Unreleased]: https://github.com/sd2389/macup/compare/v0.1.0...HEAD
+[0.4.0]: https://github.com/sd2389/macup/compare/v0.1.0...HEAD
+[0.3.0]: https://github.com/sd2389/macup/compare/v0.1.0...HEAD
+[0.2.0]: https://github.com/sd2389/macup/compare/v0.1.0...HEAD
+[0.1.1]: https://github.com/sd2389/macup/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/sd2389/macup/releases/tag/v0.1.0

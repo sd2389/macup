@@ -30,10 +30,13 @@ shell.
   is a shell-quoted rendering for people (ANSI-C quoting makes control
   characters visible). It is never executed or parsed back.
 
-Known limitation: the runner signals the process it launched, not its whole
-process group, so a grandchild may briefly outlive a cancelled command.
-Phase 3 (which runs modifying commands) should revisit this with process
-groups.
+Known limitation, still open now that MacUp runs modifying commands: the
+runner signals the process it launched, not its whole process group, so a
+grandchild may briefly outlive a cancelled command. Cancelling a `macup
+update` therefore reaches the `brew`, `npm`, or `mise` process MacUp started,
+and a helper that process spawned may take a moment longer to exit. Process
+groups are the fix and are tracked in
+`docs/IMPLEMENTATION_CHECKLIST.md`.
 
 ## Environment allowlist
 
@@ -144,3 +147,20 @@ Refused commands never reach the operating system; they are recorded in
 the report with outcome `refused`. A test runs a deliberately misbehaving
 provider that attempts `brew upgrade git` during a check and asserts the
 guard stops it.
+
+The same guard is used for every read-only operation, not only a check:
+planning hands providers a runner wrapped in it (with the metadata refresh
+switched off), and so does locating a provider before a plan runs.
+
+## The modifying guard
+
+A modifying command passes through `ExecutionGuard` instead, which is
+stricter in a different direction: it allows positional arguments, because a
+modifying command has to name what it changes, and then requires both that
+the command appear in the plan the user reviewed and that it match one of the
+reviewed shapes in `ModifyingCommandRules`.
+
+The two allowlists exist for different jobs, which is why there are two.
+`docs/ARCHITECTURE.md` ("Two allowlists") explains the split and what each
+one is protecting against; `docs/PROVIDER_NOTES.md` lists the four modifying
+shapes and where each was confirmed.

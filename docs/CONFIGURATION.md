@@ -70,9 +70,12 @@ Omitted sections take the defaults above. When no file exists, every
 provider is enabled, everything is Ask First, scheduling is off, and there
 is no telemetry.
 
-Phase 1 uses `providers.<id>.enabled` (disabled providers are never run)
-and `providers.<id>.executablePath`. Policies are stored and validated now
-and enforced from Phase 2.
+Every key above is now read and acted on. `providers.<id>.enabled` decides
+which providers run at all; `providers.<id>.executablePath` decides which
+installation they run. The policy keys are resolved by `PolicyEngine` —
+per-item, then provider, then global default — and re-read from this file
+immediately before any change, so editing it takes effect on the next item
+rather than the next run (`docs/TRUST_AND_SECURITY.md`).
 
 The `security` section is what `macup security require` writes. Turning
 `requireApproval` on by hand works too, but MacUp will then refuse every
@@ -117,13 +120,108 @@ structurally valid but has errors, read-only commands still honor its
 cannot be decoded at all, they use the defaults. Either way automatic
 modification stays off.
 
-## Writing (used by later phases)
+"Stays off" is concrete: `PolicyEngine` returns `deny` for every item, with
+the reason that MacUp cannot tell which items you excluded, and `PolicyEditor`
+refuses to write. Nothing is changed until the configuration is fixed.
+
+## Editing policy through `PolicyEditor`
+
+`PolicyEditor` is the one place MacUp changes a rule. `macup policy set`,
+`macup policy clear`, `macup provider enable`, `macup provider disable`, and
+the app's policy controls all go through it, so there is a single source of
+truth for what a policy edit is allowed to do (CLAUDE.md §12). It refuses
+more than it accepts, and the refusals are the interesting part.
+
+### A package ID is validated before anything is written
+
+An item name is parsed as a `PackageID` first. A typo or an unsupported
+ecosystem is rejected without the file being opened, so a rule that could
+never match anything does not get stored as if it might.
+
+### MacUp will not rewrite a configuration it could not read
+
+If the configuration has any error-severity problem, an edit is refused and
+the file is left exactly as it was.
+
+The reason is the same one that makes an unreadable configuration deny every
+change: **the rules saying which items are excluded are exactly the rules
+MacUp could not read.** MacUp saves the file by re-encoding what it
+understood. Writing back a file it misread would replace the parts it misread
+with its own idea of them — which could silently drop the `ignore` rule the
+user was relying on. Refusing to write is the only option that cannot lose
+somebody's exclusions.
+
+`macup config show` lists each problem with its location, and the refusal
+repeats them, so fixing the file and trying again is the whole recovery path.
+
+### What that means for a file containing keys MacUp does not know
+
+An unrecognized key at any level is already a configuration **error** (see
+"Validation fails closed" above). So a file containing one is refused for
+editing, and left byte-for-byte as the user wrote it.
+
+That is the intended outcome rather than a side effect. It keeps the unknown
+key, and it keeps the user's own formatting of everything else. Two
+alternatives were considered and are worse:
+
+- **Re-encode and drop the key.** MacUp would silently delete something the
+  user wrote, possibly a setting from a newer MacUp they are about to go back
+  to.
+- **Edit the JSON document in place.** `JSONSerialization` re-prints the
+  numbers it parsed, so a hand-written `"faceMatchThreshold": 0.6` would come
+  back as `0.59999999999999998`. An edit tool that quietly rewrites unrelated
+  values is not a tool anyone should trust with a policy file.
+
+If MacUp adds a key later, an older MacUp reading that file will refuse to
+edit it and say which key it did not recognize. That is a clear message and a
+file that still works, which is better than a clean write and lost settings.
+
+### An edit that would break the configuration is refused before writing
+
+After applying a change in memory, the result is validated again. If the
+change would introduce an error, nothing is written and the error names the
+path it would have been at.
+
+This is what stops MacUp from putting the configuration into the state that
+disables automatic modification. `pin` cannot land on a whole provider, and
+the global default cannot become `pin` or `inherit` — both are errors, and
+either would leave the user unable to change anything until they edited the
+file by hand. An edit that validated its input but not its own output would
+make MacUp the cause of the very state it fails closed on.
+
+Warnings do not block an edit. They are returned with the change, so a
+caller can say "stored, but it has no effect in this version" — setting
+`auto` for macOS, for example, which is accepted and recorded and still
+always asks.
+
+### What a change reports
+
+An edit returns the value it replaced, the value it wrote, and where in the
+file it lives (`items.brew:git.policy`, `providers.npm.enabled`,
+`global.defaultPolicy`). When the configuration already said what was asked
+for, nothing is written and the result says so plainly rather than claiming
+success; clearing a rule that was never set reports that there was nothing to
+clear.
+
+A provider the file does not mention already has a value — the built-in
+default — so an edit to it reports that value rather than "not set".
+
+If the file was read at an older schema version, the edit is about to persist
+the in-memory upgrade, so `persistMigration` writes the backup first (see
+"Migrations" below).
+
+## Writing
 
 `ConfigurationStore.save` writes atomically: a new owner-only (`0600`)
 temporary file created with `O_EXCL | O_NOFOLLOW` in the same directory,
 `fsync`, then `rename` over the destination, then `fsync` of the
 directory. It creates the directory as `0700`, refuses to write into a
 directory other users can modify, and refuses to replace a symlink.
+
+History (`~/.local/state/macup/history.jsonl`) is held to the same rules:
+owner-only, never written through a symlink, never into a directory somebody
+else could change, and trimmed by atomic replace. See
+`docs/TRUST_AND_SECURITY.md`.
 
 ## Migrations
 

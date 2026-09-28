@@ -124,9 +124,15 @@ still does: it is Phase 6, unchanged.
       next-check lines on the Dashboard and in the menu bar
 - [x] `MacUp.app` bundles the CLI at `Contents/Helpers/macup` and schedules
       that copy, so app and scheduled CLI cannot be different versions
-- [ ] App view-model tests — the app still has no test target. `Scheduler`
-      and `LaunchAgent` are fully covered; the app layer is verified by
-      rendering its own windows (`MacUp --snapshot-dir`).
+- [x] App view-model tests. The app is now `MacUpAppCore` (a library) plus a
+      one-line entry point, because a test target cannot import an executable;
+      `AppModel` takes an injected `AppEnvironment` instead of building its own
+      runner, file system, authenticator, and camera. `Tests/MacUpAppTests`
+      covers the glanceable status, the counts, overlapping checks, failed
+      schedule changes, and the schedule and security busy flags staying
+      separate — and asserts directly that no test opens a camera, prompts for
+      authentication, runs a provider command, installs a launchd agent, or
+      touches the real config and state directories.
 
 ## Approval before a change (biometrics)
 
@@ -181,32 +187,208 @@ still does: it is Phase 6, unchanged.
   weekly schedule read from a temporary configuration directory) with
   `MacUp --snapshot-dir`. Nothing was installed.
 
+## Phase 2 — policy + planning
+
+Core landed. The `macup` commands and the app controls for this phase are
+delivered by the accompanying surface work; `docs/CLI.md` is the reference
+for the exact commands and flags, and this checklist deliberately does not
+duplicate a syntax it does not own.
+
+- [x] `PolicyEngine`: precedence per item, then provider, then global default,
+      and never returns `inherit`
+- [x] Three overrides on top of precedence, all failing closed: a
+      configuration MacUp could not read allows nothing, a disabled provider
+      allows nothing, a provider-pinned item allows nothing
+- [x] Risk escalation that `confirmMajorUpdates` cannot buy past: macOS
+      updates, OS updates, an administrator prompt, a restart, a config or
+      lockfile rewrite, a major runtime change, and unknown risk
+- [x] The macOS rule checks the provider rather than the OS-update signal,
+      because `softwareupdate` reports Safari and security updates without
+      marking them as OS updates
+- [x] `PolicyIntent`: an unattended run only ever allows `auto`, and an
+      escalated `auto` item comes back as a review item rather than running
+- [x] Every decision carries a human-readable reason naming the item, so a
+      plan listing twenty skips says which item each line is about
+- [x] `PolicyEditor` as the single door for a policy change, shared by both
+      surfaces: validates the package ID first, refuses a configuration with
+      errors, refuses an edit whose result would be invalid, reports the value
+      it replaced, and says plainly when there was nothing to change
+- [x] A file containing keys MacUp does not know is left exactly as written,
+      because an unknown key is already a configuration error and the file is
+      therefore refused rather than re-encoded (docs/CONFIGURATION.md)
+- [x] `PolicyListing` resolves inheritance through the engine, so a listing
+      cannot disagree with the decision the user will get, and reports item
+      keys it could not parse instead of dropping them
+- [x] `UpdatePlanner`: runs nothing, reuses the installation the check chose,
+      and hands providers a runner wrapped in the read-only guard
+- [x] `ExecutionPlan` carries item, versions, risk, rationale, exact
+      executable and argument array, network/privilege/restart/config-change
+      expectations, verification steps, and rollback capability
+- [x] Exact command rendering, with a display-safe form kept separate from the
+      real argument array
+- [x] Every provider plan names a single item, so an exclusion means something
+- [x] Provider command shapes confirmed against `brew help upgrade`,
+      `mise upgrade --help`, and `npm help install`, not from memory
+      (docs/PROVIDER_NOTES.md records what each one changed)
+- [x] Refusals rather than guesses: a pinned Homebrew item, an ambiguous
+      formula/cask namespace, a mise exact pin, a project or system mise
+      config, a mise request MacUp cannot attribute, an npm version position
+      that is not plainly a version, and any item whose name MacUp cannot
+      display exactly
+- [x] macOS refuses to plan and says why, and declares no `planUpdates`
+      capability, so the planner refuses it by capability as well
+- [x] No plan claims rollback
+- [x] Exit criteria: a dry run executes nothing; an ignored or pinned item
+      cannot enter an executable plan; policy precedence fully tested
+
+## Phase 3 — safe execution
+
+- [x] `ModifyingCommandRules`: the four shapes MacUp may ever run, in one
+      reviewable place. Positional arguments are checked rather than trusted
+      (no leading `-`, no control or bidirectional-override characters), and
+      the count is **exact**, because naming too few is the dangerous case
+- [x] `ExecutionGuard`: wraps the runner for the length of one plan and
+      refuses anything that is not one of that plan's own steps or
+      verification commands, matched by executable, argument array, and
+      effect — and a change must match a reviewed rule as well
+- [x] Verification is given no modifying rules at all, and only the read-only
+      rules, so it cannot reach the metadata refresh either
+- [x] `ExecutionEngine` re-reads the configuration file and re-asks the policy
+      engine immediately before each item (CLAUDE.md §2.20)
+- [x] A `confirm` decision runs only for a confirmed item, and only when
+      somebody was there to confirm it
+- [x] An unattended run refuses a plan that may need a password or a restart
+- [x] Items run strictly one at a time; never overlapped
+- [x] A failed step ends that item, and a failure ends the run's appetite for
+      high-risk and unknown-risk changes
+- [x] Refuses a plan it cannot carry out faithfully: no steps, or a step
+      without a usable time limit
+- [x] The environment comes from the owning provider
+      (`executionEnvironment(context:)`), because
+      `HOMEBREW_NO_INSTALL_CLEANUP` and
+      `HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK` have no flag; detection runs
+      once per provider per run through a read-only runner, and a provider
+      MacUp cannot find means the plan does not run
+- [x] Steps run with the home directory as the working directory, so a
+      project-local configuration cannot change what a command means
+- [x] Homebrew selected-item update (formula and cask, `--yes`, explicit
+      `--formula`/`--cask`) and verification from `brew info`
+- [x] npm selected-package update at a named version, and verification from
+      `npm ls -g`
+- [x] mise safe-range update (`--cd`, never `--bump`) and verification from
+      `mise ls`, comparing the active version
+- [x] Verification reported honestly: `targetNotReached` for a version that
+      did not move, `failed` for output MacUp could not parse, never rounded
+      up to success
+- [x] `HistoryStore`: one redacted JSON object per line, owner-only, never
+      through a symlink, trimmed by atomic replace, undecodable lines counted
+      and reported rather than guessed at
+- [x] Every attempt and every skip recorded with its reason; a dry run records
+      nothing, because it attempted nothing
+- [x] History that cannot be written is logged and does not abort the run
+- [x] Cancellation reaches the running command and stops the loop
+- [x] `scripts/check-trust-invariants.sh` updated: modifying verbs are
+      permitted only in the one rules file and the one planning file per
+      provider, and still fail for the CLI, the app, discovery, and
+      scheduling. `--bump` may appear nowhere
+- [x] Exit criteria: no blanket provider upgrade; policy rechecked immediately
+      before execution; failures do not silently continue through high-risk
+      changes
+
+## Phase 4 — Doctor
+
+- [x] Eleven deterministic checks, each its own small type with a stable
+      identifier, driven only by a `DiagnosticInput`, so a check cannot reach
+      for a fact nobody gathered
+- [x] Provider availability and provider results
+- [x] Multiple Homebrew installations, and a non-standard prefix
+- [x] Executable architecture, read from the Mach-O header rather than through
+      `lipo` or `file`, and only the header
+- [x] Login-shell `PATH` against MacUp's own
+- [x] Runtime ownership: mise reporting one version active while an earlier
+      `PATH` entry runs another
+- [x] npm ownership: which Node owns the global packages, and where they
+      actually live
+- [x] Configuration diagnostics, and item policies that no longer name
+      installed software
+- [x] MacUp's own directories: usable, private, owned by you
+- [x] Whether a configured schedule is really installed and loaded
+- [x] Stable, namespaced finding identifiers, ordered deterministically —
+      severity first, then identifier, then title, then detail — so two runs
+      over one machine agree
+- [x] Findings de-duplicated, and a check stands down when a provider already
+      reported the same thing
+- [x] Severity as a judgment: a provider that is not installed is
+      information; a directory another user can write is an error
+- [x] A fact MacUp does not have becomes a finding that says so: undetermined
+      architecture produces nothing, an unreadable launchd state is unknown, an
+      uninspectable directory is unknown, unparsed output is unparsed
+- [x] Reading the login shell is the one command Doctor issues; it goes
+      through `CommandRunning` as a read-only request, the captured
+      environment is compared and dropped, and the reader is injectable so
+      tests describe a shell instead of starting one
+- [x] Everything that reaches a finding is redacted and sanitized: the home
+      directory becomes `~`, and no finding prints an environment variable's
+      value
+- [x] Doctor explains. It never fixes, and never offers to
+
+### Verification (Phases 2–4)
+
+- `scripts/test.sh`: 599 tests (516 core, 44 CLI, 39 app), all passing. No
+  test runs a modifying provider command in any form.
+- `scripts/check-trust-invariants.sh`: passing.
+- No modifying provider command was run on the owner's machine during this
+  work (CLAUDE.md §26 rules 9 and 11). The execution engine's behaviour is
+  proven against a scripted provider and a fake runner.
+- Manual verification for the surfaces belongs with the surface work; see
+  `docs/CLI.md`.
+
+### Open limitations
+
+- [ ] Face matching accuracy is untested against real faces. Vision's feature
+      prints were built for image similarity, not identity, so the default
+      threshold is a starting point rather than a tuned value.
+- [ ] Process-group termination for modifying commands. Cancellation reaches
+      the child; a child that spawns grandchildren is not yet cleaned up as a
+      group.
+- [ ] The camera face match cannot capture in a locally built app, because the
+      bundle is ad-hoc signed and macOS will not grant camera access to a
+      bundle with no team identifier. Both surfaces say so
+      (docs/DEVELOPMENT.md).
+
 ### Carried into later phases
 
-- Policy precedence and evaluation (stored and validated now) — Phase 2.
-- Execution plans, per-item updates, verification, history — Phases 2–3.
-- Process-group termination for modifying commands — Phase 3.
-- Cross-provider diagnostics (for example mise-managed Node on PATH while
-  npm runs a different Node) and binary-architecture checks — Phase 4 Doctor.
-- Login-shell PATH discovery for the app — Phase 5.
 - Scheduled *updating* (explicit-`auto` items only), notifications, and
   battery/metered-network awareness — Phase 6. Notifications need the app
   bundle: `UNUserNotificationCenter` does not work from a bare CLI.
+- Rollback. No provider action has a tested strategy, so every plan reports
+  rollback as unavailable, and will keep doing so until one does
+  (CLAUDE.md §2.22).
+- macOS update installation. Out of scope until it has its own security
+  review and tests; see `docs/PROVIDER_NOTES.md` for why.
 
 ## Phase 5a — read-only desktop app (pulled forward at the owner's request)
 
-Built on the Phase 1 engine before Phases 2–4; update and policy controls
-come later.
+Built on the Phase 1 engine before Phases 2–4; the update and policy controls
+land with those phases' surface work.
 
 - [x] Login-shell environment discovery so a Finder-launched app finds the
       same tools as the terminal (prompt hooks included)
-- [x] App target in `Apps/MacUpApp/MacUpApp`, MacUpCore only, no new dependencies
-- [x] Dashboard, Updates (with inspector), Doctor, History (empty state)
-- [x] Settings window (read-only) and MenuBarExtra (no update-everything)
+- [x] `MacUpAppCore` library at `Apps/MacUpApp/MacUpApp` plus a one-line
+      executable entry point at `Apps/MacUpApp/Main`, MacUpCore only, no new
+      dependencies
+- [x] `AppModel` takes an injected `AppEnvironment` instead of building its
+      own runner, file system, authenticator, and camera, so it can be tested
+      without running anything real
+- [x] Dashboard, Updates (with inspector), Doctor, History, Features
+- [x] Settings window and MenuBarExtra (no update-everything)
 - [x] Status in words plus symbols, never color alone; light and dark checked
 - [x] Loading, empty, and error states
-- [x] `scripts/build-app.sh` and a DEBUG snapshot mode for UI review
+- [x] `scripts/build-app.sh` and a DEBUG snapshot mode for UI review; the
+      bundle also carries the `macup` CLI at `Contents/Helpers/macup`
+- [x] `Tests/MacUpAppTests` — the app's model, plus a suite asserting that no
+      test touches the host
 - [ ] Xcode project wrapping the same sources (waiting on Xcode)
-- [ ] App icon and asset catalog (needs Xcode)
 - [ ] SwiftUI previews (the preview macros ship with Xcode)
-- [ ] View-model tests once the app gains its own logic (Phase 2 actions)
+- [ ] Asset catalog (needs Xcode). The icon itself is drawn from source by
+      `scripts/make-icon.swift` rather than committed as a binary.
