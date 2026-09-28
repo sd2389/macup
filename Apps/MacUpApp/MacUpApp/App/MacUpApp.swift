@@ -2,11 +2,16 @@ import AppKit
 import MacUpCore
 import SwiftUI
 
-@main
-struct MacUpApp: App {
+/// MacUp's windows, menu bar, and settings.
+///
+/// The `@main` entry point is in the executable target (Apps/MacUpApp/Main);
+/// everything it needs is here, where tests can reach it.
+public struct MacUpRoot: App {
     @State private var model = AppModel()
 
-    var body: some Scene {
+    public init() {}
+
+    public var body: some Scene {
         Window("MacUp", id: "main") {
             ContentView()
                 .environment(model)

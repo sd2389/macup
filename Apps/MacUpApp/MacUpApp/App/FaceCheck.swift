@@ -28,9 +28,10 @@ enum FaceCheck {
             if let output { try? report.write(toFile: output, atomically: true, encoding: .utf8) }
         }
 
-        say("camera: \(FaceCamera.cameraName ?? "none found")")
+        // The same finding the Features screen shows, in the same words, so a
+        // diagnostic run and the app can never tell different stories.
+        for line in CameraReadiness.current().diagnosticLines { say(line) }
         say("can stream: \(FaceCamera.canStreamCamera)")
-        say("camera access: \(FaceCamera.accessDescription)")
         say("bundle id: \(Bundle.main.bundleIdentifier ?? "none")")
 
         let camera = FaceCamera()
@@ -55,6 +56,15 @@ enum FaceCheck {
         } catch let error as MacUpError {
             say("FAILED: \(error.message)")
             if let suggestion = error.recoverySuggestion { say("         \(suggestion)") }
+            // macOS granting access and then never making the connection live
+            // is the signature, not a camera someone else is holding. Said
+            // again here because the error above cannot tell the two apart,
+            // and its advice does not apply to this one.
+            if !BundleSignature.current.isAttributable {
+                say("note: this build is signed ad-hoc, so macOS was never going to make")
+                say("      that connection live, whatever it says about access. A signed")
+                say("      build of MacUp is what changes it.")
+            }
         } catch {
             say("FAILED: \(error)")
         }

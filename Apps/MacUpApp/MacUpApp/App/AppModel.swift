@@ -32,11 +32,21 @@ final class AppModel {
     /// Why the last scheduling change did not happen, if it did not.
     private(set) var scheduleProblem: String?
 
-    private var environment: [String: String]?
-    private let home = FileManager.default.homeDirectoryForCurrentUser.path
-    /// macOS authentication. A stored property so a future test target can
-    /// replace it; nothing here ever sees a fingerprint, a face, or a password.
-    private let authorizer: any BiometricAuthorizing = LocalAuthenticator()
+    /// The login shell's environment, once it has been read.
+    private var shellEnvironment: [String: String]?
+    /// Everything outside this type: the command runner, the file system,
+    /// macOS authentication, the camera, the check engine, and where the
+    /// user's files live. ``AppEnvironment/live()`` is what a shipping build
+    /// passes; a test passes fakes, and nothing here ever sees a fingerprint,
+    /// a face, or a password either way.
+    let environment: AppEnvironment
+
+    init(environment: AppEnvironment = .live()) {
+        self.environment = environment
+    }
+
+    private var home: String { environment.homeDirectory }
+    private var authorizer: any BiometricAuthorizing { environment.authorizer }
 
     var updateCount: Int { report?.summary.updatesAvailable ?? 0 }
 
@@ -60,16 +70,16 @@ final class AppModel {
         isChecking = true
         defer { isChecking = false }
 
-        let environment = await loadEnvironment()
+        let processEnvironment = await loadEnvironment()
         let configuration = loadConfiguration()
-        report = await CheckEngine.standard().run(
+        report = await environment.checkEngine.run(
             configuration: configuration,
             environment: CheckEnvironment(
-                runner: ProcessCommandRunner(),
-                fileSystem: LocalFileSystem(),
-                processEnvironment: environment,
+                runner: environment.runner,
+                fileSystem: environment.fileSystem,
+                processEnvironment: processEnvironment,
                 homeDirectory: home,
-                system: .current()
+                system: environment.system
             )
         )
     }
@@ -96,8 +106,9 @@ final class AppModel {
     private(set) var faceEnrollment: FaceEnrollment?
     private(set) var isEnrollingFace = false
     /// The running enrolment, so it can be called off. Without a handle the
-    /// sheet has no honest Cancel.
-    private var faceTask: Task<Void, Never>?
+    /// sheet has no honest Cancel. Readable so a test can wait for an
+    /// enrolment to finish unwinding instead of guessing how long that takes.
+    private(set) var faceTask: Task<Void, Never>?
     /// Set apart from scheduling: enrolling a face must not appear to be
     /// changing the schedule, nor disable its switch.
     private(set) var isChangingSecurity = false
@@ -109,15 +120,18 @@ final class AppModel {
     /// What enrolling or reading the enrolment went wrong with, if anything.
     private(set) var faceProblem: String?
 
-    var cameraPresent: Bool { FaceCamera.hasCamera }
+    /// What this build can expect from the camera, and why not, when the
+    /// answer is no. Reading it opens nothing.
+    var cameraReadiness: CameraReadiness { environment.faceCamera.readiness }
 
-    /// The camera face match, when the configuration asks for it. `nil`
-    /// otherwise, so the camera is never opened for someone who did not turn
-    /// it on.
+    /// The camera face match, when the configuration asks for it and the
+    /// camera can actually be used. `nil` otherwise, so the camera is never
+    /// opened for someone who did not turn it on, and approval is not delayed
+    /// by a shortcut that cannot answer.
     private func faceUnlock(_ configuration: MacUpConfiguration, paths: MacUpPaths) -> FaceUnlockService? {
-        guard configuration.security.faceUnlock else { return nil }
+        guard configuration.security.faceUnlock, cameraReadiness.canUse else { return nil }
         return FaceUnlockService(
-            store: FaceEnrollmentStore(paths: paths),
+            store: faceStore(paths),
             comparator: FaceComparator(threshold: Float(configuration.security.faceMatchThreshold))
         )
     }
@@ -127,7 +141,7 @@ final class AppModel {
         faceProblem = nil
         guard let paths = try? resolvedPaths() else { return }
         do {
-            faceEnrollment = try FaceEnrollmentStore(paths: paths).load()
+            faceEnrollment = try faceStore(paths).load()
         } catch let error as MacUpError {
             faceEnrollment = nil
             faceProblem = error.message
@@ -136,9 +150,23 @@ final class AppModel {
         }
     }
 
+    /// MacUp's own state directory holds the enrolment, and both reading and
+    /// writing it go through the real file system, as the configuration does.
+    /// Tests isolate it by pointing the home directory somewhere throwaway.
+    private func faceStore(_ paths: MacUpPaths) -> FaceEnrollmentStore {
+        FaceEnrollmentStore(paths: paths)
+    }
+
     /// Starts enrolling. Held as a task so the sheet's Cancel can stop it.
+    ///
+    /// A camera MacUp cannot use is said so here rather than after a sheet has
+    /// opened and waited: there is nothing to wait for.
     func startFaceEnrollment() {
         guard faceTask == nil else { return }
+        if let problem = cameraReadiness.problem {
+            faceProblem = problem
+            return
+        }
         faceTask = Task { [weak self] in
             await self?.enrollFace()
             self?.faceTask = nil
@@ -177,25 +205,17 @@ final class AppModel {
             return
         }
 
-        let service = FaceUnlockService(
-            store: FaceEnrollmentStore(paths: paths),
-            comparator: FaceComparator(threshold: Float(loaded.configuration.security.faceMatchThreshold))
-        )
         defer {
-            service.camera.end()
             faceCaptureSession = nil
             faceStage = nil
         }
         do {
-            faceStage = "Opening the camera"
-            try await service.camera.begin()
-            faceCaptureSession = service.camera.captureSession
-            // A moment to be in frame before the samples are taken, so the
-            // first picture is not of someone still reaching for the mouse.
-            faceStage = "Look at the camera"
-            try? await Task.sleep(for: .milliseconds(1400))
-            faceStage = "Taking pictures"
-            faceEnrollment = try await service.enroll(cameraIsOpen: true)
+            faceEnrollment = try await environment.faceCamera.enroll(
+                into: faceStore(paths),
+                threshold: loaded.configuration.security.faceMatchThreshold,
+                stage: { [weak self] stage in self?.faceStage = stage },
+                preview: { [weak self] session in self?.faceCaptureSession = session }
+            )
 
             var configuration = loaded.configuration
             configuration.security.faceUnlock = true
@@ -215,7 +235,7 @@ final class AppModel {
         faceProblem = nil
         guard let paths = try? resolvedPaths() else { return }
         do {
-            try FaceEnrollmentStore(paths: paths).remove()
+            try faceStore(paths).remove()
             faceEnrollment = nil
             let loaded = loadConfiguration()
             if !loaded.hasErrors && loaded.configuration.security.faceUnlock {
@@ -347,11 +367,13 @@ final class AppModel {
     /// the app, so a schedule cannot end up running an older CLI. Otherwise
     /// MacUp looks for an installed `macup` on the user's search path.
     func scheduledExecutable() -> String? {
-        let bundled = Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/macup").path
-        if FileManager.default.isExecutableFile(atPath: bundled) { return bundled }
-        let path = environment?["PATH"] ?? ProcessInfo.processInfo.environment["PATH"]
+        if let bundled = environment.bundledExecutablePath,
+           environment.fileSystem.isExecutableFile(atPath: bundled) {
+            return bundled
+        }
+        let path = shellEnvironment?["PATH"] ?? environment.processEnvironment["PATH"]
         let search = ExecutableSearch(name: "macup", searchPath: SearchPath.parse(path))
-        if case .found(let resolved) = ExecutableResolver(fileSystem: LocalFileSystem()).resolve(search) {
+        if case .found(let resolved) = ExecutableResolver(fileSystem: environment.fileSystem).resolve(search) {
             return resolved.path
         }
         return nil
@@ -361,14 +383,14 @@ final class AppModel {
         Scheduler(
             paths: paths,
             executable: executable,
-            fileSystem: LocalFileSystem(),
-            runner: ProcessCommandRunner(),
-            processEnvironment: environment ?? ProcessInfo.processInfo.environment
+            fileSystem: environment.fileSystem,
+            runner: environment.runner,
+            processEnvironment: shellEnvironment ?? environment.processEnvironment
         )
     }
 
     private func resolvedPaths() throws -> MacUpPaths {
-        try MacUpPaths.resolve(homeDirectory: home, environment: ProcessInfo.processInfo.environment)
+        try MacUpPaths.resolve(homeDirectory: home, environment: environment.processEnvironment)
     }
 
     /// Reads the configuration file. Reading never creates or changes it.
@@ -377,7 +399,7 @@ final class AppModel {
         let paths: MacUpPaths
         var pathProblem: ConfigurationIssue?
         do {
-            paths = try MacUpPaths.resolve(homeDirectory: home, environment: ProcessInfo.processInfo.environment)
+            paths = try resolvedPaths()
         } catch {
             // Match the CLI's refusal visibly: say why the default location is in use.
             let message = (error as? MacUpError)?.message ?? "The configuration location could not be resolved."
@@ -395,19 +417,14 @@ final class AppModel {
     /// miss tools installed outside the standard locations. A failed read is
     /// retried on the next check rather than cached.
     private func loadEnvironment() async -> [String: String] {
-        if let environment { return environment }
-        let shell = LoginShellEnvironment.userLoginShell()
+        if let shellEnvironment { return shellEnvironment }
+        let shell = environment.loginShell.shell()
         self.shell = shell
-        var result = ProcessInfo.processInfo.environment
+        var result = environment.processEnvironment
         do {
-            result = try await LoginShellEnvironment.capture(
-                shell: shell,
-                runner: ProcessCommandRunner(),
-                homeDirectory: home,
-                baseEnvironment: ProcessInfo.processInfo.environment
-            )
+            result = try await environment.loginShell.environment(from: shell)
             environmentProblem = nil
-            environment = result
+            shellEnvironment = result
         } catch let error as MacUpError {
             environmentProblem = error.message
         } catch {

@@ -34,7 +34,10 @@ public struct BiometricCapability: Sendable, Hashable, Codable {
     public var kind: BiometryKind
     /// Whether a biometric check would work right now.
     public var isAvailable: Bool
-    /// Whether a password (or Apple Watch) can stand in for the sensor.
+    /// Whether macOS would accept the device owner's login password instead of
+    /// the sensor. The same policy also accepts an unlocked Apple Watch on a
+    /// Mac that has one paired, but macOS does not tell MacUp whether one is,
+    /// so MacUp never claims a Watch will work — only that it may.
     public var hasFallback: Bool
     /// Why biometrics are unavailable, in macOS's own words. Sanitized.
     public var unavailableReason: String?
@@ -49,6 +52,41 @@ public struct BiometricCapability: Sendable, Hashable, Codable {
         self.isAvailable = isAvailable
         self.hasFallback = hasFallback
         self.unavailableReason = unavailableReason
+    }
+
+    /// What this Mac will really ask for, in one sentence.
+    ///
+    /// The sensor's name alone understates a Mac that has no sensor: macOS's
+    /// device-owner authentication is not only Touch ID, and on a Mac without
+    /// it the login password is accepted, as is an unlocked Apple Watch when
+    /// one is paired. MacUp is not told whether a Watch is paired, so the
+    /// password is stated as what will happen and the Watch as what may.
+    public var summary: String {
+        let alternatives = "your login password, or an unlocked Apple Watch if you have one paired"
+        guard kind != .none else {
+            return hasFallback
+                ? "This Mac has no biometric sensor, so macOS will ask for \(alternatives)."
+                : """
+                    This Mac has no biometric sensor, and MacUp may not fall back to your login \
+                    password, so it cannot ask you to confirm anything.
+                    """
+        }
+        switch (isAvailable, hasFallback) {
+        case (true, true):
+            return "\(kind.displayName) is ready, and macOS will accept \(alternatives)."
+        case (true, false):
+            return "\(kind.displayName) is ready."
+        case (false, true):
+            return """
+                \(unavailableReason ?? "\(kind.displayName) is not available right now.") \
+                macOS will ask for \(alternatives) instead.
+                """
+        case (false, false):
+            return """
+                \(unavailableReason ?? "\(kind.displayName) is not available right now.") \
+                MacUp may not fall back to your login password, so it cannot ask you to confirm anything.
+                """
+        }
     }
 
     /// Nothing MacUp can ask the user to confirm with.

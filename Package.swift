@@ -26,11 +26,21 @@ let package = Package(
         ),
         // The SwiftUI desktop app. Built with scripts/build-app.sh until the
         // Xcode project (Apps/MacUpApp/MacUpApp.xcodeproj) wraps the same sources.
-        .executableTarget(
-            name: "MacUpApp",
+        //
+        // The app is a library plus a one-line entry point rather than one
+        // executable, because a test target cannot import an executable and
+        // the model is worth testing. It uses MacUpCore only; no provider or
+        // policy logic lives here.
+        .target(
+            name: "MacUpAppCore",
             dependencies: ["MacUpCore"],
             path: "Apps/MacUpApp/MacUpApp",
             exclude: ["Resources"]
+        ),
+        .executableTarget(
+            name: "MacUpApp",
+            dependencies: ["MacUpAppCore"],
+            path: "Apps/MacUpApp/Main"
         ),
         // Fakes shared by the test targets. Never linked into shipping products.
         .target(
@@ -46,6 +56,10 @@ let package = Package(
         .testTarget(
             name: "MacUpCLITests",
             dependencies: ["macup", "MacUpCore", "MacUpTestSupport"]
+        ),
+        .testTarget(
+            name: "MacUpAppTests",
+            dependencies: ["MacUpAppCore", "MacUpCore", "MacUpTestSupport"]
         ),
     ]
 )

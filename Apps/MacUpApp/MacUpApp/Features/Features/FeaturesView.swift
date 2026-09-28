@@ -44,6 +44,9 @@ private struct FeatureCard<Detail: View>: View {
     let summary: String
     @Binding var isOn: Bool
     var isBusy = false
+    /// False when this Mac cannot do the thing at all, so the switch is not
+    /// offered as though it could. ``state`` says why.
+    var canChange = true
     var state: String?
     @ViewBuilder var detail: Detail
 
@@ -61,8 +64,9 @@ private struct FeatureCard<Detail: View>: View {
                     Toggle(title, isOn: $isOn)
                         .labelsHidden()
                         .toggleStyle(.switch)
-                        .disabled(isBusy)
+                        .disabled(isBusy || !canChange)
                         .accessibilityLabel(title)
+                        .accessibilityHint(canChange ? "" : (state ?? ""))
                 }
                 Text(summary)
                     .font(.callout)
@@ -220,7 +224,10 @@ private struct ApprovalFeature: View {
             summary: "macOS asks you to confirm before MacUp changes a setting. It never sees your fingerprint or your password.",
             isOn: enabled,
             isBusy: model.isChangingSecurity,
-            state: "This Mac: \(model.biometricCapability.kind.displayName)."
+            // What this Mac will really accept, not just the name of a sensor
+            // it may not have: macOS takes the login password, and an unlocked
+            // Apple Watch when one is paired.
+            state: model.biometricCapability.summary
         ) {
             if let problem = model.securityProblem {
                 Label(problem.displaySafe, systemImage: "xmark.octagon").foregroundStyle(.red)
@@ -255,13 +262,19 @@ private struct FaceMatchFeature: View {
             summary: "Use the camera to approve a change instead of Touch ID. A photograph of you passes it, so it is a shortcut, not a lock.",
             isOn: enabled,
             isBusy: model.isEnrollingFace,
+            // Nothing to turn on when the camera cannot be opened, and the
+            // switch says so by not pretending otherwise.
+            canChange: model.cameraReadiness.canUse || model.faceEnrollment != nil,
             state: state
         ) {
             HStack {
                 Button(model.faceEnrollment == nil ? "Enroll Face…" : "Enroll Again…") {
                     model.startFaceEnrollment()
                 }
-                .disabled(!model.cameraPresent || model.isEnrollingFace)
+                // Offering a button that cannot work would be a lie; the
+                // reason is stated above it instead.
+                .disabled(!model.cameraReadiness.canUse || model.isEnrollingFace)
+                .help(model.cameraReadiness.problem ?? "Take a few pictures and remember what they look like.")
                 Button("Forget Face") { model.forgetFace() }
                     .disabled(model.faceEnrollment == nil || model.isEnrollingFace)
             }
@@ -282,8 +295,10 @@ private struct FaceMatchFeature: View {
         }
     }
 
+    /// What is true of this Mac right now. A camera MacUp cannot use is said
+    /// here, before anyone presses a button and waits for a refusal.
     private var state: String? {
-        guard model.cameraPresent else { return "This Mac has no camera MacUp can use." }
+        if let problem = model.cameraReadiness.problem { return problem }
         guard let enrollment = model.faceEnrollment else { return "No face enrolled yet." }
         return "Enrolled \(enrollment.signatures.count) samples on \(enrollment.createdAt.formatted(date: .abbreviated, time: .shortened))."
     }
