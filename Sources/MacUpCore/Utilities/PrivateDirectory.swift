@@ -14,7 +14,18 @@ public struct PrivateDirectory: Sendable {
     /// Opens (creating if needed) `path` as a private directory.
     public init(_ path: String) throws {
         if mkdir(path, 0o700) != 0 && errno != EEXIST {
-            throw MacUpError(.configurationInvalid, "Could not create \(path): \(String(cString: strerror(errno))).")
+            // A fresh Mac has no `~/.local/state`, so the first thing MacUp
+            // writes there would otherwise fail with "no such file or
+            // directory". Missing parents are created owner-only too: a
+            // directory MacUp makes on the way is as private as the one it
+            // was asked for.
+            guard errno == ENOENT else {
+                throw MacUpError(.configurationInvalid, "Could not create \(path): \(String(cString: strerror(errno))).")
+            }
+            try Self.createParents(of: path)
+            if mkdir(path, 0o700) != 0 && errno != EEXIST {
+                throw MacUpError(.configurationInvalid, "Could not create \(path): \(String(cString: strerror(errno))).")
+            }
         }
         let descriptor = open(path, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
         guard descriptor >= 0 else {
@@ -26,6 +37,27 @@ public struct PrivateDirectory: Sendable {
             throw MacUpError(.configurationInvalid, "\(path) belongs to another user or others can write to it; choose a private directory.")
         }
         self.path = path
+    }
+
+    /// Creates the directories above `path`, each owner-only.
+    ///
+    /// Only missing components are created; anything already there is left
+    /// exactly as the user has it, including its permissions. Whether the
+    /// result is actually private is decided by the check in ``init``, not
+    /// here, so a parent somebody else controls still stops MacUp.
+    private static func createParents(of path: String) throws {
+        let parent = (path as NSString).deletingLastPathComponent
+        guard parent.hasPrefix("/"), parent != "/", parent != path else { return }
+        var built = ""
+        for component in parent.split(separator: "/") {
+            built += "/" + component
+            if mkdir(built, 0o700) != 0 && errno != EEXIST {
+                throw MacUpError(
+                    .configurationInvalid,
+                    "Could not create \(built): \(String(cString: strerror(errno)))."
+                )
+            }
+        }
     }
 
     /// Removes `name` from the directory, following no symlink out of it.

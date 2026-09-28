@@ -18,6 +18,20 @@ struct PrivateDirectoryTests {
         #expect(fileMode?.intValue == 0o600)
     }
 
+    @Test("Missing parent directories are created, owner-only")
+    func createsMissingParents() throws {
+        // A Mac that has never used ~/.local/state has neither directory, and
+        // the first thing MacUp writes there must not fail because of it.
+        let root = try TemporaryDirectory()
+        let path = root.appending(".local").appendingPathComponent("state").appendingPathComponent("macup").path
+        let directory = try PrivateDirectory(path)
+        #expect(directory.path == path)
+        for created in [root.appending(".local").path, root.appending(".local").appendingPathComponent("state").path, path] {
+            let mode = try FileManager.default.attributesOfItem(atPath: created)[.posixPermissions] as? NSNumber
+            #expect(mode?.intValue == 0o700, "\(created) should be owner-only")
+        }
+    }
+
     @Test("A planted symlink is never written through")
     func refusesSymlinkedFile() throws {
         let root = try TemporaryDirectory()
