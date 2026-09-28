@@ -6,21 +6,42 @@ struct MacUpCommand: AsyncParsableCommand {
         commandName: "macup",
         abstract: "Understand, review, and maintain your Mac development environment.",
         discussion: """
-            MacUp checks Homebrew, npm (global packages), mise, and macOS for updates \
-            and tells you what is outdated. This version is read-only: it never \
-            installs, upgrades, or removes anything.
+            MacUp checks Homebrew, npm (global packages), mise, and macOS for updates, \
+            shows you exactly what it would run, and applies the ones you allow.
+
+            One command changes packages: `macup update`. It shows the plan first, \
+            asks about anything set to Ask First, runs one item at a time, and records \
+            what happened. A few commands change MacUp's own configuration file and no \
+            packages: `macup policy set|clear` (and `macup exclude`), `macup provider \
+            enable|disable`, `macup schedule enable|disable`, and `macup security \
+            require`. Everything else — including plain `macup` — only reads.
 
             Examples:
               macup                   See what is outdated
-              macup check --verbose   Also see who manages each item and why
-              macup check --json      Machine-readable output for scripts
-              macup providers         Which installation of each tool MacUp uses
-              macup config            The settings MacUp is using
-              macup schedule          Whether MacUp checks automatically
+              macup plan              See exactly what an update would run
+              macup update --dry-run  The same, launching nothing
+              macup update            Apply what your policy allows
+              macup update brew:git   Apply one item
+              macup policy list       What MacUp may do with each item
+              macup exclude brew:postgresql   Never update this one
+              macup doctor            What is odd about this Mac
+              macup history           What MacUp has changed
               macup security          Ask for Touch ID before MacUp changes anything
             """,
         version: MacUp.version,
-        subcommands: [CheckCommand.self, ProviderCommand.self, ConfigCommand.self, ScheduleCommand.self, SecurityCommand.self],
+        subcommands: [
+            CheckCommand.self,
+            PlanCommand.self,
+            UpdateCommand.self,
+            PolicyCommand.self,
+            ExcludeCommand.self,
+            ProviderCommand.self,
+            DoctorCommand.self,
+            HistoryCommand.self,
+            ConfigCommand.self,
+            ScheduleCommand.self,
+            SecurityCommand.self,
+        ],
         defaultSubcommand: CheckCommand.self
     )
 }

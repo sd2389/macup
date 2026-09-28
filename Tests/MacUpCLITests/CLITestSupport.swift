@@ -25,6 +25,22 @@ struct CLIRun {
     var exitCode: Int32?
 }
 
+/// Answers MacUp's yes-or-no questions in order, standing in for someone at a
+/// terminal. An empty script means nobody is there, which every prompt in the
+/// CLI treats as "no".
+final class ScriptedAnswers: @unchecked Sendable {
+    private let lock = NSLock()
+    private var pending: [String]
+
+    init(_ answers: [String]) {
+        pending = answers
+    }
+
+    func next() -> String? {
+        lock.withLock { pending.isEmpty ? nil : pending.removeFirst() }
+    }
+}
+
 /// A pretend Mac for CLI tests: Homebrew and macOS updates by default, a
 /// temporary configuration directory, and a fake runner that refuses
 /// anything unregistered.
@@ -45,17 +61,33 @@ final class CLIHarness: @unchecked Sendable {
     var environment: [String: String]
     var homeDirectory = "/Users/example"
     var isTerminal = false
+    /// What someone at a terminal types when MacUp asks. Empty means nobody
+    /// answers, so nothing that needs confirmation runs.
+    var answers: [String] = []
 
     static let brewOutdated = """
         {"formulae": [{"name": "git", "installed_versions": ["2.43.0"], "current_version": "2.44.0", "pinned": false, "pinned_version": null},
                       {"name": "mysql", "installed_versions": ["9.7.1"], "current_version": "26.7.0_2", "pinned": false, "pinned_version": null}],
          "casks": []}
         """
-    static let brewInfo = """
-        {"formulae": [{"name": "git", "full_name": "git", "installed": [{"version": "2.43.0", "installed_on_request": true}], "linked_keg": "2.43.0", "pinned": false},
-                      {"name": "mysql", "full_name": "mysql", "installed": [{"version": "9.7.1", "installed_on_request": true}], "linked_keg": "9.7.1", "pinned": false}],
+
+    /// `brew outdated --json=v2` with git held back by Homebrew itself, so a
+    /// test can prove MacUp never plans an upgrade for a pinned formula.
+    static let brewOutdatedPinned = """
+        {"formulae": [{"name": "git", "installed_versions": ["2.43.0"], "current_version": "2.44.0", "pinned": true, "pinned_version": "2.43.0"}],
          "casks": []}
         """
+
+    /// `brew info --json=v2 --installed`. MacUp reads this to count installed
+    /// items and, after an upgrade, to confirm the new version, so a test that
+    /// upgrades git re-registers it with the version it expects to see.
+    static func brewInfo(git: String = "2.43.0", mysql: String = "9.7.1") -> String {
+        """
+        {"formulae": [{"name": "git", "full_name": "git", "installed": [{"version": "\(git)", "installed_on_request": true}], "linked_keg": "\(git)", "pinned": false},
+                      {"name": "mysql", "full_name": "mysql", "installed": [{"version": "\(mysql)", "installed_on_request": true}], "linked_keg": "\(mysql)", "pinned": false}],
+         "casks": []}
+        """
+    }
     static let softwareUpdate = """
         Software Update Tool
 
@@ -82,8 +114,51 @@ final class CLIHarness: @unchecked Sendable {
         runner.register("brew", ["--version"], .success("Homebrew 7.0.6\n"))
         runner.register("brew", ["--prefix"], .success("/opt/homebrew\n"))
         runner.register("brew", ["outdated", "--json=v2"], .success(Self.brewOutdated))
-        runner.register("brew", ["info", "--json=v2", "--installed"], .success(Self.brewInfo))
+        runner.register("brew", ["info", "--json=v2", "--installed"], .success(Self.brewInfo()))
         runner.register("softwareupdate", ["--list", "--no-scan"], .success(Self.softwareUpdate))
+    }
+
+    /// Lets `macup update` upgrade one Homebrew formula, and makes the version
+    /// MacUp reads back afterwards the upgraded one.
+    ///
+    /// The runner is fake, so registering this launches nothing: it only means
+    /// the fake stops refusing that exact executable and argument list.
+    func allowBrewUpgrade(
+        _ formula: String,
+        readingBack version: String,
+        _ response: FakeCommandRunner.Response = .success("Upgrading git\n")
+    ) {
+        runner.register("brew", ["upgrade", "--formula", "--yes", formula], response)
+        runner.register("brew", ["info", "--json=v2", "--installed"], .success(Self.brewInfo(git: version)))
+    }
+
+    /// Every modifying command the fake runner was asked for. A read-only
+    /// command never appears here, so a dry run should leave it empty.
+    var modifyingRequests: [CommandInvocation] {
+        runner.recordedRequests.filter { $0.effect == .modifying }.map(\.invocation)
+    }
+
+    var historyStore: HistoryStore {
+        HistoryStore(fileURL: stateDirectory.appending("history.jsonl"))
+    }
+
+    /// The diagnostics `macup doctor` runs. Replaced so no test starts a
+    /// login shell on the machine running the tests.
+    lazy var doctorEngine: DoctorEngine = matchingShellDoctor()
+
+    /// Doctor with the login-shell probe answered from this harness, so the
+    /// Mac under test is one whose terminal PATH is the one MacUp already
+    /// has. Every other check is the shipping one.
+    private func matchingShellDoctor() -> DoctorEngine {
+        let standard = DoctorEngine.standard()
+        let path = environment["PATH"] ?? ""
+        return DoctorEngine(
+            providers: standard.providers,
+            checks: standard.checks.map { check in
+                guard check is ShellEnvironmentCheck else { return check }
+                return ShellEnvironmentCheck(read: { _ in ("/bin/zsh", ["PATH": path]) })
+            }
+        )
     }
 
     /// Adds npm with the given `npm outdated -g --json` output.
@@ -133,6 +208,7 @@ final class CLIHarness: @unchecked Sendable {
     func run(_ arguments: [String]) async throws -> CLIRun {
         let stdout = BufferedOutput()
         let stderr = BufferedOutput()
+        let scripted = ScriptedAnswers(answers)
         let context = CLIContext(
             environment: environment,
             homeDirectory: homeDirectory,
@@ -140,6 +216,7 @@ final class CLIHarness: @unchecked Sendable {
             standardError: stderr,
             standardOutputIsTerminal: isTerminal,
             engine: .standard(),
+            doctorEngine: doctorEngine,
             checkEnvironment: CheckEnvironment(
                 runner: runner,
                 fileSystem: fileSystem,
@@ -152,15 +229,30 @@ final class CLIHarness: @unchecked Sendable {
             userID: userID,
             schedulerRunner: schedulerRunner,
             schedulerFileSystem: schedulerFileSystem,
-            authorizer: authorizer
+            authorizer: authorizer,
+            readLine: { scripted.next() }
         )
         return try await runCLI(arguments, context: context, stdout: stdout, stderr: stderr)
     }
 }
 
 /// Parses and runs a command the way `macup` would, inside `context`.
+///
+/// A command line MacUp rejects is reported the way the real binary reports
+/// it — the usage message on standard error and exit status 64 — rather than
+/// as a thrown test failure, so a test can assert on what the user is told.
 func runCLI(_ arguments: [String], context: CLIContext, stdout: BufferedOutput, stderr: BufferedOutput) async throws -> CLIRun {
-    var command = try MacUpCommand.parseAsRoot(arguments)
+    var command: any ParsableCommand
+    do {
+        command = try MacUpCommand.parseAsRoot(arguments)
+    } catch {
+        stderr.write(MacUpCommand.fullMessage(for: error) + "\n")
+        return CLIRun(
+            standardOutput: stdout.text,
+            standardError: stderr.text,
+            exitCode: MacUpCommand.exitCode(for: error).rawValue
+        )
+    }
     var exitCode: Int32?
     do {
         try await CLIContext.$current.withValue(context) {

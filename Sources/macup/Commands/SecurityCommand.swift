@@ -18,8 +18,10 @@ struct SecurityCommand: AsyncParsableCommand {
             without it. What it buys is a deliberate step in front of every change \
             MacUp itself makes, in the app and here alike.
 
-            Today the only change MacUp can make is the scheduled check. The \
-            execution engine uses the same gate when it arrives.
+            Every change goes through this one gate: `macup update` before it runs \
+            anything, and the commands that edit MacUp's own configuration — `macup \
+            policy set|clear`, `macup exclude`, `macup provider enable|disable`, \
+            `macup schedule enable|disable`, and this command itself.
             """,
         subcommands: [SecurityStatusCommand.self, SecurityRequireCommand.self, SecurityFaceCommand.self],
         defaultSubcommand: SecurityStatusCommand.self
