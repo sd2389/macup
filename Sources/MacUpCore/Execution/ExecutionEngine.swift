@@ -541,7 +541,10 @@ public struct ExecutionEngine: Sendable {
             base: environment.runner,
             plan: planned.plan,
             modifyingRules: [],
-            readOnlyRules: CommandAllowlist.readOnlyCheck
+            // Reading only, and not even a metadata refresh: `brew update`
+            // is on the check allowlist for `macup check --refresh`, and an
+            // update the user reviewed never said it would refresh anything.
+            readOnlyRules: CommandAllowlist.readOnlyCheck.filter { $0.effect == .readOnly }
         )
         do {
             return try await provider.verify(result, for: planned.candidate, context: context)

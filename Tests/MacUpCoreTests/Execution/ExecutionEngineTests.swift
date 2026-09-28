@@ -817,6 +817,47 @@ struct ExecutionEngineTests {
         #expect(harness.runner.recordedInvocations.map(\.arguments) == [["upgrade", "--formula", "git"], ["--version"]])
     }
 
+    @Test("Verification may not refresh provider metadata either")
+    func verificationRefusesAMetadataRefresh() async throws {
+        let harness = try ExecutionHarness()
+        harness.registerBrewUpgrade()
+        harness.runner.register(path: "/opt/homebrew/bin/brew", ["update"], .success("Already up-to-date"))
+        let loaded = try harness.save(configuration(["brew:git": .auto]))
+
+        // `brew update` is on the allowlist a check uses, for
+        // `macup check --refresh`. An update the user reviewed never said it
+        // would refresh anything, so it may not happen here.
+        let provider = ScriptedUpdateProvider { _, candidate, context in
+            var refused = false
+            do {
+                _ = try await context.runner.run(CommandRequest(
+                    executable: URL(fileURLWithPath: "/opt/homebrew/bin/brew"),
+                    arguments: ["update"],
+                    effect: .metadataRefresh
+                ))
+            } catch {
+                refused = (error as? MacUpError)?.kind == .policyDenied
+            }
+            return VerificationResult(
+                item: candidate.id,
+                outcome: .verified,
+                expectedVersion: candidate.availableVersion.raw,
+                observedVersion: candidate.availableVersion.raw,
+                message: "refused=\(refused)"
+            )
+        }
+
+        let report = await harness.engine(providers: [provider]).run(
+            PlannedUpdateFactory.report([gitPlan()]),
+            configuration: loaded,
+            options: ExecutionOptions(origin: .cli),
+            environment: harness.environment
+        )
+
+        #expect(report.executed.first?.verification?.message == "refused=true")
+        #expect(harness.runner.recordedInvocations.map(\.arguments) == [["upgrade", "--formula", "git"]])
+    }
+
     // MARK: History
 
     @Test("Every skip is recorded with the reason for it")
