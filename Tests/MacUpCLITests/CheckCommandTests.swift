@@ -259,7 +259,7 @@ struct ProviderAndConfigCommandTests {
         #expect(run.exitCode == MacUpExitCode.configurationInvalid.rawValue)
         #expect(run.standardOutput.contains("error: providers.homebew: Unknown provider 'homebew'."))
         #expect(run.standardOutput.contains("error: schedule.time:"))
-        #expect(run.standardOutput.contains("Automatic changes: disabled until the errors below are fixed."))
+        #expect(run.standardOutput.contains("Changes: disabled until the errors below are fixed. MacUp will update nothing."))
 
         let json = try await harness.run(["config", "show", "--json"])
         let object = try #require(try JSONSerialization.jsonObject(with: Data(json.standardOutput.utf8)) as? [String: Any])

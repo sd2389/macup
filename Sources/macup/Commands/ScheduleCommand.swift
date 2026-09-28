@@ -8,7 +8,7 @@ extension MacUpConfiguration.ScheduleSettings.Weekday: ExpressibleByArgument {}
 struct ScheduleCommand: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "schedule",
-        abstract: "Check automatically on a schedule (read-only).",
+        abstract: "Check automatically on a schedule. A scheduled check never updates anything.",
         discussion: """
             MacUp installs a launchd user agent that runs `macup check --save-state` \
             at the time you choose. The scheduled run is the same read-only check as \
@@ -17,8 +17,10 @@ struct ScheduleCommand: AsyncParsableCommand {
             ~/.local/state/macup/scheduler.log.
 
             The agent runs as you, not as root, and `macup schedule disable` removes \
-            it completely. Scheduled updating does not exist: this version of MacUp \
-            cannot modify a package at all.
+            it completely. Scheduled updating does not exist: the agent is only ever \
+            allowed to run a check, so nothing MacUp installs can update a package \
+            while you are not there. Run `macup update` yourself when you want a \
+            change.
             """,
         subcommands: [ScheduleStatusCommand.self, ScheduleEnableCommand.self, ScheduleDisableCommand.self],
         defaultSubcommand: ScheduleStatusCommand.self

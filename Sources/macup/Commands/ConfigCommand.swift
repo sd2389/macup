@@ -66,8 +66,8 @@ struct ConfigShowCommand: AsyncParsableCommand {
             case .file: lines.append(loaded.hasErrors ? "The file has errors." : "The file is valid.")
             }
             lines.append(loaded.allowsAutomaticModification
-                ? "Automatic changes: none happen in this version of MacUp."
-                : "Automatic changes: disabled until the errors below are fixed.")
+                ? "Changes: `macup update` may run items set to Auto Update without asking. Nothing runs on a schedule."
+                : "Changes: disabled until the errors below are fixed. MacUp will update nothing.")
             if loaded.configuration.schedule.enabled {
                 lines.append(
                     "Scheduling: \(loaded.configuration.schedule.summary), read-only. "

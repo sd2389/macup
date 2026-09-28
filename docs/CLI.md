@@ -1,10 +1,25 @@
 # CLI reference
 
-This version of MacUp is **read-only** about your packages: no command
-installs, upgrades, removes, cleans, or prunes anything. Two commands write
-MacUp's own files — `macup schedule enable` and `macup schedule disable`,
-which record the schedule in the configuration and install or remove a
-launchd agent. The scheduled job itself only runs `macup check`.
+## What can change your machine
+
+Exactly one command installs or upgrades anything: **`macup update`**. It
+shows the plan first, asks about anything your policy marks Ask First, runs
+one item at a time, verifies each result, and records what happened. It never
+cleans, prunes, removes, or uninstalls, and it never upgrades an item it did
+not name.
+
+These commands write **MacUp's own configuration file** and no packages:
+`macup policy set`, `macup policy clear`, `macup exclude`, `macup provider
+enable`, `macup provider disable`, `macup schedule enable`, `macup schedule
+disable`, `macup security require`, and `macup security face enroll|forget`.
+
+**Everything else only reads**, including plain `macup`, `macup check`,
+`macup plan`, `macup doctor`, `macup history`, `macup policy list`,
+`macup provider list`, and `macup config`.
+
+Nothing runs on a schedule but a check. The launchd agent MacUp installs is
+only ever allowed to run `macup check --save-state`, and a static check in
+CI enforces that.
 
 ## Install
 
@@ -51,7 +66,17 @@ macup --generate-completion-script zsh > ~/.zsh/completions/_macup
 | `macup check --inventory` | Also lists installed items. |
 | `macup check --verbose` | Adds ownership chains, risk reasons, notes, and every command MacUp ran. |
 | `macup check --save-state` | Also writes the report to `~/.local/state/macup/last-check.json`. This is how a scheduled check leaves its result behind. |
+| `macup plan [<package-id>…] [--refresh] [--json] [--verbose]` | Shows what `macup update` would do: current → proposed version, provider, effective policy, risk and its reason, and the exact executable and arguments — plus every item it would leave alone, with the reason. Launches nothing. |
+| **`macup update [<package-id>…]`** | **The only command that changes packages.** Flags below. |
+| `macup doctor [--json] [--verbose]` | Runs MacUp's deterministic diagnostics and explains each finding. Fixes nothing. |
+| `macup history [--limit N] [--json] [--verbose]` | What MacUp has changed and what it decided not to change, newest first. |
+| `macup policy` / `macup policy list [--json]` | Every policy rule, the global default, and where each lives in the file. Read-only. |
+| `macup policy set <target> <auto\|ask\|ignore\|pin\|inherit> [--json]` | Sets the rule for a package ID, a provider name, or `default`. |
+| `macup policy clear <target>… [--json]` | Removes an item's rule, or sets a provider back to `inherit`. |
+| `macup exclude <package-id>… [--json]` | Shorthand for `macup policy set … ignore`; the same rule in the same place. |
 | `macup providers` / `macup provider list [--json]` | Shows which providers were found and exactly which installation MacUp uses. Runs detection only. |
+| `macup provider enable <id> [--json]` | Lets MacUp check a provider again and propose its updates. |
+| `macup provider disable <id> [--json]` | Stops MacUp checking a provider. Uninstalls nothing. |
 | `macup config` / `macup config show [--json]` | Shows the configuration in effect and every problem with it. Never creates the file. |
 | `macup config path [--json]` | Prints the configuration file and state directory locations. |
 | `macup schedule` / `macup schedule status [--json]` | Shows whether a check is scheduled, when it next runs, and what the last one found. Read-only. |
@@ -64,9 +89,92 @@ macup --generate-completion-script zsh > ~/.zsh/completions/_macup
 | `macup security face forget` | Deletes the enrolled face and turns the camera check off. |
 | `macup --help`, `macup --version` | Help and version. |
 
-The remaining commands in the CLI contract (`update`, `plan`, `doctor`,
-`history`, `provider enable|disable`, `policy …`) arrive with Phases 2–4
-and are intentionally absent rather than stubbed.
+### `macup update`
+
+| Flag | What it does |
+| --- | --- |
+| *(no arguments)* | Considers every update your policy allows. |
+| `<package-id>…` | Only these items. An ID that is not a package ID, or that has no update available, is an error and nothing runs. Naming an item is a request, not a confirmation. |
+| `--dry-run` | Shows the plan and launches nothing. Nothing is recorded in history. |
+| `-y`, `--yes` | Confirms every item in the plan MacUp just showed. |
+| `--refresh` | Refreshes provider metadata before planning. Changes no package. |
+| `--stop-on-failure` | Stops at the first failure instead of moving on. |
+| `--json` | Prints an `ExecutionReport` (schema version 1). Never asks anything. |
+| `-v`, `--verbose` | Shows every command with its exit status and timing. |
+
+### Worked examples
+
+```bash
+macup                                  # what is outdated
+macup check --refresh --json           # fresh metadata, machine-readable
+macup plan                             # the exact commands an update would run
+macup plan brew:git --verbose          # one item, with rollback and verification
+macup update --dry-run                 # the same, launching nothing
+macup update                           # apply what policy allows, asking about the rest
+macup update brew:git npm:prettier -y  # two named items, confirmed up front
+macup policy list                      # every rule and where it lives
+macup policy set brew:postgresql ignore
+macup policy set homebrew auto         # a whole provider
+macup policy set default ask           # the fallback for everything else
+macup policy clear brew:postgresql
+macup exclude npm:@anthropic-ai/claude-code
+macup provider disable mise
+macup provider enable mise
+macup doctor                           # what is odd about this Mac
+macup doctor --json                    # the same, machine-readable
+macup history --limit 50               # what MacUp has done
+```
+
+## How `macup update` decides to run something
+
+Five things have to line up, and every one of them can only ever stop a
+change:
+
+1. **Policy.** The item's own rule wins over its provider's rule, which wins
+   over the default. `ignore` and `pin` never run. A provider that is off
+   never runs. A formula Homebrew itself has pinned never runs, and MacUp
+   does not unpin it for you.
+2. **Risk.** An item set to `auto` still waits for you when the change is a
+   macOS update, a major runtime change, unknown risk, or would need an
+   administrator password, a restart, or a rewrite of your configuration or
+   a lockfile. `confirmMajorUpdates` governs only an ordinary package's major
+   version bump; it cannot buy past the rules above it.
+3. **Your confirmation**, for anything left at "needs your confirmation":
+   - With `--yes`, every item in the plan MacUp just printed is confirmed.
+   - Otherwise, **when stdout is a terminal** MacUp prints the plan and asks
+     once: `Run the 2 changes that need your confirmation, shown above? [y/N]`.
+     Only `y` or `yes` is a yes; no answer, a closed input, or anything else
+     is a no.
+   - **When stdout is not a terminal** — a pipe, a script, a log — MacUp asks
+     nobody. It lists those items, leaves them alone, and says how to confirm
+     them. This is why a scripted `macup update` can never silently change an
+     Ask First item.
+   - `--json` never asks, because prompting inside a document nobody is
+     reading would be worse than refusing. Use `--yes`.
+   - A dry run confirms everything in the plan, because it launches nothing
+     and the point of a dry run is to see the whole command list.
+4. **The device owner**, when `security.requireApproval` is on. The approval
+   gate runs immediately before anything is launched, and only when something
+   will actually run — so a `macup update` that would change nothing does not
+   put a Touch ID prompt in front of you, and a scripted one does not fail on
+   a prompt it could not show. A refused or unavailable approval is exit
+   code 77 and nothing is changed.
+5. **Policy again.** The execution engine re-reads the configuration file
+   immediately before each item, so a rule you change after reading the plan
+   still applies.
+
+A run where nothing is confirmed changes nothing and records nothing: what
+MacUp decided is on screen, and there was no attempt to log. Once MacUp
+attempts an item, the attempt is in history whether it succeeded, failed, or
+was abandoned.
+
+Items run strictly one after another. After a failure MacUp stops before any
+remaining `high` or `unknown` risk change, because a failure means it no
+longer knows the state of the machine as well as the plan assumed.
+
+Ctrl+C cancels: the running command receives SIGTERM (then SIGKILL after a
+grace period), nothing further is started, and the report says which items
+ran and which never did. A second Ctrl+C exits immediately.
 
 ## Approval before a change
 
@@ -88,8 +196,10 @@ edit `~/.config/macup/config.json` to turn it off. What it buys is a
 deliberate step in front of every change MacUp itself makes, in the CLI and
 the app alike.
 
-- Today the gated change is the schedule (`macup schedule enable|disable`).
-  The execution engine uses the same gate when it arrives.
+- Every change goes through this one gate: `macup update` before it launches
+  anything, and the commands that write MacUp's configuration — `macup policy
+  set|clear`, `macup exclude`, `macup provider enable|disable`, `macup
+  schedule enable|disable`, and `macup security require` itself.
 - Changing the setting is itself gated, by the rule in force at the time.
 - MacUp refuses to require an approval this Mac could never give: if there is
   no usable sensor and no fallback, `macup security require on` fails rather
@@ -140,7 +250,10 @@ and in `macup schedule status`:
 ```
 
 That is the same read-only check as `macup check`. Scheduled *updating* does
-not exist in this version, because MacUp cannot modify a package at all yet.
+not exist: the agent is only ever allowed to run a check, and
+`scripts/check-trust-invariants.sh` fails the build if that ever changes.
+Nothing MacUp installs can update a package while you are not there — run
+`macup update` yourself when you want a change.
 
 - The report goes to `~/.local/state/macup/last-check.json`; `macup schedule
   status` summarises it.
@@ -196,19 +309,34 @@ finish, the output says so and the check exits with status 2.
 
 | Code | Meaning |
 | --- | --- |
-| 0 | The command completed. For `check`, every enabled provider was checked or is simply not installed. Updates being available is not an error. |
-| 2 | `check` completed but at least one provider failed or left updates out (listed updates MacUp could not read, or lookups the provider could not finish); results are partial. |
-| 3 | The configuration is invalid. Read-only commands still ran (a file other users could change is ignored, so defaults were used); automatic modifications stay disabled. When `MACUP_CONFIG_DIR`/`MACUP_STATE_DIR`/`MACUP_LAUNCH_AGENTS_DIR` is not absolute, nothing runs. |
-| 64 | Invalid command-line usage. |
+| 0 | The command completed. For `check`, every enabled provider was checked or is simply not installed. Updates being available is not an error, and neither is `update` deciding to change nothing. |
+| 2 | `check`, `plan`, or `update` completed but at least one provider failed or left updates out (listed updates MacUp could not read, or lookups the provider could not finish); results are partial. |
+| 3 | The configuration is invalid. Read-only commands still ran (a file other users could change is ignored, so defaults were used); MacUp will change nothing until it is fixed, and `policy set`/`clear`, `exclude`, and `provider enable`/`disable` refuse rather than rewrite a file they misread. When `MACUP_CONFIG_DIR`/`MACUP_STATE_DIR`/`MACUP_LAUNCH_AGENTS_DIR` is not absolute, nothing runs. |
+| 4 | `update` ran and at least one item failed. Everything it did attempt is in `macup history`. |
+| 5 | `doctor` found at least one warning or error. Notes alone are exit code 0. |
+| 64 | Invalid command-line usage: an argument that is not a package ID, an unknown provider, an unknown policy, `--limit` below 1, or (for `plan` and `update`) a package ID with no update available. `update` changes nothing in that case. |
 | 77 | The device owner did not approve the change, or MacUp could not ask. Nothing was changed. |
 | 130 | Interrupted with Ctrl+C. |
-| 1 | Unexpected internal error, and `schedule enable`/`disable` failing to install, remove, or record the schedule. |
+| 1 | Unexpected internal error; `schedule enable`/`disable` failing to install, remove, or record the schedule; and `history` failing to read its file. |
 
-When several apply, the first in this order wins: 130, 2, 3.
+When several apply, the first in this order wins: 130, then 64, then 4, then
+3, then 2. `macup doctor` is the exception: it reports a configuration
+problem as a finding rather than as exit code 3, so it answers 5.
 
-Ctrl+C cancels a check cleanly: in-flight provider commands receive
-SIGTERM (then SIGKILL after a grace period), and the partial report is
-marked `"cancelled": true`. A second Ctrl+C exits immediately.
+Two things deliberately do **not** change the exit code:
+
+- An update that ran but could **not be confirmed** afterwards. The command
+  succeeded and the machine did change, so calling it a failure would make
+  scripts retry an update that already happened. MacUp says so loudly in the
+  output, counts it in `summary.unverified`, and records the verification
+  outcome in history — it just never claims the update was verified.
+- Updates being available at all. `macup check` and `macup plan` exit 0 with
+  a full list.
+
+Ctrl+C cancels cleanly: in-flight provider commands receive SIGTERM (then
+SIGKILL after a grace period), the partial report is marked
+`"cancelled": true`, and `update` reports which items ran and which never
+started. A second Ctrl+C exits immediately.
 
 ## JSON (schema version 1)
 
@@ -259,10 +387,88 @@ Errors (`MacUpError`): `kind` (`providerUnavailable`, `commandFailed`,
 `Tests/MacUpCLITests/JSONSchemaTests.swift` contains a complete golden
 example and fails if the encoding changes.
 
+### `macup plan --json` (`"kind": "plan"`, schema version 1)
+
+| Field | Meaning |
+| --- | --- |
+| `createdAt` | When the plan was built |
+| `intent` | `interactive` from the CLI; `unattended` exists for a run with nobody at the Mac |
+| `planned[]` | `candidate` (an update entry as above), `decision`, and `plan` |
+| `skipped[]` | `item`, `displayName`, `currentVersion`, `proposedVersion`, `decision`, `reason`, `error` |
+| `summary` | `allowed`, `needsConfirmation`, `deniedByPolicy`, `unplannable` |
+| `configuration` | As in `check` |
+| `unmatchedSelection[]` | Package IDs you named that no provider offered an update for |
+| `providers[]` | The provider reports behind the plan, so a failed provider is visible |
+| `cancelled` | `true` if interrupted |
+
+`decision`: `item`, `action` (`allow`, `confirm`, `deny`), `policy` (the
+effective one, never `inherit`), `source` (`item`, `provider`, `global`,
+`providerDisabled`, `providerPin`, `risk`, `configuration`, `unattended`),
+`reason`, `escalated` (risk turned an automatic update into a confirmation).
+
+`plan` (an `ExecutionPlan`): `id`, `createdAt`, `item`, `currentVersion`,
+`proposedVersion`, `risk`, `rationale`, `steps[]`, `expectsNetwork`,
+`mayRequirePrivilege`, `mayRequireRestart`, `mayChangeUserConfiguration`,
+`verification[]`, `rollback` (`availability`: `available`, `unavailable`,
+`unknown`; `explanation` — MacUp never claims rollback without a tested
+strategy). Each step: `summary`, `invocation` (`executable` and
+`arguments[]`, the exact things MacUp will launch), `effect`,
+`expectsNetwork`, `mayRequirePrivilege`, `timeoutSeconds`.
+
+### `macup update --json` (`"kind": "update"`, schema version 1)
+
+| Field | Meaning |
+| --- | --- |
+| `origin` | `cli` |
+| `dryRun` | `true` when nothing was launched |
+| `startedAt`, `finishedAt`, `cancelled` | When the run happened, and whether it was interrupted |
+| `executed[]` | `item`, `displayName`, `plan`, `result`, `verification` |
+| `skipped[]` | Every item MacUp did not change, with the reason (same shape as `plan`'s) |
+| `summary` | `attempted`, `succeeded`, `failed`, `skipped`, `verified`, `unverified` |
+
+`result`: `planID`, `item`, `outcome` (`succeeded`, `failed`, `skipped`,
+`cancelled`, `timedOut`), `startedAt`, `finishedAt`, `steps[]` (`command`
+— the redacted display form, `exitStatus`, `durationSeconds`,
+`errorExcerpt`), `error`. `verification`: `item`, `outcome` (`verified`,
+`targetNotReached`, `failed`, `notPerformed`), `expectedVersion`,
+`observedVersion`, `message`.
+
+### `macup doctor --json` (`"kind": "doctor"`, schema version 1)
+
+`startedAt`, `finishedAt`, `findings[]` (most severe first, then by
+identifier: `id` such as `homebrew.multipleInstallations`, `severity`
+(`error`, `warning`, `info`), `provider`, `title`, `detail`,
+`recommendation`), `providers[]`, `configuration`, `summary` (`errors`,
+`warnings`, `notes`, `checksRun`), `cancelled`.
+
+### `macup history --json` (`"kind": "history"`, schema version 1)
+
+`path`, `limit`, `entries[]` (newest first), `unreadableLines` (lines MacUp
+could not decode — reported, never guessed at), `olderEntriesNotRead`.
+
+Each entry: `schemaVersion`, `id`, `timestamp`, `origin` (`cli`, `gui`,
+`scheduled`), `item`, `versionBefore`, `versionTarget`, `versionAfter`,
+`command` (redacted display form), `outcome`, `verification`,
+`errorSummary`, `skipReason`, `durationSeconds`.
+
 ### Other documents
 
 - `macup provider list --json` → `"kind": "providerList"`: `macupVersion`,
   `providers[]` (as above, detection fields only), `commands[]`.
+- `macup policy list --json` → `"kind": "policyList"`: `defaultPolicy`,
+  `confirmMajorUpdates`, `providers[]` (`provider`, `enabled`, `policy` as
+  written, `effectivePolicy`, `explicit` — false when the row is MacUp's
+  built-in default rather than something in your file, `path`, `source`),
+  `items[]` (`item`, `policy`, `effectivePolicy`, `path`, `source`),
+  `unreadableItemKeys[]`, `automaticModificationsAllowed`,
+  `configurationFile`.
+- `macup policy set|clear --json`, `macup exclude --json`, and `macup
+  provider enable|disable --json` → `"kind": "policyChange"`:
+  `configurationFile` and `changes[]` (`subject` (`{"kind": "item"|"provider"
+  |"global", "id": …}`), `setting` (`policy` or `enabled`), `previousValue`,
+  `newValue` (null when the rule was removed), `changed` (false when the
+  configuration already said this and nothing was written), `path`,
+  `summary`, `warnings[]`).
 - `macup config show --json` → `"kind": "configuration"`: `path`, `source`,
   `valid`, `automaticModificationsAllowed`, `issues[]`, `configuration`.
 - `macup config path --json` → `"kind": "configPaths"`: `configFile`,

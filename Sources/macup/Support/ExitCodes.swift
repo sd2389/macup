@@ -12,6 +12,12 @@ enum MacUpExitCode: Int32, CaseIterable {
     /// The configuration is invalid. Read-only commands still ran; automatic
     /// modifications stay disabled until it is fixed.
     case configurationInvalid = 3
+    /// `macup update` ran but at least one item failed. What succeeded is
+    /// still recorded in history.
+    case updateFailed = 4
+    /// `macup doctor` found something that needs attention: an error or a
+    /// warning. Notes alone are exit code 0.
+    case attentionRequired = 5
     /// Invalid command-line usage.
     case usage = 64
     /// The device owner did not approve the change, or MacUp could not ask.

@@ -24,6 +24,10 @@ struct CLIContext: Sendable {
     var standardError: any TextOutput
     var standardOutputIsTerminal: Bool
     var engine: CheckEngine
+    /// The diagnostics `macup doctor` runs. Injectable for the same reason as
+    /// `engine`: one of them starts the user's login shell, and a test should
+    /// describe a Mac rather than run anything on the host.
+    var doctorEngine: DoctorEngine
     var checkEnvironment: CheckEnvironment
     /// Ctrl+C handling is process-wide; tests turn it off.
     var handlesInterrupts: Bool
@@ -38,6 +42,10 @@ struct CLIContext: Sendable {
     var schedulerFileSystem: any FileSystem
     /// macOS authentication, replaced in tests so no test shows a prompt.
     var authorizer: any BiometricAuthorizing
+    /// Reads one line of the user's answer to a question MacUp asked.
+    /// Returns `nil` when there is nobody to read from, which every caller
+    /// treats as "no" rather than as consent.
+    var readLine: @Sendable () -> String?
 
     /// Asks the device owner to approve a change, when the configuration says
     /// to. Returns the outcome; the caller refuses the change unless it allows
@@ -84,13 +92,15 @@ struct CLIContext: Sendable {
             standardError: FileHandleOutput(handle: .standardError),
             standardOutputIsTerminal: isatty(STDOUT_FILENO) == 1,
             engine: .standard(),
+            doctorEngine: .standard(),
             checkEnvironment: .live(processEnvironment: environment, homeDirectory: home),
             handlesInterrupts: true,
             executablePath: currentExecutablePath(),
             userID: getuid(),
             schedulerRunner: ProcessCommandRunner(),
             schedulerFileSystem: LocalFileSystem(),
-            authorizer: LocalAuthenticator()
+            authorizer: LocalAuthenticator(),
+            readLine: { Swift.readLine(strippingNewline: true) }
         )
     }
 
@@ -132,5 +142,46 @@ struct CLIContext: Sendable {
             printError("error: \(TerminalText.sanitize(error.message))")
             throw MacUpExitCode.configurationInvalid.exitCode
         }
+    }
+
+    /// Stops a command that would write to a configuration MacUp could not
+    /// read, and says which lines it could not read.
+    ///
+    /// Saving re-encodes what MacUp understood, so writing a file it misread
+    /// could drop the very exclusions the user is relying on. Refusing is the
+    /// fail-closed answer (CLAUDE.md §2.23).
+    func requireReadableConfiguration(_ loaded: LoadedConfiguration) throws {
+        guard loaded.hasErrors else { return }
+        printError("error: MacUp will not change a configuration it cannot read.")
+        for issue in loaded.issues where issue.severity == .error {
+            let location = issue.path.isEmpty ? "" : TerminalText.sanitize(issue.path) + ": "
+            printError("  \(location)\(TerminalText.sanitize(issue.message))")
+        }
+        printError("Fix \(PathDisplay.abbreviatingHome(loaded.path, homeDirectory: homeDirectory)) and try again.")
+        throw MacUpExitCode.configurationInvalid.exitCode
+    }
+
+    /// Asks the device owner to approve a change and stops the command when
+    /// the answer is anything but yes.
+    func requireApproval(_ action: String, _ configuration: MacUpConfiguration, paths: MacUpPaths) async throws {
+        let approval = await approval(action, configuration, paths: paths)
+        guard approval.allowsChange else {
+            printError("error: \(TerminalText.sanitize(approval.explanation ?? "MacUp did not get your approval."))")
+            printError("Nothing was changed.")
+            throw MacUpExitCode.notApproved.exitCode
+        }
+    }
+
+    /// Asks a yes-or-no question and returns true only for an explicit yes.
+    ///
+    /// Anything else — no answer at all, a closed input, a word MacUp does not
+    /// recognize — is a no, because a change nobody agreed to must not happen.
+    func askToProceed(_ question: String) -> Bool {
+        standardOutput.write(question + " [y/N] ")
+        guard let answer = readLine()?.trimmingCharacters(in: .whitespaces).lowercased() else {
+            print("")
+            return false
+        }
+        return answer == "y" || answer == "yes"
     }
 }

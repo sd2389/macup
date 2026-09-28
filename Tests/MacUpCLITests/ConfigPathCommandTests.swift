@@ -22,9 +22,41 @@ struct ConfigPathCommandTests {
         let help = MacUpCommand.helpMessage()
         #expect(help.contains("USAGE: macup"))
         #expect(help.contains("Examples:"))
-        #expect(help.contains("macup check --verbose"))
+        #expect(help.contains("macup update --dry-run"))
         for subcommand in ["check", "provider", "config"] {
             #expect(help.contains(subcommand))
+        }
+    }
+
+    /// Help text is wrapped to the terminal width, so a phrase is matched
+    /// against it with the line breaks and indentation collapsed away.
+    private func unwrapped(_ command: any ParsableCommand.Type) -> String {
+        MacUpCommand.helpMessage(for: command).split(whereSeparator: \.isWhitespace).joined(separator: " ")
+    }
+
+    @Test("--help says plainly which commands change things and which only read")
+    func helpIsHonestAboutWhatChanges() {
+        let help = MacUpCommand.helpMessage()
+        #expect(help.contains("One command changes packages: `macup update`"))
+        #expect(help.contains("Everything else — including plain `macup` — only reads."))
+        for subcommand in ["plan", "update", "policy", "exclude", "doctor", "history"] {
+            #expect(help.contains(subcommand))
+        }
+        #expect(unwrapped(CheckCommand.self).contains("without changing anything"))
+        #expect(unwrapped(PlanCommand.self).contains("change nothing"))
+        #expect(unwrapped(UpdateCommand.self).contains("only command that changes packages"))
+        #expect(unwrapped(UpdateCommand.self).contains("Naming an item is a request, not a confirmation"))
+        #expect(unwrapped(DoctorCommand.self).contains("read-only"))
+        #expect(unwrapped(HistoryCommand.self).contains("read-only"))
+        #expect(unwrapped(PolicyListCommand.self).contains("read-only"))
+    }
+
+    @Test("Every command's help says what it does to the machine, including its exit codes")
+    func helpDocumentsExitStatus() {
+        for command in [PlanCommand.self, UpdateCommand.self, DoctorCommand.self, HistoryCommand.self]
+            as [any ParsableCommand.Type]
+        {
+            #expect(unwrapped(command).contains("Exit status:"))
         }
     }
 
