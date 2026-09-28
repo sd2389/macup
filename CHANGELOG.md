@@ -13,6 +13,18 @@ claim that 0.4.0 has been released.
 ## [0.4.0] — unreleased
 
 ### Added
+- **App layout**: the sidebar is now Dashboard, Providers, Updates,
+  Features, Doctor, History. The dashboard lists pending updates first and
+  the items your rules ignore or hold below them, each with the way to clear
+  its rule.
+- **Providers screen**: every provider MacUp knows, what was found and where,
+  a switch to turn it on or off, and the rule its items inherit.
+- **What changes**: each update shows which parts of the version change
+  (major, minor, patch, build, pre-release, packaging revision), and a link
+  to read about the release where the provider gives one — npm's page for
+  that version, or the Homebrew homepage. MacUp only builds the address and
+  accepts `https` only; it fetches nothing. In the app's Updates screen and
+  in `macup check --verbose`.
 - **Doctor**: eleven deterministic diagnostics that read the result of one
   read-only check and say what they saw. Provider availability and results;
   multiple Homebrew installations and a non-standard prefix; executable

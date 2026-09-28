@@ -58,21 +58,61 @@ struct DashboardView: View {
                     .padding(.vertical, 4)
                 }
 
-                Section("Providers") {
-                    ForEach(report.providers, id: \.provider) { provider in
-                        let updates = report.updates(for: provider.provider)
+                Section {
+                    if model.pendingUpdates.isEmpty {
+                        Text(report.updates.isEmpty
+                            ? "Nothing is waiting. Everything MacUp checked is up to date."
+                            : "Nothing is waiting. Every update found is one your rules leave alone, listed below.")
+                            .foregroundStyle(.secondary)
+                    }
+                    ForEach(model.pendingUpdates) { update in
                         Button {
-                            // Take the reader to what this row is about,
-                            // rather than to the top of a list they then
-                            // have to search.
-                            model.selectedUpdate = updates.first?.id ?? model.selectedUpdate
+                            model.selectedUpdate = update.id
                             model.section = .updates
                         } label: {
-                            ProviderRow(provider: provider, updates: updates)
+                            DashboardUpdateRow(update: update, decision: model.decisions[update.id])
                         }
                         .buttonStyle(.plain)
-                        .disabled(updates.isEmpty)
                     }
+                } header: {
+                    Text("Pending Updates")
+                } footer: {
+                    if !model.pendingUpdates.isEmpty {
+                        Text("Nothing here runs until you review it. Select one to see what changes and the exact command.")
+                            .leadingFooter()
+                    }
+                }
+
+                Section {
+                    if model.leftAloneUpdates.isEmpty && model.heldRulesWithoutUpdate.isEmpty {
+                        Text("No item is ignored or pinned. Choose Ignore or Pin for an item on the Updates screen.")
+                            .foregroundStyle(.secondary)
+                    }
+                    ForEach(model.leftAloneUpdates) { update in
+                        HeldRow(
+                            item: update.id,
+                            title: update.displayName,
+                            detail: model.decisions[update.id]?.reason ?? "",
+                            versions: "\(update.installedVersion?.raw ?? "Unknown") → \(update.availableVersion.raw)",
+                            policy: model.decisions[update.id]?.policy ?? .ignore,
+                            canClear: model.decisions[update.id]?.source == .item
+                        )
+                    }
+                    ForEach(model.heldRulesWithoutUpdate) { rule in
+                        HeldRow(
+                            item: rule.item,
+                            title: rule.item.name,
+                            detail: "No update right now. The rule applies to the next one.",
+                            versions: nil,
+                            policy: rule.effectivePolicy,
+                            canClear: true
+                        )
+                    }
+                } header: {
+                    Text("Ignored and Held")
+                } footer: {
+                    Text("MacUp never updates these. Clearing a rule makes the item follow its provider again.")
+                        .leadingFooter()
                 }
 
                 if !attention(report).isEmpty {
@@ -191,79 +231,88 @@ struct DashboardView: View {
     }
 }
 
-private struct ProviderRow: View {
-    let provider: ProviderReport
-    let updates: [UpdateCandidate]
-
-    private var updateCount: Int { updates.count }
-    private var highRiskCount: Int { updates.filter { $0.risk.level == .high }.count }
+/// One pending update: what it is, how far it moves, and what policy says.
+private struct DashboardUpdateRow: View {
+    let update: UpdateCandidate
+    let decision: PolicyDecision?
 
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: provider.provider.symbolName)
+            Image(systemName: update.provider.symbolName)
                 .font(.title3)
                 .foregroundStyle(.secondary)
                 .frame(width: 28)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
-                Text([provider.displayName, provider.version?.displaySafe].compactMap { $0 }.joined(separator: " "))
-                Text(detail)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
+                Text(update.displayName.displaySafe)
+                HStack(spacing: 10) {
+                    Text(update.provider.displayName)
+                    if let decision { PolicyLabel(policy: decision.policy) }
+                    RiskLabel(level: update.risk.level)
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
             }
             Spacer()
-            VStack(alignment: .trailing, spacing: 2) {
-                Text(status)
-                    .foregroundStyle(provider.hasErrors ? AnyShapeStyle(.red) : AnyShapeStyle(.secondary))
-                if highRiskCount > 0 {
-                    Text(highRiskCount == 1 ? "1 high risk" : "\(highRiskCount) high risk")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            if !updates.isEmpty {
-                Image(systemName: "chevron.right")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.tertiary)
-                    .accessibilityHidden(true)
-            }
+            Text("\(update.installedVersion?.raw.displaySafe ?? "Unknown") → \(update.availableVersion.raw.displaySafe)")
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
+            Image(systemName: "chevron.right")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.tertiary)
+                .accessibilityHidden(true)
         }
         .contentShape(Rectangle())
         .padding(.vertical, 2)
+        .accessibilityElement(children: .combine)
+        .accessibilityHint("Opens this update on the Updates screen")
     }
+}
 
-    private func fact(_ key: String) -> String? {
-        provider.facts.first { $0.key == key }?.value
-    }
+/// An item MacUp is leaving alone, why, and the way to stop.
+private struct HeldRow: View {
+    @Environment(AppModel.self) private var model
+    let item: PackageID
+    let title: String
+    let detail: String
+    let versions: String?
+    let policy: UpdatePolicy
+    /// Only a rule on the item itself can be cleared here. One inherited
+    /// from the provider, or a pin in the package manager, is changed where
+    /// it lives.
+    let canClear: Bool
 
-    private var detail: String {
-        switch provider.availability {
-        case .disabled: return "Turned off in the configuration"
-        case .unavailable: return "Not installed, or not found in your PATH"
-        case .failed: return provider.errors.first?.error.message.displaySafe ?? "Found but not usable"
-        case .available: break
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: item.provider.symbolName)
+                .font(.title3)
+                .foregroundStyle(.secondary)
+                .frame(width: 28)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 8) {
+                    Text(title.displaySafe)
+                    PolicyLabel(policy: policy).font(.caption).foregroundStyle(.secondary)
+                }
+                Text(detail.displaySafe)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer()
+            if let versions {
+                Text(versions.displaySafe).monospacedDigit().foregroundStyle(.secondary)
+            }
+            if canClear {
+                Button(policy == .pin ? "Unpin" : "Stop Ignoring") {
+                    Task { await model.clearPolicy(for: item) }
+                }
+                .disabled(model.isChangingPolicy)
+                .accessibilityLabel("\(policy == .pin ? "Unpin" : "Stop ignoring") \(item.name)")
+                .help("Remove this item's rule so it follows its provider again")
+            }
         }
-        if provider.provider == .npm, let node = fact("nodeVersion") {
-            let manager = fact("nodeManager").map { $0 == "unrecognized" ? "" : ", managed by \($0)" } ?? ""
-            return "Node \(node.displaySafe)\(manager.displaySafe)"
-        }
-        return provider.executable?.path.displayPath ?? ""
-    }
-
-    private var status: String {
-        switch provider.availability {
-        case .disabled: return "Off"
-        case .unavailable: return "Not found"
-        case .failed: return "Not usable"
-        case .available: break
-        }
-        if provider.hasErrors { return "Check failed" }
-        switch updateCount {
-        case 0: return "Up to date"
-        case 1: return "1 update"
-        default: return "\(updateCount) updates"
-        }
+        .padding(.vertical, 2)
+        .accessibilityElement(children: .contain)
     }
 }

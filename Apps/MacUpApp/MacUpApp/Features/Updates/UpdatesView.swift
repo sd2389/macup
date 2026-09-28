@@ -132,6 +132,11 @@ private struct UpdateRow: View {
             }
             .font(.caption)
             .foregroundStyle(.secondary)
+            if let difference = update.versionDifference {
+                Text("Changes: \(difference.summary.displaySafe)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
             if let reason = decision?.reason {
                 Text(reason.displaySafe)
                     .font(.caption)
@@ -261,6 +266,38 @@ private struct UpdateDetail: View {
                 LabeledContent("Installed", value: update.installedVersion?.raw.displaySafe ?? "Unknown")
                 LabeledContent("Available", value: update.availableVersion.raw.displaySafe)
                 LabeledContent("Change", value: update.versionChange.displayName.capitalizedFirst)
+            }
+
+            Section {
+                if let difference = update.versionDifference {
+                    ForEach(difference.parts, id: \.name) { part in
+                        LabeledContent(part.name) {
+                            Text(part.changed ? "\(part.from) → \(part.to)" : "\(part.from), unchanged")
+                                .monospacedDigit()
+                                .fontWeight(part.changed ? .semibold : .regular)
+                                .foregroundStyle(part.changed ? .primary : .secondary)
+                        }
+                        .accessibilityLabel(part.changed
+                            ? "\(part.name) changes from \(part.from) to \(part.to)"
+                            : "\(part.name) stays \(part.from)")
+                    }
+                } else {
+                    Text("MacUp cannot break these versions into parts, so it does not guess at what changes between them.")
+                        .foregroundStyle(.secondary)
+                }
+                if let link = update.releaseInfoLink {
+                    Link(destination: link.url) {
+                        Label(link.title, systemImage: "arrow.up.right.square")
+                    }
+                    .help(link.url.absoluteString)
+                }
+            } header: {
+                Text("What Changes")
+            } footer: {
+                Text(update.releaseInfoLink == nil
+                    ? "Worked out from the two version numbers. \(update.provider.displayName) gives MacUp no page to read the release notes on."
+                    : "Worked out from the two version numbers. The page opens in your browser; MacUp itself fetches nothing.")
+                    .leadingFooter()
             }
 
             Section("Policy") {

@@ -29,7 +29,7 @@ enum Snapshots {
         let main = NSApp.windows.first { $0.title == "MacUp" && $0.isVisible }
         main?.makeKeyAndOrderFront(nil)
         let sections: [(AppModel.Section, String)] = [
-            (.dashboard, "dashboard"), (.updates, "updates"), (.features, "features"),
+            (.dashboard, "dashboard"), (.providers, "providers"), (.updates, "updates"), (.features, "features"),
             (.doctor, "doctor"), (.history, "history"),
         ]
         for (appearance, suffix) in [(NSAppearance.Name.aqua, "light"), (.darkAqua, "dark")] {

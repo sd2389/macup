@@ -168,37 +168,12 @@ struct SettingsView: View {
 
 /// One provider: whether MacUp runs it, and what its items inherit.
 private struct ProviderRuleRow: View {
-    @Environment(AppModel.self) private var model
     let rule: PolicyListing.ProviderRule
     let inherited: UpdatePolicy
 
     var body: some View {
         LabeledContent {
-            HStack(spacing: 12) {
-                Menu {
-                    Picker("Policy", selection: policy) {
-                        Text("Use the Default (\(inherited.displayName))").tag(UpdatePolicy.inherit)
-                        Text(UpdatePolicy.auto.displayName).tag(UpdatePolicy.auto)
-                        Text(UpdatePolicy.ask.displayName).tag(UpdatePolicy.ask)
-                        Text(UpdatePolicy.ignore.displayName).tag(UpdatePolicy.ignore)
-                    }
-                    .pickerStyle(.inline)
-                    .labelsHidden()
-                } label: {
-                    Label(rule.effectivePolicy.displayName, systemImage: rule.effectivePolicy.symbolName)
-                }
-                .menuStyle(.button)
-                .fixedSize()
-                .disabled(model.isChangingPolicy || !rule.enabled)
-                .accessibilityLabel(
-                    "Update policy for \(rule.provider.displayName), currently \(rule.effectivePolicy.displayName)"
-                )
-                Toggle("Enabled", isOn: enabled)
-                    .labelsHidden()
-                    .toggleStyle(.switch)
-                    .disabled(model.isChangingPolicy)
-                    .accessibilityLabel("Check \(rule.provider.displayName)")
-            }
+            ProviderPolicyControls(rule: rule, inherited: inherited)
         } label: {
             Label {
                 VStack(alignment: .leading, spacing: 2) {
@@ -211,23 +186,6 @@ private struct ProviderRuleRow: View {
                 Image(systemName: rule.provider.symbolName).accessibilityHidden(true)
             }
         }
-    }
-
-    private var policy: Binding<UpdatePolicy> {
-        Binding(
-            get: { rule.policy },
-            // Pin is not offered for a whole provider: holding every item of a
-            // provider at its current version is what turning the provider off
-            // means, and the validator refuses the rule outright.
-            set: { newValue in Task { await model.setPolicy(newValue, for: rule.provider) } }
-        )
-    }
-
-    private var enabled: Binding<Bool> {
-        Binding(
-            get: { rule.enabled },
-            set: { newValue in Task { await model.setProviderEnabled(newValue, for: rule.provider) } }
-        )
     }
 }
 

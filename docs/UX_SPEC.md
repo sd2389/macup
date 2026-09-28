@@ -13,25 +13,41 @@ Do not use:
 
 ## Main app
 
+### Navigation
+
+Sidebar order: Dashboard, Providers, Updates, Features, Doctor, History, with
+Settings at the foot.
+
 ### Dashboard
 
 ```text
 MacUp
 
-7 updates available
-
-Homebrew        3
-npm             2
-mise            1
-macOS           1 review required
-
-2 items ignored
-1 item pinned
-
+5 updates available
 [ Review Updates ]
+
+Pending Updates
+  @anthropic-ai/claude-code   npm · Ask First · Low      2.1.282 → 2.1.284  ›
+  npm                         npm · Ask First · High     11.17.0 → 12.1.0   ›
+
+Ignored and Held
+  mysql     Pin     held at its current version   9.7.1 → 26.7.0_2  [Unpin]
+  wget      Ignore  no update right now                             [Stop Ignoring]
 
 Last checked: Today, 5:42 PM
 ```
+
+Pending updates come first: everything that could still run. Items a rule
+leaves alone come under them, with the reason, never hidden. Only a rule on
+the item itself can be cleared from here.
+
+### Providers
+
+One section per provider MacUp knows, whether or not this Mac has it: found
+or not, version, the exact executable and the facts behind it, the update
+count, a switch that turns the provider on or off, and the rule its items
+inherit (Use the Default, Auto Update, Ask First, Ignore). Same rules as
+`macup provider enable|disable` and `macup policy set <provider>`.
 
 ### Update row
 
@@ -51,6 +67,12 @@ npm → Node 24.19.0 → mise
 Show:
 - ownership chain
 - current/target
+- what changes: each part of the version (major, minor, patch, build,
+  pre-release, packaging revision), from and to, worked out from the two
+  version strings only; nothing when a version cannot be parsed
+- a link to read about the release when the provider gives one (npm's page
+  for that version, Homebrew's homepage). Only `https` addresses; MacUp
+  never fetches the page itself
 - detected source
 - risk/reason
 - exact executable

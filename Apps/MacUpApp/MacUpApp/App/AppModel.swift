@@ -11,7 +11,7 @@ import Observation
 @Observable
 final class AppModel {
     enum Section: Hashable {
-        case dashboard, updates, features, doctor, history
+        case dashboard, providers, updates, features, doctor, history
     }
 
     var section: Section? = .dashboard
@@ -109,6 +109,29 @@ final class AppModel {
         return Dictionary(
             uniqueKeysWithValues: report.updates.map { ($0.id, engine.decide($0, intent: .interactive)) }
         )
+    }
+
+    /// Updates that could still happen: allowed, or waiting for the user.
+    /// The top of the dashboard.
+    var pendingUpdates: [UpdateCandidate] {
+        let decisions = decisions
+        return (report?.updates ?? []).filter { decisions[$0.id]?.allowsExecution != false }
+    }
+
+    /// Updates a rule or a provider's own pin keeps back. Listed under the
+    /// pending ones, with the reason, so a decision is never hidden.
+    var leftAloneUpdates: [UpdateCandidate] {
+        let decisions = decisions
+        return (report?.updates ?? []).filter { decisions[$0.id]?.allowsExecution == false }
+    }
+
+    /// Items ruled Ignore or Pin that have no update right now. Still worth
+    /// listing: the rule is in force and will apply to the next update.
+    var heldRulesWithoutUpdate: [PolicyListing.ItemRule] {
+        let updating = Set((report?.updates ?? []).map(\.id))
+        return policyRules.items.filter {
+            ($0.effectivePolicy == .ignore || $0.effectivePolicy == .pin) && !updating.contains($0.item)
+        }
     }
 
     /// Updates that will wait for the user even though they were found.

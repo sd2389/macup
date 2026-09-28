@@ -51,6 +51,8 @@ struct ContentView: View {
             List(selection: $model.section) {
                 Label("Dashboard", systemImage: "rectangle.grid.2x2")
                     .tag(AppModel.Section.dashboard)
+                Label("Providers", systemImage: "shippingbox")
+                    .tag(AppModel.Section.providers)
                 Label("Updates", systemImage: "arrow.down.circle")
                     .badge(model.updateCount)
                     .tag(AppModel.Section.updates)
@@ -79,6 +81,7 @@ struct ContentView: View {
         } detail: {
             switch model.section ?? .dashboard {
             case .dashboard: DashboardView()
+            case .providers: ProvidersView()
             case .updates: UpdatesView()
             case .features: FeaturesView()
             case .doctor: DoctorView()
