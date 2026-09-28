@@ -31,10 +31,16 @@ struct DashboardView: View {
                 }
 
                 // Only what MacUp actually knows. No score, no percentage.
+                // A grid rather than one row: the numbers wrap instead of
+                // squeezing when there are several of them or the text is
+                // large (CLAUDE.md §21).
                 Section {
-                    HStack(alignment: .top, spacing: 0) {
+                    LazyVGrid(
+                        columns: [GridItem(.adaptive(minimum: 140, maximum: 260), spacing: 16, alignment: .topLeading)],
+                        alignment: .leading,
+                        spacing: 12
+                    ) {
                         ForEach(facts(report), id: \.label) { fact in
-                            if fact.label != facts(report).first?.label { Divider().frame(height: 34) }
                             VStack(alignment: .leading, spacing: 3) {
                                 Text(fact.value)
                                     .font(.title3.weight(.medium))
@@ -42,9 +48,9 @@ struct DashboardView: View {
                                 Text(fact.label)
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.leading, fact.label == facts(report).first?.label ? 0 : 16)
                             .accessibilityElement(children: .combine)
                             .accessibilityLabel("\(fact.label): \(fact.value)")
                         }
@@ -116,34 +122,52 @@ struct DashboardView: View {
     }
 
     /// The glanceable numbers from CLAUDE.md §13, and nothing invented.
-    /// A figure is shown only when MacUp has it.
+    /// A figure is shown only when MacUp has it, and a zero that would only
+    /// take up room is left out.
     private func facts(_ report: CheckReport) -> [Fact] {
-        var facts = [
-            Fact(label: "Updates", value: "\(report.summary.updatesAvailable)"),
-            Fact(
-                label: "Providers checked",
-                value: "\(report.summary.providersChecked) of \(report.providers.count)"
-            ),
-        ]
-        if report.pinnedCount > 0 {
-            facts.append(Fact(label: "Pinned by provider", value: "\(report.pinnedCount)"))
+        var facts = [Fact(label: "Awaiting review", value: "\(report.summary.updatesAvailable)")]
+        if model.updatesNeedingConfirmation > 0 {
+            facts.append(Fact(label: "Need your confirmation", value: "\(model.updatesNeedingConfirmation)"))
+        }
+        if model.ignoredUpdateCount > 0 {
+            facts.append(Fact(label: "Ignored by your rules", value: "\(model.ignoredUpdateCount)"))
+        }
+        if model.pinnedUpdateCount > 0 {
+            facts.append(Fact(label: "Held at this version", value: "\(model.pinnedUpdateCount)"))
+        }
+        facts.append(Fact(
+            label: "Providers checked",
+            value: "\(report.summary.providersChecked) of \(report.providers.count)"
+        ))
+        if report.summary.providersWithErrors > 0 {
+            facts.append(Fact(label: "Providers with errors", value: "\(report.summary.providersWithErrors)"))
         }
         facts.append(Fact(
             label: "Last check",
             value: report.finishedAt.formatted(date: .omitted, time: .shortened)
         ))
-        if let next = scheduledNext {
-            facts.append(Fact(label: "Next check", value: next.formatted(date: .abbreviated, time: .shortened)))
-        }
+        facts.append(Fact(
+            label: "Next check",
+            value: scheduledNext?.formatted(date: .abbreviated, time: .shortened) ?? "Not scheduled"
+        ))
         return facts
     }
 
     private func statusLine(_ report: CheckReport) -> String {
         var parts = ["Checked at \(report.finishedAt.formatted(date: .omitted, time: .shortened)). Nothing was changed."]
-        switch report.pinnedCount {
+        switch model.updatesNeedingConfirmation {
         case 0: break
-        case 1: parts.append("1 update is pinned by its provider.")
-        case let count: parts.append("\(count) updates are pinned by their providers.")
+        case 1: parts.append("1 needs your confirmation.")
+        case let count: parts.append("\(count) need your confirmation.")
+        }
+        // Decisions the user already made are stated here rather than left to
+        // be discovered, so a count on this screen is never quietly smaller
+        // than the list on the next one (CLAUDE.md §21).
+        var decided: [String] = []
+        if model.ignoredUpdateCount > 0 { decided.append("\(model.ignoredUpdateCount) ignored") }
+        if model.pinnedUpdateCount > 0 { decided.append("\(model.pinnedUpdateCount) held at the current version") }
+        if !decided.isEmpty {
+            parts.append("MacUp is leaving \(decided.joined(separator: " and ")) alone, as you asked.")
         }
         return parts.joined(separator: " ")
     }

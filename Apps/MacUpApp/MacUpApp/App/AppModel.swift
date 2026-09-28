@@ -74,13 +74,401 @@ final class AppModel {
         let configuration = loadConfiguration()
         report = await environment.checkEngine.run(
             configuration: configuration,
-            environment: CheckEnvironment(
-                runner: environment.runner,
-                fileSystem: environment.fileSystem,
-                processEnvironment: processEnvironment,
-                homeDirectory: home,
-                system: environment.system
-            )
+            environment: checkEnvironment(processEnvironment)
+        )
+    }
+
+    /// The outside world an engine runs against, with the login shell's
+    /// environment when MacUp managed to read it. Built in one place so the
+    /// check, the planner, the executor, and Doctor all see the same Mac.
+    private func checkEnvironment(_ processEnvironment: [String: String]) -> CheckEnvironment {
+        CheckEnvironment(
+            runner: environment.runner,
+            fileSystem: environment.fileSystem,
+            processEnvironment: processEnvironment,
+            homeDirectory: home,
+            system: environment.system
+        )
+    }
+
+    // MARK: - Policy
+
+    /// Every rule the configuration sets, as written, for the Settings screen.
+    var policyRules: PolicyListing {
+        configuration.map(PolicyListing.init) ?? PolicyListing(configuration: .defaults)
+    }
+
+    /// What policy says about each update the last check found, and why.
+    ///
+    /// Deciding needs no commands — only the rules, and the risk the provider
+    /// already reported — so every screen can show the effective policy and
+    /// its reason straight after a check, without waiting for a plan.
+    var decisions: [PackageID: PolicyDecision] {
+        guard let report, let configuration else { return [:] }
+        let engine = PolicyEngine(configuration)
+        return Dictionary(
+            uniqueKeysWithValues: report.updates.map { ($0.id, engine.decide($0, intent: .interactive)) }
+        )
+    }
+
+    /// Updates that will wait for the user even though they were found.
+    var updatesNeedingConfirmation: Int {
+        decisions.values.filter { $0.action == .confirm }.count
+    }
+
+    /// Updates a rule says to leave alone. Shown, never dropped: it is a
+    /// decision the user made, and hiding it would hide the decision
+    /// (CLAUDE.md §21).
+    var ignoredUpdateCount: Int {
+        decisions.values.filter { $0.action == .deny && $0.policy == .ignore }.count
+    }
+
+    /// Updates held at their current version, whether by a MacUp rule or by
+    /// the provider's own pin.
+    var pinnedUpdateCount: Int {
+        decisions.values.filter { $0.policy == .pin || $0.source == .providerPin }.count
+    }
+
+    /// What the last check found the named provider can do. Empty for a
+    /// provider that was not checked, which is the conservative answer: a
+    /// capability MacUp has not seen is one it does not offer.
+    func capabilities(of provider: ProviderID) -> Set<ProviderCapability> {
+        Set(report?.providers.first { $0.provider == provider }?.capabilities ?? [])
+    }
+
+    /// Whether Pin is a real thing for this provider, rather than a word in a
+    /// menu. MacUp offers it only where the provider has its own pin
+    /// mechanism (CLAUDE.md §13).
+    func supportsPin(_ provider: ProviderID) -> Bool {
+        capabilities(of: provider).contains(.nativePin)
+    }
+
+    /// Whether MacUp can apply this provider's updates at all, as opposed to
+    /// only reporting them. macOS updates are reported and never installed in
+    /// this version, so the app does not offer a button that would only
+    /// produce a refusal (CLAUDE.md §9).
+    func canApplyUpdates(of provider: ProviderID) -> Bool {
+        capabilities(of: provider).contains(.updateSelectedItems)
+    }
+
+    /// The last policy edit, so a screen can say what changed rather than
+    /// only that something did.
+    private(set) var lastPolicyChange: PolicyChange?
+    /// Why the last policy edit did not happen, if it did not.
+    private(set) var policyProblem: String?
+    private(set) var isChangingPolicy = false
+
+    func setPolicy(_ policy: UpdatePolicy, for item: PackageID) async {
+        await editPolicy("set the rule for \(item.rawValue)") { try $0.setPolicy(policy, for: item) }
+    }
+
+    func clearPolicy(for item: PackageID) async {
+        await editPolicy("clear the rule for \(item.rawValue)") { try $0.clearPolicy(for: item) }
+    }
+
+    func setPolicy(_ policy: UpdatePolicy, for provider: ProviderID) async {
+        await editPolicy("set the rule for \(provider.displayName)") { try $0.setPolicy(policy, for: provider) }
+    }
+
+    func setProviderEnabled(_ enabled: Bool, for provider: ProviderID) async {
+        await editPolicy("turn \(provider.displayName) \(enabled ? "on" : "off") in MacUp") {
+            try $0.setProviderEnabled(enabled, for: provider)
+        }
+    }
+
+    func setDefaultPolicy(_ policy: UpdatePolicy) async {
+        await editPolicy("change MacUp's default update policy") { try $0.setDefaultPolicy(policy) }
+    }
+
+    /// Every policy edit the app makes, through the one editor that is allowed
+    /// to make them (CLAUDE.md §12). The app validates nothing itself: the
+    /// editor refuses a configuration it could not read and a result it would
+    /// not use, and its refusal is what the user is shown.
+    private func editPolicy(
+        _ action: String,
+        _ edit: (PolicyEditor) throws -> PolicyChange
+    ) async {
+        guard !isChangingPolicy else { return }
+        isChangingPolicy = true
+        defer { isChangingPolicy = false }
+        policyProblem = nil
+        lastPolicyChange = nil
+
+        let loaded = loadConfiguration()
+        guard let paths = try? resolvedPaths() else {
+            policyProblem = "MacUp could not resolve where its files live, so it changed nothing."
+            return
+        }
+        // No approval is asked for a change that cannot happen: a
+        // configuration with errors is refused below, with the reason.
+        if !loaded.hasErrors {
+            let approval = await ApprovalGate(
+                settings: loaded.configuration.security,
+                authorizer: authorizer,
+                faceUnlock: faceUnlock(loaded.configuration, paths: paths)
+            ).approve(action)
+            guard approval.allowsChange else {
+                policyProblem = approval.explanation
+                return
+            }
+        }
+        do {
+            lastPolicyChange = try edit(PolicyEditor(paths: paths))
+            loadConfiguration()
+        } catch let error as MacUpError {
+            policyProblem = [error.message, error.detail, error.recoverySuggestion]
+                .compactMap { $0 }
+                .joined(separator: "\n")
+        } catch {
+            policyProblem = "The rule could not be changed."
+        }
+    }
+
+    // MARK: - Planning
+
+    /// The plan under review: every change MacUp would make, with the exact
+    /// commands, and every change it would not.
+    private(set) var updatePlan: PlanReport?
+    private(set) var isPlanning = false
+    private(set) var planProblem: String?
+    /// Whether the review sheet is open. Set by the model rather than by a
+    /// view, because it must not open before there is a plan to show.
+    var isReviewingPlan = false
+    /// Items the user has confirmed in the review sheet. An item needing
+    /// confirmation that is not in here does not run.
+    private(set) var confirmedItems: Set<PackageID> = []
+    /// Whether the review sheet has its command list open. On the model so it
+    /// stays open when the sheet is closed and reopened, and so the state can
+    /// be captured.
+    var reviewShowsCommands = false
+
+    /// Builds a plan for the named items, or for everything the last check
+    /// found, and opens the review sheet.
+    ///
+    /// Planning reuses the candidates the check already produced, so it never
+    /// checks the machine twice, and the planner's runner refuses anything
+    /// that is not read-only.
+    func reviewUpdates(_ selection: Set<PackageID>? = nil) async {
+        guard await makePlan(selection) != nil else { return }
+        confirmedItems = []
+        executionReport = nil
+        executionProblem = nil
+        startedItems = []
+        isReviewingPlan = true
+    }
+
+    /// Closes the review sheet. The plan is kept so its result stays readable
+    /// if the sheet is reopened.
+    func endReview() {
+        isReviewingPlan = false
+    }
+
+    func setConfirmed(_ isConfirmed: Bool, for item: PackageID) {
+        if isConfirmed {
+            confirmedItems.insert(item)
+        } else {
+            confirmedItems.remove(item)
+        }
+    }
+
+    /// Items in the plan that MacUp will not run until the user says so.
+    var itemsAwaitingConfirmation: [PlannedUpdate] {
+        updatePlan?.needingConfirmation ?? []
+    }
+
+    /// What pressing Apply would actually change: the items policy allows
+    /// outright, plus the ones the user has confirmed. The count is stated
+    /// rather than implied, so a batch can never look larger than it is
+    /// (CLAUDE.md §21).
+    var itemsThatWouldRun: [PlannedUpdate] {
+        (updatePlan?.planned ?? []).filter { !$0.needsConfirmation || confirmedItems.contains($0.item) }
+    }
+
+    private func makePlan(_ selection: Set<PackageID>?) async -> PlanReport? {
+        guard !isPlanning, !isApplying else { return nil }
+        isPlanning = true
+        defer { isPlanning = false }
+        planProblem = nil
+
+        guard let report else {
+            planProblem = "MacUp has not checked this Mac yet, so there is nothing to plan."
+            return nil
+        }
+        let loaded = loadConfiguration()
+        let plan = await environment.planner.plan(
+            report,
+            request: PlanRequest(selection: selection, intent: .interactive),
+            configuration: loaded,
+            environment: checkEnvironment(await loadEnvironment())
+        )
+        updatePlan = plan
+        return plan
+    }
+
+    // MARK: - The exact command
+
+    /// A one-item plan behind the "View command" affordance, so the exact
+    /// executable and arguments can be read without opening a review.
+    private(set) var commandPlan: PlanReport?
+    private(set) var commandItem: PackageID?
+    var isShowingCommand = false
+
+    /// Plans one item and shows what MacUp would run — or, when there is
+    /// nothing it would run, why not.
+    func showCommand(for item: PackageID) async {
+        guard !isPlanning, !isApplying, let report else { return }
+        isPlanning = true
+        defer { isPlanning = false }
+        commandItem = item
+        commandPlan = await environment.planner.plan(
+            report,
+            request: PlanRequest(selection: [item], intent: .interactive),
+            configuration: loadConfiguration(),
+            environment: checkEnvironment(await loadEnvironment())
+        )
+        isShowingCommand = true
+    }
+
+    func dismissCommand() {
+        isShowingCommand = false
+    }
+
+    // MARK: - Applying a plan
+
+    private(set) var isApplying = false
+    /// The item whose command is running now.
+    private(set) var runningItem: PackageID?
+    /// Items whose commands have started, in the order they started, so the
+    /// sheet can say "3 of 5" without claiming an outcome it does not have.
+    private(set) var startedItems: [PackageID] = []
+    private(set) var executionReport: ExecutionReport?
+    /// Why nothing was applied, when nothing was.
+    private(set) var executionProblem: String?
+    /// The running batch, so Cancel has something to cancel. Readable so a
+    /// test can wait for it to finish unwinding.
+    private(set) var applyTask: Task<Void, Never>?
+
+    /// Runs the plan the user reviewed. Held as a task so it can be cancelled.
+    func applyReviewedPlan() {
+        guard applyTask == nil, let plan = updatePlan, !itemsThatWouldRun.isEmpty else { return }
+        applyTask = Task { [weak self] in
+            await self?.apply(plan)
+            self?.applyTask = nil
+        }
+    }
+
+    /// Stops a batch in progress. The engine stops before the next item, and
+    /// the running command is signalled rather than left to finish unwatched.
+    func cancelApply() {
+        applyTask?.cancel()
+    }
+
+    private func apply(_ plan: PlanReport) async {
+        guard !isApplying else { return }
+        isApplying = true
+        defer {
+            isApplying = false
+            runningItem = nil
+        }
+        executionProblem = nil
+        executionReport = nil
+        startedItems = []
+
+        let loaded = loadConfiguration()
+        guard let paths = try? resolvedPaths() else {
+            executionProblem = "MacUp could not resolve where its files live, so it changed nothing."
+            return
+        }
+        let count = itemsThatWouldRun.count
+        let approval = await ApprovalGate(
+            settings: loaded.configuration.security,
+            authorizer: authorizer,
+            faceUnlock: faceUnlock(loaded.configuration, paths: paths)
+        ).approve(count == 1 ? "apply one update on this Mac" : "apply \(count) updates on this Mac")
+        guard approval.allowsChange else {
+            executionProblem = approval.explanation
+            return
+        }
+
+        var runEnvironment = checkEnvironment(await loadEnvironment())
+        runEnvironment.runner = PlanProgressRunner(
+            base: environment.runner,
+            planned: plan.planned
+        ) { [weak self] item in
+            self?.noteRunning(item)
+        }
+
+        executionReport = await environment.makeExecutionEngine(paths).run(
+            plan,
+            configuration: loaded,
+            options: ExecutionOptions(
+                origin: .gui,
+                intent: .interactive,
+                confirmed: confirmedItems
+            ),
+            environment: runEnvironment
+        )
+        runningItem = nil
+        loadHistory()
+        // The versions on this Mac have moved, so what the Updates screen is
+        // showing is now out of date. Checking again is read-only.
+        await checkNow()
+    }
+
+    private func noteRunning(_ item: PackageID) {
+        runningItem = item
+        if !startedItems.contains(item) { startedItems.append(item) }
+    }
+
+    // MARK: - History
+
+    /// What MacUp attempted, newest first, including what it could not read.
+    private(set) var history: HistoryReading?
+    /// Why the history could not be read, if it could not.
+    private(set) var historyProblem: String?
+
+    /// Reads the history file. Reading never creates or changes it.
+    func loadHistory(limit: Int = 250) {
+        historyProblem = nil
+        guard let paths = try? resolvedPaths() else {
+            historyProblem = "MacUp could not resolve where its files live, so it did not look for a history."
+            return
+        }
+        do {
+            history = try HistoryStore(paths: paths).read(limit: limit)
+        } catch let error as MacUpError {
+            history = nil
+            historyProblem = [error.message, error.recoverySuggestion].compactMap { $0 }.joined(separator: " ")
+        } catch {
+            history = nil
+            historyProblem = "MacUp could not read its history."
+        }
+    }
+
+    // MARK: - Doctor
+
+    private(set) var doctorReport: DoctorReport?
+    private(set) var isDiagnosing = false
+    private(set) var doctorProblem: String?
+
+    /// Runs MacUp's deterministic diagnostics. Every check reads; none fixes.
+    func runDoctor() async {
+        guard !isDiagnosing else { return }
+        isDiagnosing = true
+        defer { isDiagnosing = false }
+        doctorProblem = nil
+
+        let processEnvironment = await loadEnvironment()
+        let loaded = loadConfiguration()
+        guard let paths = try? resolvedPaths() else {
+            doctorProblem = "MacUp could not resolve where its files live, so it could not check them."
+            return
+        }
+        doctorReport = await environment.doctorEngine.run(
+            configuration: loaded,
+            environment: checkEnvironment(processEnvironment),
+            paths: paths,
+            schedule: scheduleStatus
         )
     }
 

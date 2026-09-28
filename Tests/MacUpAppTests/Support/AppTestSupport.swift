@@ -256,10 +256,16 @@ final class AppModelHarness {
     let authorizer: FakeBiometricAuthorizer
     let camera: FakeFaceCamera
     let provider: StubCheckProvider
+    /// The provider that can also plan, run, and verify. When a test supplies
+    /// one it replaces ``provider`` everywhere, so the check the app shows and
+    /// the plan it builds come from the same place they would in the app.
+    let planning: StubPlanningProvider?
     let model: AppModel
 
     init(
         provider: StubCheckProvider = StubCheckProvider(),
+        planning: StubPlanningProvider? = nil,
+        doctorChecks: [any DiagnosticCheck] = [],
         capability: BiometricCapability = .touchID,
         camera: FakeFaceCamera = FakeFaceCamera(),
         loginShell: FakeLoginShell = FakeLoginShell()
@@ -268,6 +274,7 @@ final class AppModelHarness {
         authorizer = FakeBiometricAuthorizer(capability: capability)
         self.camera = camera
         self.provider = provider
+        self.planning = planning
         // The directories MacUp's own live under exist on a Mac that has been
         // used; MacUp creates only its own leaf directory, so a test home has
         // to look the same or it would be testing a different machine.
@@ -278,11 +285,25 @@ final class AppModelHarness {
             )
         }
         let bundledExecutablePath = home.canonicalPath + "/MacUp.app/Contents/Helpers/macup"
+        // One set of providers for every engine. A provider that can only be
+        // checked is given no planner and no executor at all, so a test that
+        // has not asked for one cannot accidentally run something.
+        let checkProviders: [any UpdateProvider] = planning.map { [$0] } ?? [provider]
+        let updateProviders: [any UpdateProvider] = planning.map { [$0] } ?? []
         model = AppModel(environment: AppEnvironment(
             runner: runner,
             fileSystem: fileSystem,
             authorizer: authorizer,
-            checkEngine: CheckEngine(providers: [provider]),
+            checkEngine: CheckEngine(providers: checkProviders),
+            planner: UpdatePlanner(providers: updateProviders),
+            makeExecutionEngine: { paths in
+                ExecutionEngine(
+                    providers: updateProviders,
+                    history: HistoryStore(paths: paths),
+                    configurationStore: ConfigurationStore(paths: paths)
+                )
+            },
+            doctorEngine: DoctorEngine(providers: checkProviders, checks: doctorChecks),
             faceCamera: camera,
             loginShell: loginShell,
             homeDirectory: home.canonicalPath,
