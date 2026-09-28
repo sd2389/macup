@@ -94,6 +94,18 @@ public final class FaceCamera: @unchecked Sendable {
         AVCaptureDevice.authorizationStatus(for: .video) == .authorized
     }
 
+    /// macOS's own answer about camera access, in words, so a refusal can be
+    /// told apart from a question that was never asked.
+    public static var accessDescription: String {
+        switch AVCaptureDevice.authorizationStatus(for: .video) {
+        case .authorized: return "allowed"
+        case .notDetermined: return "not asked yet"
+        case .denied: return "refused"
+        case .restricted: return "not allowed on this Mac"
+        @unknown default: return "unknown"
+        }
+    }
+
     public static var hasCamera: Bool {
         preferredDevice() != nil
     }
@@ -172,6 +184,7 @@ public final class FaceCamera: @unchecked Sendable {
         let session = try FaceCameraSession()
         lock.withLock { self.session = session }
         try await session.start()
+        try await session.waitForConnection()
     }
 
     public func end() {
@@ -183,64 +196,54 @@ public final class FaceCamera: @unchecked Sendable {
         session?.stop()
     }
 
-    /// Captures `count` frames, spaced out so they are not the same instant.
-    /// ``begin()`` must have been called.
+    /// Takes `count` still pictures, spaced out so they are not the same
+    /// instant. ``begin()`` must have been called.
     public func capture(count: Int, spacing: Duration = .milliseconds(300)) async throws -> [CGImage] {
         guard let session = lock.withLock({ self.session }) else {
             throw MacUpError(.verificationFailed, "The camera was not open.")
         }
         var frames: [CGImage] = []
-        // Generous, because the first frame after a cold start can take a
-        // moment, and a camera that is going to work usually works at once.
-        let deadline = ContinuousClock.now.advanced(by: .seconds(20))
-        while frames.count < count {
-            if ContinuousClock.now > deadline {
-                // Say which half failed. "No pictures" covers two very
-                // different faults: a camera that sends nothing, and a camera
-                // whose pictures MacUp could not read.
-                let counts = session.counts()
-                let detail: String
-                let suggestion: String
+        for index in 0..<count {
+            if index > 0 { try await Task.sleep(for: spacing) }
+            do {
+                frames.append(try await session.capturePhoto())
+            } catch let error as MacUpError {
+                // One bad frame is not a failed enrolment; running out is.
+                if frames.isEmpty && index == count - 1 { throw error }
                 if let fault = session.fault {
-                    detail = "The camera stopped sending pictures: \(fault)."
-                    suggestion = "Close anything else using the camera and try again."
-                } else if counts.received == 0 {
-                    detail = session.connectionIsActive
-                        ? "The camera is open and connected but sent MacUp no pictures."
-                        : "The camera is open but macOS never made its video connection active, so no pictures arrived."
-                    suggestion = session.connectionIsActive
-                        ? "Another app may be holding the camera. Close it and try again."
-                        : "Enroll from the MacUp app rather than the command line: macOS only streams the camera to a signed app bundle."
-                } else if counts.converted == 0 {
-                    detail = "The camera sent \(counts.received) pictures and MacUp could not read any of them."
-                    suggestion = "Please report this with the camera model shown above."
-                } else {
-                    detail = "The camera sent only \(frames.count) of \(count) usable pictures in time."
-                    suggestion = "Try again in better light."
+                    throw MacUpError(
+                        .verificationFailed,
+                        "The camera stopped: \(fault).",
+                        recoverySuggestion: "Close anything else using the camera and try again."
+                    )
                 }
-                throw MacUpError(.timeout, detail, recoverySuggestion: suggestion)
             }
-            try await Task.sleep(for: spacing)
-            if let frame = session.latestFrame() { frames.append(frame) }
+        }
+        guard !frames.isEmpty else {
+            throw MacUpError(
+                .timeout,
+                session.fault.map { "The camera stopped: \($0)." }
+                    ?? "The camera took no usable pictures.",
+                recoverySuggestion: "Close anything else using the camera and try again."
+            )
         }
         return frames
     }
 }
 
 /// The AVFoundation plumbing, kept apart from the policy above.
-final class FaceCameraSession: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate, @unchecked Sendable {
+///
+/// Still capture rather than a video stream. A video data output is the
+/// obvious choice and it is the one that failed: macOS ran the session and
+/// delivered no sample buffer at all. Asking for photographs is both what
+/// this feature actually wants and a path that works.
+final class FaceCameraSession: NSObject, AVCapturePhotoCaptureDelegate, @unchecked Sendable {
     let session = AVCaptureSession()
-    private let output = AVCaptureVideoDataOutput()
+    private let output = AVCapturePhotoOutput()
     private let queue = DispatchQueue(label: "dev.macup.face-camera")
     private let lock = NSLock()
-    private var frame: CGImage?
-    /// Counted separately so a failure can say whether the camera sent
-    /// nothing or sent pictures MacUp could not read.
-    private var received = 0
-    private var converted = 0
-    /// What macOS said went wrong, if it said anything. Without this, a
-    /// session that fails at runtime looks exactly like one that is merely
-    /// slow.
+    private var pending: CheckedContinuation<CGImage, any Error>?
+    /// What macOS said went wrong, if it said anything.
     private var sessionFault: String?
     private var observers: [any NSObjectProtocol] = []
     private static let context = CIContext()
@@ -254,22 +257,15 @@ final class FaceCameraSession: NSObject, AVCaptureVideoDataOutputSampleBufferDel
         guard let device, let input = try? AVCaptureDeviceInput(device: device), session.canAddInput(input) else {
             throw MacUpError(.providerUnavailable, "MacUp could not open the camera.")
         }
-        // Order matters: configure the graph, commit it, and only then set
-        // the output's format and delegate. Doing either before the output
-        // belongs to a session leaves it attached to nothing.
         session.beginConfiguration()
-        session.sessionPreset = .high
+        session.sessionPreset = .photo
         session.addInput(input)
         guard session.canAddOutput(output) else {
             session.commitConfiguration()
-            throw MacUpError(.providerUnavailable, "MacUp could not read pictures from the camera.")
+            throw MacUpError(.providerUnavailable, "MacUp could not take pictures with the camera.")
         }
         session.addOutput(output)
         session.commitConfiguration()
-
-        output.alwaysDiscardsLateVideoFrames = true
-        output.videoSettings = [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA]
-        output.setSampleBufferDelegate(self, queue: queue)
 
         observe()
 
@@ -280,22 +276,164 @@ final class FaceCameraSession: NSObject, AVCaptureVideoDataOutputSampleBufferDel
             )
         }
         if !connection.isEnabled { connection.isEnabled = true }
-        guard connection.isActive || connection.isEnabled else {
+    }
+
+    /// Starts the session and returns once it is running.
+    func start() async throws {
+        let session = session
+        await withCheckedContinuation { continuation in
+            queue.async {
+                session.startRunning()
+                continuation.resume()
+            }
+        }
+        guard session.isRunning else {
             throw MacUpError(
                 .providerUnavailable,
-                "The video connection to \(device.localizedName) is not active."
+                "The camera did not start.",
+                recoverySuggestion: "Another app may be using it. Close it and try again."
             )
         }
     }
 
-    /// Whether macOS considers the video connection live, for diagnostics.
-    var connectionIsActive: Bool {
-        output.connection(with: .video)?.isActive ?? false
+    func stop() {
+        let session = session
+        queue.async { session.stopRunning() }
     }
 
-    /// What macOS reported about the session, if anything.
     var fault: String? {
         lock.withLock { sessionFault }
+    }
+
+    /// Waits for macOS to make the photo connection live. It is not active
+    /// the moment the session starts, and capturing before it is throws an
+    /// Objective-C exception that Swift cannot catch.
+    func waitForConnection() async throws {
+        for _ in 0..<40 {
+            if let connection = output.connection(with: .video), connection.isActive, connection.isEnabled {
+                return
+            }
+            try await Task.sleep(for: .milliseconds(100))
+        }
+        if let fault {
+            throw MacUpError(
+                .providerUnavailable,
+                "The camera stopped before it was ready: \(fault).",
+                recoverySuggestion: "Close anything else using the camera and try again."
+            )
+        }
+        // macOS reporting access as still undecided after it was asked means
+        // it declined to decide, which it does for a build it cannot
+        // attribute to a developer. The connection then never goes live.
+        let undecided = AVCaptureDevice.authorizationStatus(for: .video) == .notDetermined
+        throw MacUpError(
+            .authorizationRequired,
+            undecided
+                ? "macOS never granted MacUp access to the camera, so its connection never went live."
+                : "macOS never made the camera's connection active.",
+            recoverySuggestion: undecided
+                ? "This build is signed ad-hoc, which macOS will not attribute to a developer. A signed build, or resetting this app's camera decision, is needed before it can ask you."
+                : "Close anything else using the camera and try again."
+        )
+    }
+
+    /// Takes one picture. Fails rather than hanging if macOS never answers.
+    ///
+    /// Every precondition `capturePhotoWithSettings:delegate:` documents is
+    /// checked first, because it reports a violation by throwing an
+    /// Objective-C exception, which in Swift is a crash rather than an error.
+    func capturePhoto() async throws -> CGImage {
+        guard session.isRunning else {
+            throw MacUpError(.providerUnavailable, "The camera stopped running.")
+        }
+        guard let connection = output.connection(with: .video), connection.isActive, connection.isEnabled else {
+            throw MacUpError(.providerUnavailable, "The camera's connection is not active.")
+        }
+        guard let settings = photoSettings() else {
+            throw MacUpError(
+                .unsupported,
+                "The camera offered MacUp no picture format it can read."
+            )
+        }
+        return try await withThrowingTaskGroup(of: CGImage.self) { group in
+            group.addTask { [self] in
+                try await withCheckedThrowingContinuation { continuation in
+                    let busy: Bool = lock.withLock {
+                        if pending != nil { return true }
+                        pending = continuation
+                        return false
+                    }
+                    if busy {
+                        continuation.resume(throwing: MacUpError(
+                            .verificationFailed, "MacUp asked for two pictures at once."
+                        ))
+                        return
+                    }
+                    output.capturePhoto(with: settings, delegate: self)
+                }
+            }
+            group.addTask { [self] in
+                try await Task.sleep(for: .seconds(8))
+                finish(.failure(MacUpError(.timeout, "The camera did not return a picture.")))
+                throw MacUpError(.timeout, "The camera did not return a picture.")
+            }
+            defer { group.cancelAll() }
+            guard let image = try await group.next() else {
+                throw MacUpError(.timeout, "The camera did not return a picture.")
+            }
+            return image
+        }
+    }
+
+    /// Uncompressed only. A compressed photo has no pixel buffer on macOS,
+    /// and MacUp needs pixels, not a JPEG it cannot open. `nil` when the
+    /// camera offers nothing uncompressed, which is reported rather than
+    /// guessed around. The list is only populated once the session runs.
+    private func photoSettings() -> AVCapturePhotoSettings? {
+        let available = output.availablePhotoPixelFormatTypes
+        guard !available.isEmpty else { return nil }
+        let format = available.contains(kCVPixelFormatType_32BGRA) ? kCVPixelFormatType_32BGRA : available[0]
+        return AVCapturePhotoSettings(format: [kCVPixelBufferPixelFormatTypeKey as String: format])
+    }
+
+    private func finish(_ result: Result<CGImage, any Error>) {
+        let continuation = lock.withLock {
+            let pending = self.pending
+            self.pending = nil
+            return pending
+        }
+        continuation?.resume(with: result)
+    }
+
+    func photoOutput(
+        _ output: AVCapturePhotoOutput,
+        didFinishProcessingPhoto photo: AVCapturePhoto,
+        error: (any Error)?
+    ) {
+        if let error {
+            finish(.failure(MacUpError(
+                .verificationFailed,
+                "The camera could not take a picture: \(TerminalText.sanitize(error.localizedDescription))."
+            )))
+            return
+        }
+        guard let buffer = photo.pixelBuffer, let image = Self.makeImage(from: buffer) else {
+            finish(.failure(MacUpError(.parseFailed, "MacUp could not read the picture the camera took.")))
+            return
+        }
+        finish(.success(image))
+    }
+
+    /// VideoToolbox converts a pixel buffer without a render pass, which is
+    /// both cheaper and less likely to fail than going through Core Image.
+    /// Core Image remains the fallback.
+    static func makeImage(from buffer: CVPixelBuffer) -> CGImage? {
+        var image: CGImage?
+        if VTCreateCGImageFromCVPixelBuffer(buffer, options: nil, imageOut: &image) == noErr, let image {
+            return image
+        }
+        let ciImage = CIImage(cvPixelBuffer: buffer)
+        return context.createCGImage(ciImage, from: ciImage.extent)
     }
 
     private func observe() {
@@ -325,69 +463,6 @@ final class FaceCameraSession: NSObject, AVCaptureVideoDataOutputSampleBufferDel
     deinit {
         let observers = lock.withLock { self.observers }
         for observer in observers { NotificationCenter.default.removeObserver(observer) }
-    }
-
-    /// Starts the session and returns once it is running, so a caller never
-    /// waits for frames from a session that failed to start.
-    func start() async throws {
-        let session = session
-        await withCheckedContinuation { continuation in
-            queue.async {
-                session.startRunning()
-                continuation.resume()
-            }
-        }
-        guard session.isRunning else {
-            throw MacUpError(
-                .providerUnavailable,
-                "The camera did not start.",
-                recoverySuggestion: "Another app may be using it. Close it and try again."
-            )
-        }
-    }
-
-    func stop() {
-        output.setSampleBufferDelegate(nil, queue: nil)
-        let session = session
-        queue.async { session.stopRunning() }
-    }
-
-    func latestFrame() -> CGImage? {
-        lock.withLock {
-            let frame = self.frame
-            self.frame = nil
-            return frame
-        }
-    }
-
-    func counts() -> (received: Int, converted: Int) {
-        lock.withLock { (received, converted) }
-    }
-
-    /// VideoToolbox converts a pixel buffer without a render pass, which is
-    /// both cheaper and less likely to fail on a background queue than going
-    /// through Core Image. Core Image remains the fallback.
-    static func makeImage(from buffer: CVPixelBuffer) -> CGImage? {
-        var image: CGImage?
-        if VTCreateCGImageFromCVPixelBuffer(buffer, options: nil, imageOut: &image) == noErr, let image {
-            return image
-        }
-        let ciImage = CIImage(cvPixelBuffer: buffer)
-        return context.createCGImage(ciImage, from: ciImage.extent)
-    }
-
-    func captureOutput(
-        _ output: AVCaptureOutput,
-        didOutput sampleBuffer: CMSampleBuffer,
-        from connection: AVCaptureConnection
-    ) {
-        lock.withLock { received += 1 }
-        guard let buffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
-        guard let cgImage = Self.makeImage(from: buffer) else { return }
-        lock.withLock {
-            converted += 1
-            frame = cgImage
-        }
     }
 }
 

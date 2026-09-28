@@ -104,6 +104,12 @@ struct ContentView: View {
             }
         }
         .task {
+            #if DEBUG
+            if FaceCheck.requested {
+                await FaceCheck.run()
+                return
+            }
+            #endif
             if model.report == nil || model.report?.cancelled == true { await model.checkNow() }
             #if DEBUG
             if let directory = Snapshots.directory {
