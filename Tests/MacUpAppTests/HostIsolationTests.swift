@@ -31,26 +31,69 @@ struct HostIsolationTests {
         #expect(loaded.source == .defaults)
     }
 
+    /// The only real paths the app is ever allowed to name: the login shell it
+    /// reads the environment from, and launchctl. The fake runner refuses both.
+    private static let permittedRealPaths: Set<String> = [
+        "/bin/zsh", "/bin/bash", "/bin/sh", "/bin/dash", Scheduler.launchctlPath,
+    ]
+
     @Test("Nothing a test does runs a provider command or launchctl")
     func noCommandReachesTheHost() async throws {
-        let harness = try AppModelHarness(provider: StubCheckProvider(updateNames: ["git"]))
-            .withScheduledExecutable()
+        let git = try PackageID(parsing: "brew:git")
+        let harness = try AppModelHarness(
+            planning: StubPlanningProvider(candidates: [PlannedUpdateFactory.candidate("brew:git")]),
+            doctorChecks: [StubDiagnosticCheck()]
+        ).withScheduledExecutable()
+        try harness.rule(.auto, for: git)
+        harness.allowUpdate(of: "git")
+
+        // Every screen that can reach the outside world, including the one
+        // that applies a change.
         await harness.model.checkNow()
         await harness.model.refreshScheduleStatus()
         await harness.model.applySchedule(MacUpConfiguration.ScheduleSettings(enabled: true))
         await harness.model.applySecurity(MacUpConfiguration.SecuritySettings(requireApproval: true))
+        await harness.model.setPolicy(.ask, for: git)
+        await harness.model.runDoctor()
+        await harness.model.showCommand(for: git)
+        await harness.reviewEverything()
+        await harness.applyAndWait()
+        harness.model.loadHistory()
         await harness.enroll()
 
-        // Every request the fake runner saw. It answers nothing it was not
-        // told to, so an unexpected command fails rather than escaping; this
-        // names what was attempted so a regression is legible.
-        let attempted = Set(harness.launchedExecutables.map { ($0 as NSString).lastPathComponent })
-        for forbidden in ["brew", "npm", "node", "mise", "softwareupdate"] {
-            #expect(!attempted.contains(forbidden), "a test tried to run \(forbidden)")
+        // Every executable path any command was given. The fake runner
+        // launches nothing, so this is what the app *named*, and nothing on
+        // it may be a package manager that exists on this Mac.
+        for path in harness.launchedExecutables where !Self.permittedRealPaths.contains(path) {
+            #expect(path.hasPrefix("/stub/"), "a test named \(path), which is not one of this suite's stubs")
+            #expect(
+                !FileManager.default.fileExists(atPath: path),
+                "\(path) is a real executable on this Mac"
+            )
         }
-        // Reading the login shell's environment is the one thing the app asks
-        // of a shell, and the fake runner refuses it too.
-        #expect(attempted.subtracting(["zsh", "bash", "sh", "fish", "launchctl"]).isEmpty)
+        let attempted = Set(harness.launchedExecutables.map { ($0 as NSString).lastPathComponent })
+        #expect(attempted.subtracting(["zsh", "bash", "sh", "fish", "launchctl", "brew"]).isEmpty)
+    }
+
+    @Test("Applying an update writes MacUp's history inside the throwaway home only")
+    func historyIsWrittenInsideTheTemporaryHome() async throws {
+        let git = try PackageID(parsing: "brew:git")
+        let harness = try AppModelHarness(planning: StubPlanningProvider(
+            candidates: [PlannedUpdateFactory.candidate("brew:git")]
+        ))
+        try harness.rule(.auto, for: git)
+        harness.allowUpdate(of: "git")
+        await harness.reviewEverything()
+        await harness.applyAndWait()
+
+        // The run really did record something, or this would prove nothing.
+        #expect(try harness.recordedHistory().count == 1)
+        #expect(FileManager.default.fileExists(atPath: harness.paths.historyFile))
+        #expect(harness.paths.historyFile.hasPrefix(harness.home.canonicalPath))
+
+        let real = MacUpPaths.standard(homeDirectory: FileManager.default.homeDirectoryForCurrentUser.path)
+        #expect(harness.paths.historyFile != real.historyFile)
+        #expect(harness.paths.configFile != real.configFile)
     }
 
     @Test("No test opens a camera or shows an authentication prompt")

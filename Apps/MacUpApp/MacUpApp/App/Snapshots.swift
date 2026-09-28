@@ -37,8 +37,17 @@ enum Snapshots {
             for (section, name) in sections {
                 model.section = section
                 try? await Task.sleep(for: .milliseconds(700))
+                // Doctor runs a second, fuller check of its own, so waiting
+                // for it is the difference between photographing the findings
+                // and photographing a spinner.
+                var waited = 0
+                while model.isDiagnosing && waited < 60 {
+                    try? await Task.sleep(for: .milliseconds(250))
+                    waited += 1
+                }
                 if let main { write(main, to: directory, named: "\(name)-\(suffix).png") }
             }
+            await captureSheets(model: model, main: main, into: directory, suffix: suffix)
         }
         openSettings()
         try? await Task.sleep(for: .milliseconds(1200))
@@ -49,6 +58,46 @@ enum Snapshots {
             write(settings, to: directory, named: "settings-light.png")
         }
         NSApp.terminate(nil)
+    }
+
+    /// The two sheets the Updates screen can open, which are windows of their
+    /// own and so are not captured by photographing the main one.
+    ///
+    /// Both are read-only: opening a review builds a plan, and building a plan
+    /// runs nothing. Nothing here presses Apply, and nothing here ever will —
+    /// a snapshot run must be as safe to start as `macup check`.
+    @MainActor
+    private static func captureSheets(
+        model: AppModel,
+        main: NSWindow?,
+        into directory: PrivateDirectory,
+        suffix: String
+    ) async {
+        guard let item = model.report?.updates.first?.id else { return }
+        model.section = .updates
+
+        await model.reviewUpdates()
+        try? await Task.sleep(for: .milliseconds(900))
+        if let sheet = main?.attachedSheet { write(sheet, to: directory, named: "review-\(suffix).png") }
+        model.endReview()
+        try? await Task.sleep(for: .milliseconds(500))
+
+        // One item with its commands open, because the command list is the
+        // half of the sheet that would be easiest to get wrong unnoticed, and
+        // a one-item review is short enough to fit on screen.
+        model.reviewShowsCommands = true
+        await model.reviewUpdates([item])
+        try? await Task.sleep(for: .milliseconds(900))
+        if let sheet = main?.attachedSheet { write(sheet, to: directory, named: "review-commands-\(suffix).png") }
+        model.reviewShowsCommands = false
+        model.endReview()
+        try? await Task.sleep(for: .milliseconds(500))
+
+        await model.showCommand(for: item)
+        try? await Task.sleep(for: .milliseconds(900))
+        if let sheet = main?.attachedSheet { write(sheet, to: directory, named: "command-\(suffix).png") }
+        model.dismissCommand()
+        try? await Task.sleep(for: .milliseconds(500))
     }
 
     @MainActor

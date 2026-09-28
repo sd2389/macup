@@ -21,10 +21,27 @@ struct UpdatesView: View {
                             Text("These results are incomplete")
                         }
                     }
+                    if let change = model.lastPolicyChange {
+                        Section {
+                            Label(change.summary.displaySafe, systemImage: "checkmark.circle")
+                            ForEach(change.warnings, id: \.self) { warning in
+                                Label(warning.displaySafe, systemImage: "exclamationmark.triangle")
+                            }
+                        } header: {
+                            Text("Rule changed")
+                        }
+                    }
+                    if let problem = model.policyProblem {
+                        Section {
+                            Label(problem.displaySafe, systemImage: "xmark.octagon")
+                        } header: {
+                            Text("The rule was not changed")
+                        }
+                    }
                     ForEach(report.providers.filter { !report.updates(for: $0.provider).isEmpty }, id: \.provider) { provider in
                         Section(provider.displayName) {
                             ForEach(report.updates(for: provider.provider)) { update in
-                                UpdateRow(update: update).tag(update.id)
+                                UpdateRow(update: update, decision: model.decisions[update.id]).tag(update.id)
                             }
                         }
                     }
@@ -47,14 +64,25 @@ struct UpdatesView: View {
         .inspector(isPresented: $showsInspector) {
             Group {
                 if let update = updates.first(where: { $0.id == model.selectedUpdate }) {
-                    UpdateDetail(update: update)
+                    UpdateDetail(update: update, decision: model.decisions[update.id])
                 } else {
                     ContentUnavailableView("No Selection", systemImage: "sidebar.trailing", description: Text("Select an update to see its details."))
                 }
             }
-            .inspectorColumnWidth(min: 300, ideal: 340, max: 460)
+            .inspectorColumnWidth(min: 300, ideal: 360, max: 480)
         }
         .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    Task { await model.reviewUpdates() }
+                } label: {
+                    Label("Review Updates", systemImage: "list.bullet.rectangle")
+                }
+                .disabled(updates.isEmpty || model.isPlanning || model.isApplying)
+                // Deliberately not "Update All": the review shows what would
+                // change and what would not, and nothing runs until Apply.
+                .help("See exactly what MacUp would run, and what it would leave alone")
+            }
             ToolbarItem {
                 Button {
                     showsInspector.toggle()
@@ -64,33 +92,164 @@ struct UpdatesView: View {
                 .help("Show or hide details")
             }
         }
+        .sheet(isPresented: $model.isReviewingPlan) {
+            ReviewSheet()
+        }
+        .sheet(isPresented: $model.isShowingCommand) {
+            CommandSheet()
+        }
     }
 }
 
+/// One update: what it is, where it came from, what policy says, and the two
+/// controls that change something.
 private struct UpdateRow: View {
+    @Environment(AppModel.self) private var model
     let update: UpdateCandidate
+    let decision: PolicyDecision?
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline) {
-            VStack(alignment: .leading, spacing: 2) {
+        // The controls sit on their own line rather than beside the text, so
+        // a long package name cannot squeeze a button until its label wraps
+        // one letter per line.
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
                 Text(update.displayName.displaySafe).fontWeight(.medium)
-                Text(update.id.rawValue.displaySafe).font(.caption).foregroundStyle(.secondary)
-            }
-            Spacer()
-            VStack(alignment: .trailing, spacing: 2) {
+                Spacer(minLength: 8)
                 Text("\(update.installedVersion?.raw.displaySafe ?? "Unknown") → \(update.availableVersion.raw.displaySafe)")
                     .monospacedDigit()
-                RiskLabel(level: update.risk.level).font(.caption)
+                    .accessibilityLabel(
+                        "\(update.installedVersion?.raw ?? "unknown version") to \(update.availableVersion.raw)"
+                    )
             }
+            HStack(spacing: 10) {
+                Text(update.id.rawValue.displaySafe)
+                Label(update.provider.displayName, systemImage: update.provider.symbolName)
+                if let decision {
+                    PolicyLabel(policy: decision.policy)
+                }
+                RiskLabel(level: update.risk.level)
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            if let reason = decision?.reason {
+                Text(reason.displaySafe)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            HStack(spacing: 8) {
+                Spacer(minLength: 0)
+                ItemPolicyPicker(item: update.id)
+                Button("Update…") { Task { await model.reviewUpdates([update.id]) } }
+                    .disabled(!canApply || model.isPlanning || model.isApplying)
+                    .help(applyHelp)
+                    .accessibilityLabel("Review an update for \(update.displayName)")
+                    .accessibilityHint(applyHelp)
+            }
+            .padding(.top, 2)
         }
-        .padding(.vertical, 3)
+        .padding(.vertical, 5)
         // Run the row separator under the whole row, not just the last label.
         .alignmentGuide(.listRowSeparatorLeading) { $0[.leading] }
+        // An ignored or pinned item stays legible: the decision the user made
+        // is the information, so it is never greyed out into invisibility.
+        .accessibilityElement(children: .contain)
+    }
+
+    /// MacUp offers to apply an update only when the provider can apply one
+    /// and policy has not already refused it. Everything else gets the reason
+    /// instead of a button that would fail.
+    private var canApply: Bool {
+        model.canApplyUpdates(of: update.provider) && decision?.allowsExecution != false
+    }
+
+    private var applyHelp: String {
+        if !model.canApplyUpdates(of: update.provider) {
+            return "MacUp reports \(update.provider.displayName) updates but does not apply them. Use View Command to see what it would take."
+        }
+        if decision?.allowsExecution == false {
+            return decision?.reason ?? "MacUp will not change this item."
+        }
+        return "Review the exact command before anything runs"
+    }
+}
+
+/// The rule for one item, written through ``PolicyEditor`` and nowhere else.
+///
+/// "Use the default" removes the rule rather than writing `inherit`, because a
+/// rule that says "inherit" and no rule at all mean the same thing, and having
+/// one fewer way to say it keeps the configuration file honest.
+struct ItemPolicyPicker: View {
+    @Environment(AppModel.self) private var model
+    let item: PackageID
+
+    var body: some View {
+        // A menu rather than a pop-up button: the options have to name what
+        // the default is, and a pop-up button would put that whole sentence
+        // in the row.
+        Menu {
+            Picker("Policy", selection: selection) {
+                Text("Use the Default (\(inherited.displayName))").tag(UpdatePolicy.inherit)
+                Text(UpdatePolicy.auto.displayName).tag(UpdatePolicy.auto)
+                Text(UpdatePolicy.ask.displayName).tag(UpdatePolicy.ask)
+                Text(UpdatePolicy.ignore.displayName).tag(UpdatePolicy.ignore)
+                // Pin is offered only where the provider has a pin of its
+                // own, so the menu never contains a word MacUp cannot act on
+                // (CLAUDE.md §13).
+                if model.supportsPin(item.provider) || rule == .pin {
+                    Text(UpdatePolicy.pin.displayName).tag(UpdatePolicy.pin)
+                }
+            }
+            .pickerStyle(.inline)
+            .labelsHidden()
+        } label: {
+            Label(effective.displayName, systemImage: effective.symbolName)
+        }
+        .menuStyle(.button)
+        .fixedSize()
+        .disabled(model.isChangingPolicy)
+        .accessibilityLabel("Update policy for \(item.name), currently \(effective.displayName)")
+        .help(rule == nil
+            ? "\(item.name) follows the default. Choose a rule of its own here."
+            : "\(item.name) has a rule of its own.")
+    }
+
+    /// What this item gets today, whether from its own rule or inherited.
+    private var effective: UpdatePolicy { rule ?? inherited }
+
+    private var rule: UpdatePolicy? {
+        model.policyRules.rule(for: item)?.policy
+    }
+
+    /// What this item would get with no rule of its own.
+    private var inherited: UpdatePolicy {
+        let rules = model.policyRules
+        let provider = rules.rule(for: item.provider)?.policy ?? .inherit
+        return provider == .inherit ? rules.defaultPolicy : provider
+    }
+
+    private var selection: Binding<UpdatePolicy> {
+        Binding(
+            get: { rule ?? .inherit },
+            set: { policy in
+                Task {
+                    if policy == .inherit {
+                        await model.clearPolicy(for: item)
+                    } else {
+                        await model.setPolicy(policy, for: item)
+                    }
+                }
+            }
+        )
     }
 }
 
 private struct UpdateDetail: View {
+    @Environment(AppModel.self) private var model
     let update: UpdateCandidate
+    let decision: PolicyDecision?
 
     var body: some View {
         Form {
@@ -107,10 +266,33 @@ private struct UpdateDetail: View {
                 LabeledContent("Change", value: update.versionChange.displayName.capitalizedFirst)
             }
 
+            Section("Policy") {
+                if let decision {
+                    LabeledContent("In effect") { PolicyLabel(policy: decision.policy) }
+                    Text(decision.reason.displaySafe).foregroundStyle(.secondary)
+                }
+                LabeledContent("Rule for this item") { ItemPolicyPicker(item: update.id) }
+                if !model.supportsPin(update.provider) {
+                    Text("\(update.provider.displayName) has no pin of its own, so MacUp does not offer one here.")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                }
+                if !model.canApplyUpdates(of: update.provider) {
+                    Text("MacUp reports \(update.provider.displayName) updates and does not apply them in this version.")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
             Section("Risk") {
                 RiskLabel(level: update.risk.level)
                 ForEach(update.risk.reasons, id: \.self) { reason in
                     Text(reason.displaySafe).foregroundStyle(.secondary)
+                }
+                ForEach(update.signals, id: \.self) { signal in
+                    Label(signal.explanation, systemImage: "info.circle")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
                 }
             }
 
@@ -143,9 +325,16 @@ private struct UpdateDetail: View {
             }
 
             Section {
-                Text("MacUp doesn't install updates yet. This version only reports them.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
+                Button("View Command…") { Task { await model.showCommand(for: update.id) } }
+                    .disabled(model.isPlanning || model.isApplying)
+                    .help("The exact executable and arguments MacUp would run for this item")
+                Button("Review Update…") { Task { await model.reviewUpdates([update.id]) } }
+                    .disabled(
+                        !model.canApplyUpdates(of: update.provider)
+                            || decision?.allowsExecution == false
+                            || model.isPlanning
+                            || model.isApplying
+                    )
             }
         }
         .formStyle(.grouped)

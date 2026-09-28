@@ -47,6 +47,15 @@ private struct FeatureCard<Detail: View>: View {
     /// False when this Mac cannot do the thing at all, so the switch is not
     /// offered as though it could. ``state`` says why.
     var canChange = true
+    /// Whether the panel below the divider has anything in it.
+    ///
+    /// SwiftUI cannot answer this for us. A `ViewBuilder` whose content is
+    /// entirely conditional still has a concrete type, so `Detail.self` is
+    /// never `EmptyView` even when every branch is false — which is how the
+    /// scheduling card came to draw a divider over an empty panel whenever
+    /// scheduling was off. A card whose detail can be empty says so here, and
+    /// the divider and its padding go with it.
+    var hasDetail = true
     var state: String?
     @ViewBuilder var detail: Detail
 
@@ -76,7 +85,7 @@ private struct FeatureCard<Detail: View>: View {
             }
             .padding(16)
 
-            if state != nil || hasDetail {
+            if state != nil || showsDetail {
                 Divider()
                 VStack(alignment: .leading, spacing: 12) {
                     if let state {
@@ -96,7 +105,7 @@ private struct FeatureCard<Detail: View>: View {
         .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(.separator))
     }
 
-    private var hasDetail: Bool { !(Detail.self == EmptyView.self) }
+    private var showsDetail: Bool { hasDetail && Detail.self != EmptyView.self }
 }
 
 // MARK: - Automatic checks
@@ -113,6 +122,7 @@ private struct AutomaticChecksFeature: View {
             summary: "Look for updates on a schedule. The check only reports; it never installs anything.",
             isOn: enabled,
             isBusy: model.isChangingSchedule,
+            hasDetail: hasDetail,
             state: state
         ) {
             if draft.enabled {
@@ -165,6 +175,15 @@ private struct AutomaticChecksFeature: View {
         guard !model.isChangingSchedule else { return }
         draft = model.scheduleSettings
         loaded = true
+    }
+
+    /// The detail panel here is the frequency and time controls, the
+    /// scheduler's warnings, and a failure. With scheduling off and nothing
+    /// wrong there is none of it, and the card should stop at its summary.
+    private var hasDetail: Bool {
+        draft.enabled
+            || !(model.scheduleStatus?.warnings ?? []).isEmpty
+            || model.scheduleProblem != nil
     }
 
     /// Turning it on or off applies at once; the details below get one Apply,

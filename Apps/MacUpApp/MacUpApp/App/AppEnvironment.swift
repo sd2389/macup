@@ -104,6 +104,15 @@ struct AppEnvironment {
     /// The read-only check, injected whole, so a test runs the real engine
     /// over stub providers rather than over the machine it is running on.
     var checkEngine: CheckEngine
+    /// Turns the candidates a check found into reviewable plans. Injected for
+    /// the same reason as the check engine, and it launches nothing either.
+    var planner: UpdatePlanner
+    /// Builds the engine that runs a plan. A closure because the engine needs
+    /// the paths MacUp resolved at the time, and because a test supplies
+    /// providers whose commands the fake runner refuses.
+    var makeExecutionEngine: (MacUpPaths) -> ExecutionEngine
+    /// MacUp's deterministic diagnostics.
+    var doctorEngine: DoctorEngine
     var faceCamera: any FaceEnrolling
     var loginShell: any LoginShellReading
     var homeDirectory: String
@@ -128,6 +137,9 @@ struct AppEnvironment {
             fileSystem: fileSystem,
             authorizer: LocalAuthenticator(),
             checkEngine: .standard(),
+            planner: .standard(),
+            makeExecutionEngine: { ExecutionEngine.standard(paths: $0) },
+            doctorEngine: .standard(),
             faceCamera: SystemFaceCamera(),
             loginShell: SystemLoginShell(
                 runner: runner,

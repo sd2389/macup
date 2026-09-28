@@ -140,13 +140,14 @@ struct MenuBarContent: View {
         ForEach(model.status.reasons, id: \.self) { reason in
             Text(reason)
         }
+        // The decisions the user already made, so the menu's count is never
+        // quietly larger than what Review Updates would actually change
+        // (CLAUDE.md §21). There is still no blind "update everything" here.
+        ForEach(decisionLines, id: \.self) { line in
+            Text(line)
+        }
         if let report = model.report {
             Text("Last checked at \(report.finishedAt.formatted(date: .omitted, time: .shortened))")
-        }
-        // Only when a check will really happen: an agent that is installed and
-        // loaded, not merely a schedule written in the configuration.
-        if let status = model.scheduleStatus, status.isActive, let next = status.nextRun {
-            Text("Next check \(next.formatted(date: .abbreviated, time: .shortened))")
         }
         Divider()
         Button("Review Updates…") { show(.updates) }
@@ -155,10 +156,34 @@ struct MenuBarContent: View {
             .disabled(model.isChecking)
         Divider()
         Button("Open MacUp") { show(.dashboard) }
+        Button("History") { show(.history) }
         SettingsLink { Text("Settings…") }
         Divider()
         Button("Quit MacUp") { NSApp.terminate(nil) }
             .keyboardShortcut("q")
+    }
+
+    /// Only the counts MacUp has. A zero is left out rather than shown as a
+    /// reassuring nothing.
+    private var decisionLines: [String] {
+        var lines: [String] = []
+        switch model.updatesNeedingConfirmation {
+        case 0: break
+        case 1: lines.append("1 needs your confirmation")
+        case let count: lines.append("\(count) need your confirmation")
+        }
+        if model.ignoredUpdateCount > 0 {
+            lines.append("\(model.ignoredUpdateCount) ignored by your rules")
+        }
+        if model.pinnedUpdateCount > 0 {
+            lines.append("\(model.pinnedUpdateCount) held at the current version")
+        }
+        // Only when a check will really happen: an agent that is installed and
+        // loaded, not merely a schedule written in the configuration.
+        if let status = model.scheduleStatus, status.isActive, let next = status.nextRun {
+            lines.append("Next check \(next.formatted(date: .abbreviated, time: .shortened))")
+        }
+        return lines
     }
 
     private func show(_ section: AppModel.Section) {
