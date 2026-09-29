@@ -41,6 +41,9 @@ public enum RiskSignal: String, Sendable, Hashable, Codable, CaseIterable, Compa
     case buildsFromSource
     /// An earlier install of this item never finished.
     case installationIncomplete
+    /// An AI estimate the user asked for advises care (AI/UpdateInsight.swift).
+    /// It only ever adds caution: MacUp asks first.
+    case aiCaution
 
     public var explanation: String {
         switch self {
@@ -55,6 +58,7 @@ public enum RiskSignal: String, Sendable, Hashable, Codable, CaseIterable, Compa
         case .packageManagerSelfUpdate: "Updates a package manager itself"
         case .buildsFromSource: "Will be built from source, which can take a long time"
         case .installationIncomplete: "An earlier install of it did not finish"
+        case .aiCaution: "An AI estimate from TypeSafe advises care; see its note"
         }
     }
 
@@ -66,6 +70,12 @@ public enum RiskSignal: String, Sendable, Hashable, Codable, CaseIterable, Compa
             .high
         case .runtimeOrToolchain, .targetVersionNotGuaranteed, .mayRewriteConfiguration,
              .mayAffectDependents, .packageManagerSelfUpdate, .buildsFromSource:
+            .moderate
+        // Moderate, not high: an unclassifiable change must stay unknown,
+        // which asks first on its own, rather than become a high risk that
+        // `confirmMajorUpdates` could wave through. The policy engine asks
+        // first for this signal regardless.
+        case .aiCaution:
             .moderate
         }
     }

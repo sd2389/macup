@@ -25,7 +25,7 @@ public struct ConfigurationIssue: Sendable, Hashable, Codable {
 /// certainty is an error, because a misread policy could let an update run
 /// that the user meant to block.
 public enum ConfigurationValidator {
-    static let topLevelKeys: Set<String> = ["schemaVersion", "global", "providers", "items", "schedule", "privacy", "security"]
+    static let topLevelKeys: Set<String> = ["schemaVersion", "global", "providers", "items", "schedule", "privacy", "security", "ai"]
     static let globalKeys: Set<String> = ["defaultPolicy", "confirmMajorUpdates"]
     static let providerKeys: Set<String> = ["enabled", "policy", "executablePath"]
     static let itemKeys: Set<String> = ["policy", "skipVersion", "note"]
@@ -58,6 +58,7 @@ public enum ConfigurationValidator {
         check(object["schedule"], scheduleKeys, at: "schedule")
         check(object["security"], securityKeys, at: "security")
         check(object["privacy"], privacyKeys, at: "privacy")
+        check(object["ai"], aiKeys, at: "ai")
         if let providers = object["providers"] as? [String: Any] {
             for (name, value) in providers { check(value, providerKeys, at: "providers.\(name)") }
         }
@@ -165,6 +166,8 @@ public enum ConfigurationValidator {
                 "Face match is on but approval is not required, so MacUp never asks for it."
             ))
         }
+
+        issues += aiIssues(in: configuration)
 
         if configuration.privacy.telemetry {
             issues.append(ConfigurationIssue(

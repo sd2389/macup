@@ -256,6 +256,12 @@ public struct PolicyEngine: Sendable {
         if risk.level == .high, configuration.global.confirmMajorUpdates {
             return "Updating \(item.name) is a high-risk change (\(risk.reasons.first?.lowercased() ?? "reason unknown")), so it asks first."
         }
+        // Last, so it is the reason shown only when it is the one that made
+        // the difference. An estimate the user asked for can add this step
+        // and nothing can take it away: no setting switches it off.
+        if signals.contains(.aiCaution) {
+            return "An AI estimate from TypeSafe says updating \(item.name) needs extra care, so it asks first."
+        }
         return nil
     }
 
