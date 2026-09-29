@@ -151,11 +151,58 @@ public struct HomebrewProvider: UpdateProvider {
         guard result.succeeded else {
             throw MacUpError.commandFailed(result, "`brew info` failed.")
         }
-        return try HomebrewInventoryParser.parse(
+        var listing = try HomebrewInventoryParser.parse(
             result.standardOutput,
             ownership: ownership(installation),
             command: result.invocation.displayString
         )
+        if let prefix = installation.fact("prefix") {
+            listing.elements = Self.annotate(listing.elements, prefix: prefix, fileSystem: context.fileSystem)
+        }
+        return listing
+    }
+
+    /// Adds what Homebrew's JSON leaves out, read from the files Homebrew
+    /// itself keeps (reading only):
+    ///
+    /// - `optVersion`: the version `<prefix>/opt/<name>` points at, which is
+    ///   what services and other formulae run, linked or not.
+    /// - `incompleteVersions`: installed versions whose folder has no
+    ///   `INSTALL_RECEIPT.json`. Homebrew writes the receipt when an install
+    ///   finishes, so a folder without one is an install that was cut short.
+    /// - `buildsFromSource`: the current version has no ready-made build that
+    ///   pours into this prefix. A build made for a fixed cellar, such as
+    ///   `/opt/homebrew/Cellar`, pours only there; `:any` pours anywhere.
+    ///
+    /// A formula whose folder MacUp cannot see gets no file-based facts at
+    /// all, rather than being judged incomplete for want of a receipt.
+    static func annotate(_ items: [ManagedItem], prefix: String, fileSystem: any FileSystem) -> [ManagedItem] {
+        let cellar = prefix + "/Cellar"
+        let canonicalCellar = fileSystem.canonicalPath(ofPath: cellar) ?? cellar
+        return items.map { item in
+            guard item.kind == .formula else { return item }
+            var item = item
+            if let cellars = item.details["bottleCellars"] {
+                let pourable = cellars.split(separator: "\n").contains { entry in
+                    entry == ":any" || entry == ":any_skip_relocation" || entry == cellar || entry == canonicalCellar
+                }
+                if !pourable { item.details["buildsFromSource"] = "true" }
+            }
+            let rackName = item.id.name.split(separator: "/").last.map(String.init) ?? item.id.name
+            let rack = cellar + "/" + rackName
+            guard fileSystem.isDirectory(atPath: rack) else { return item }
+            let canonicalRack = fileSystem.canonicalPath(ofPath: rack) ?? rack
+            if let target = fileSystem.canonicalPath(ofPath: prefix + "/opt/" + rackName),
+               target.hasPrefix(canonicalRack + "/") {
+                let version = String(target.dropFirst(canonicalRack.count + 1))
+                if !version.isEmpty, !version.contains("/") { item.details["optVersion"] = version }
+            }
+            let incomplete = item.installedVersions.map(\.raw).filter {
+                !fileSystem.fileExists(atPath: rack + "/" + $0 + "/INSTALL_RECEIPT.json")
+            }
+            if !incomplete.isEmpty { item.details["incompleteVersions"] = incomplete.joined(separator: ", ") }
+            return item
+        }
     }
 
     public func refine(_ candidates: [UpdateCandidate], using inventory: [ManagedItem]) -> [UpdateCandidate] {
@@ -178,11 +225,52 @@ public struct HomebrewProvider: UpdateProvider {
             if item.details["disabled"] == "true" {
                 notes.append("Disabled in Homebrew.")
             }
+            if item.details["buildsFromSource"] == "true" {
+                signals.insert(.buildsFromSource)
+                notes.append(
+                    "Homebrew has no ready-made build of this version for where your Homebrew is installed, so it will "
+                        + "compile \(item.displayName) from source. That can take a long time, an hour or more for a large "
+                        + "package, and it should be left to finish."
+                )
+            }
+            let incomplete = item.details["incompleteVersions"]
+            if let incomplete {
+                signals.insert(.installationIncomplete)
+                notes.append(
+                    "An earlier install of \(item.displayName) \(incomplete) did not finish: Homebrew writes an install "
+                        + "receipt when an install completes, and this one has none."
+                )
+                if item.activeVersion == nil, item.details["kegOnly"] != "true" {
+                    notes.append("No version of \(item.displayName) is linked, so its commands are not on your PATH.")
+                }
+            }
             var refined = candidate.adding(signals: signals, notes: notes)
             // Kept verbatim; ``UpdateCandidate/releaseInfoLink`` decides whether it is safe to offer.
             if let homepage = item.details["homepage"] { refined.details["homepage"] = homepage }
+            if let incomplete { refined.details["incompleteVersions"] = incomplete }
+            if item.details["buildsFromSource"] == "true" { refined.details["buildsFromSource"] = "true" }
+            // The version in use, not merely the newest folder: after an
+            // interrupted upgrade the newest folder can be an empty one.
+            if let inUse = Self.versionInUse(item), inUse != refined.installedVersion?.raw {
+                refined = refined.replacingInstalledVersion(
+                    InstalledVersion(inUse),
+                    scheme: RuntimeCatalog.versionScheme(for: item.displayName)
+                )
+            }
             return refined
         }
+    }
+
+    /// The version that is actually in use: the linked keg, then what the
+    /// `opt` link points at, then the newest version whose install finished.
+    /// `nil` when none of those is known, leaving Homebrew's own answer.
+    static func versionInUse(_ item: ManagedItem) -> String? {
+        if let active = item.activeVersion?.raw { return active }
+        if let opt = item.details["optVersion"] { return opt }
+        guard let incomplete = item.details["incompleteVersions"] else { return nil }
+        let unfinished = Set(incomplete.components(separatedBy: ", "))
+        let finished = item.installedVersions.map(\.raw).filter { !unfinished.contains($0) }
+        return finished.isEmpty ? nil : HomebrewOutdatedParser.newest(finished)
     }
 
     private func ownership(_ installation: ProviderInstallation) -> OwnershipChain {

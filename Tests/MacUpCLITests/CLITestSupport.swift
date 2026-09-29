@@ -129,7 +129,10 @@ final class CLIHarness: @unchecked Sendable {
         _ response: FakeCommandRunner.Response = .success("Upgrading git\n")
     ) {
         runner.register("brew", ["upgrade", "--formula", "--yes", formula], response)
-        runner.register("brew", ["info", "--json=v2", "--installed"], .success(Self.brewInfo(git: version)))
+        // Homebrew reports the new version only once the upgrade has run.
+        runner.onRun("brew", ["upgrade", "--formula", "--yes", formula]) { [runner] in
+            runner.register("brew", ["info", "--json=v2", "--installed"], .success(Self.brewInfo(git: version)))
+        }
     }
 
     /// Every modifying command the fake runner was asked for. A read-only

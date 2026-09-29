@@ -36,6 +36,11 @@ public enum RiskSignal: String, Sendable, Hashable, Codable, CaseIterable, Compa
     case mayAffectDependents
     case pinnedByProvider
     case packageManagerSelfUpdate
+    /// The provider has nothing ready-made for this machine and will compile
+    /// it, which is slow and can fail part-way.
+    case buildsFromSource
+    /// An earlier install of this item never finished.
+    case installationIncomplete
 
     public var explanation: String {
         switch self {
@@ -48,16 +53,19 @@ public enum RiskSignal: String, Sendable, Hashable, Codable, CaseIterable, Compa
         case .mayAffectDependents: "May affect other software that depends on it"
         case .pinnedByProvider: "Pinned in the provider; updating would override the pin"
         case .packageManagerSelfUpdate: "Updates a package manager itself"
+        case .buildsFromSource: "Will be built from source, which can take a long time"
+        case .installationIncomplete: "An earlier install of it did not finish"
         }
     }
 
     /// The least risk an update carrying this signal can have.
     public var minimumLevel: RiskLevel {
         switch self {
-        case .operatingSystemUpdate, .restartRequired, .administratorAuthorizationMayBeRequired, .pinnedByProvider:
+        case .operatingSystemUpdate, .restartRequired, .administratorAuthorizationMayBeRequired, .pinnedByProvider,
+             .installationIncomplete:
             .high
         case .runtimeOrToolchain, .targetVersionNotGuaranteed, .mayRewriteConfiguration,
-             .mayAffectDependents, .packageManagerSelfUpdate:
+             .mayAffectDependents, .packageManagerSelfUpdate, .buildsFromSource:
             .moderate
         }
     }

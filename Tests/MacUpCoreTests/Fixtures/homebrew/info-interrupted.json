@@ -1,0 +1,83 @@
+{
+  "formulae": [
+    {
+      "name": "mysql",
+      "full_name": "mysql",
+      "tap": "homebrew/core",
+      "desc": "Open source relational database management system",
+      "homepage": "https://github.com/mysql/mysql-server",
+      "installed": [
+        {
+          "version": "9.7.1",
+          "installed_on_request": true,
+          "installed_as_dependency": false
+        },
+        {
+          "version": "26.7.0_2",
+          "installed_on_request": false,
+          "installed_as_dependency": false
+        }
+      ],
+      "linked_keg": null,
+      "pinned": false,
+      "outdated": true,
+      "keg_only": false,
+      "deprecated": false,
+      "disabled": false,
+      "versions": {
+        "stable": "26.7.0",
+        "head": null,
+        "bottle": true
+      },
+      "bottle": {
+        "stable": {
+          "rebuild": 0,
+          "root_url": "https://ghcr.io/v2/homebrew/core",
+          "files": {
+            "arm64_golden_gate": {
+              "cellar": "/opt/homebrew/Cellar",
+              "url": "https://ghcr.io/v2/homebrew/core/mysql/blobs/sha256:0000000000000000000000000000000000000000000000000000000000000000",
+              "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "jq",
+      "full_name": "jq",
+      "tap": "homebrew/core",
+      "desc": "Lightweight and flexible command-line JSON processor",
+      "installed": [
+        {
+          "version": "1.8.1",
+          "installed_on_request": true,
+          "installed_as_dependency": false
+        }
+      ],
+      "linked_keg": "1.8.1",
+      "pinned": false,
+      "outdated": false,
+      "keg_only": false,
+      "versions": {
+        "stable": "1.8.1",
+        "head": null,
+        "bottle": true
+      },
+      "bottle": {
+        "stable": {
+          "rebuild": 0,
+          "root_url": "https://ghcr.io/v2/homebrew/core",
+          "files": {
+            "arm64_golden_gate": {
+              "cellar": ":any",
+              "url": "https://ghcr.io/v2/homebrew/core/jq/blobs/sha256:1111111111111111111111111111111111111111111111111111111111111111",
+              "sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "casks": []
+}

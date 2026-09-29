@@ -1,0 +1,15 @@
+{
+  "formulae": [
+    {
+      "name": "mysql",
+      "installed_versions": [
+        "9.7.1",
+        "26.7.0_2"
+      ],
+      "current_version": "26.7.0_2",
+      "pinned": false,
+      "pinned_version": null
+    }
+  ],
+  "casks": []
+}

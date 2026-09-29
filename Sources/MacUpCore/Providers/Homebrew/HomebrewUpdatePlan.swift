@@ -57,6 +57,18 @@ extension HomebrewProvider {
             )
         }
 
+        // Upgrading on top of an install that never finished would ask
+        // Homebrew to reason from a state it did not leave on purpose. The
+        // person who knows why it stopped is the one to repair it.
+        guard !signals.contains(.installationIncomplete) else {
+            throw PlanSupport.cannotPlan(
+                "An earlier install of \(candidate.displayName) did not finish, so MacUp will not start another upgrade on top of it.",
+                detail: candidate.details["incompleteVersions"].map { "Unfinished: \(candidate.displayName) \($0)" },
+                recoverySuggestion: "Check `brew info \(name)` and repair or remove the unfinished version yourself. "
+                    + "MacUp changes nothing here until Homebrew's own state is consistent again."
+            )
+        }
+
         let isCask: Bool
         switch candidate.id.namespace {
         case .brew: isCask = false
@@ -80,6 +92,12 @@ extension HomebrewProvider {
             rationale += " This cask installs through a macOS installer package, so Homebrew may ask for an administrator "
                 + "password itself; MacUp neither supplies nor stores one."
         }
+        let buildsFromSource = signals.contains(.buildsFromSource)
+        if buildsFromSource {
+            rationale += " Homebrew has no ready-made build for where it is installed, so it will compile \(name) from "
+                + "source, which can take an hour or more. Let it finish: MacUp never stops it part-way, because "
+                + "Homebrew unlinks the old version before it builds the new one."
+        }
 
         return ExecutionPlan(
             createdAt: context.now(),
@@ -95,9 +113,11 @@ extension HomebrewProvider {
                     effect: .modifying,
                     expectsNetwork: true,
                     mayRequirePrivilege: needsAdministrator,
-                    // An hour: a formula can build from source and a cask can
-                    // be a multi-gigabyte download.
-                    timeoutSeconds: 3600
+                    // An hour: a cask can be a multi-gigabyte download. Four
+                    // when Homebrew has said it must compile, because a large
+                    // package can take longer than one; on the limit MacUp
+                    // interrupts Homebrew the way Ctrl+C would, never kills it.
+                    timeoutSeconds: buildsFromSource ? 4 * 3600 : 3600
                 )
             ],
             expectsNetwork: true,
@@ -134,11 +154,14 @@ extension HomebrewProvider {
                     because: "`brew info` failed afterwards, so MacUp cannot say which version is installed now."
                 )
             }
-            let items = try HomebrewInventoryParser.parse(
+            var items = try HomebrewInventoryParser.parse(
                 listing.standardOutput,
                 ownership: nil,
                 command: listing.invocation.displayString
             )
+            if let prefix = installation.fact("prefix") {
+                items.elements = Self.annotate(items.elements, prefix: prefix, fileSystem: context.fileSystem)
+            }
             guard let item = items.elements.first(where: { $0.id == candidate.id }) else {
                 return PlanSupport.compare(candidate.id, expected: expected, observed: nil)
             }
@@ -153,13 +176,16 @@ extension HomebrewProvider {
     }
 
     /// The version now in use: the linked keg or installed cask version when
-    /// Homebrew names one, otherwise the newest keg present.
+    /// Homebrew names one, then the `opt` link, otherwise the newest keg whose
+    /// install finished.
     ///
     /// Several versions can remain installed at once — MacUp deliberately
     /// suppresses Homebrew's cleanup — so "installed" alone would not say
-    /// which one an upgrade produced.
+    /// which one an upgrade produced. And an interrupted upgrade leaves an
+    /// empty folder named after the new version, which must never read as
+    /// the upgrade having worked.
     static func observedVersion(of item: ManagedItem) -> String? {
-        if let active = item.activeVersion?.raw { return active }
+        if let inUse = versionInUse(item) { return inUse }
         let versions = item.installedVersions.map(\.raw)
         return versions.isEmpty ? nil : HomebrewOutdatedParser.newest(versions)
     }

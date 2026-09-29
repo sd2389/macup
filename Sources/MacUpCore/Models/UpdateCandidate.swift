@@ -49,6 +49,23 @@ public struct UpdateCandidate: Sendable, Hashable, Codable, Identifiable {
 
     public var provider: ProviderID { id.provider }
 
+    /// Returns a copy with a different installed version, the change and the
+    /// risk worked out again from it.
+    public func replacingInstalledVersion(_ version: InstalledVersion, scheme: VersionScheme) -> UpdateCandidate {
+        UpdateCandidate(
+            id: id,
+            kind: kind,
+            displayName: displayName,
+            installedVersion: version,
+            availableVersion: availableVersion,
+            versionScheme: scheme,
+            signals: Set(signals),
+            ownership: ownership,
+            notes: notes,
+            details: details
+        )
+    }
+
     /// Returns a copy with extra signals and notes, reassessing risk.
     public func adding(signals extraSignals: Set<RiskSignal> = [], notes extraNotes: [String] = []) -> UpdateCandidate {
         var copy = self
