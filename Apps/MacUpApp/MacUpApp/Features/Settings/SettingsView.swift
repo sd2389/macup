@@ -126,6 +126,8 @@ struct SettingsView: View {
                 LabeledContent("Login shell", value: model.shell?.displayPath ?? "Not read yet")
                 LabeledContent("Shell environment", value: model.environmentProblem == nil ? (model.shell == nil ? "Not read yet" : "Read successfully") : "Could not be read")
                 Button("Open Doctor") { show(.doctor) }
+                Button("Export Diagnostics…") { model.beginDiagnosticsExport() }
+                    .help("Make a redacted file to attach to a bug report. You see all of it before anything is saved.")
             }
 
             Section {
@@ -139,6 +141,14 @@ struct SettingsView: View {
         // sizes, which is exactly who needs the extra room (CLAUDE.md §21).
         .frame(minWidth: 540, idealWidth: 600, minHeight: 440, idealHeight: 720)
         .onAppear { model.loadConfiguration() }
+        .sheet(isPresented: Binding(
+            get: { model.diagnosticsExport != nil },
+            set: { if !$0 { model.endDiagnosticsExport() } }
+        )) {
+            if let export = model.diagnosticsExport {
+                DiagnosticsExportSheet(export: export)
+            }
+        }
     }
 
     private var defaultPolicy: Binding<UpdatePolicy> {
