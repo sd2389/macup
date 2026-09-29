@@ -3,9 +3,11 @@ import Foundation
 
 /// Runs work that Ctrl+C should cancel cleanly.
 ///
-/// The first Ctrl+C cancels the task; providers' commands receive SIGTERM
-/// through the command runner and the command finishes with a partial,
-/// clearly marked result. A second Ctrl+C exits immediately.
+/// The first Ctrl+C cancels the task. A read-only command stops at once; a
+/// command that changes something is left to finish, because stopping a
+/// package manager part-way can leave a package half-installed, and nothing
+/// after it starts. The result is partial and clearly marked. A second Ctrl+C
+/// exits immediately.
 enum Interruption {
     static func run<Value: Sendable>(
         handlingInterrupts: Bool,
@@ -19,7 +21,11 @@ enum Interruption {
         let source = DispatchSource.makeSignalSource(signal: SIGINT, queue: .global(qos: .userInitiated))
         source.setEventHandler {
             if state.markInterrupted() {
-                FileHandle.standardError.write(Data("\nCancelling… (press Ctrl+C again to quit immediately)\n".utf8))
+                FileHandle.standardError.write(Data((
+                    "\nStopping. Nothing further will start. A command that is changing something is left to finish, "
+                        + "because stopping it part-way can leave a package half-installed. "
+                        + "Press Ctrl+C again to quit MacUp now; that command may keep running on its own.\n"
+                ).utf8))
                 task.cancel()
             } else {
                 exit(MacUpExitCode.cancelled.rawValue)

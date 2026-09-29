@@ -9,8 +9,15 @@ import Foundation
 ///   `/dev/null`, so it can never block on an interactive prompt.
 /// - stdout and stderr are captured separately, bounded by `outputLimit`, and
 ///   optionally streamed.
-/// - On timeout or task cancellation the process receives SIGTERM, then
-///   SIGKILL after `terminationGracePeriod`.
+/// - A read-only command is stopped on timeout or task cancellation: SIGTERM,
+///   then SIGKILL after `terminationGracePeriod`.
+/// - A command that changes the machine is never killed part-way. Cancelling
+///   only keeps it from starting; once it is running it is left to finish,
+///   and the caller stops before the next one. On timeout it receives SIGINT,
+///   exactly what Ctrl+C at a terminal sends and what package managers are
+///   written to recover from, and MacUp waits for it to exit. Stopping
+///   Homebrew between unlinking the old version and linking the new one is
+///   how a formula ends up with neither on PATH.
 public struct ProcessCommandRunner: CommandRunning {
     public var terminationGracePeriod: Duration
     /// How long to wait for output pipes to close after the process exits.
@@ -37,7 +44,11 @@ public struct ProcessCommandRunner: CommandRunning {
         return try await withTaskCancellationHandler {
             try await execution.run()
         } onCancel: {
-            execution.stop(.cancelled)
+            if request.effect == .readOnly {
+                execution.stop(.cancelled)
+            } else {
+                execution.preventLaunch()
+            }
         }
     }
 }
@@ -129,7 +140,9 @@ private final class ProcessExecution: @unchecked Sendable {
         case .timedOut:
             throw MacUpError(
                 .timeout,
-                "The command did not finish within \(Self.describe(timeout)) and was stopped.",
+                request.effect == .readOnly
+                    ? "The command did not finish within \(Self.describe(timeout)) and was stopped."
+                    : "The command did not finish within \(Self.describe(timeout)), so MacUp interrupted it the way Ctrl+C would and waited for it to exit.",
                 detail: TextExcerpt.tail(of: String(decoding: stderr.data, as: UTF8.self)),
                 command: displayCommand,
                 recoverySuggestion: "Check your network connection or run the command yourself to see why it is slow."
@@ -185,7 +198,18 @@ private final class ProcessExecution: @unchecked Sendable {
         }
     }
 
-    /// Stops the process: SIGTERM now, SIGKILL after the grace period.
+    /// Keeps a command that has not started from starting, and leaves one that
+    /// is running alone. How a cancelled run treats a command that changes the
+    /// machine.
+    func preventLaunch() {
+        lock.withLock {
+            if phase == .idle && stopReason == nil { stopReason = .cancelled }
+        }
+    }
+
+    /// Stops the process. A read-only command gets SIGTERM now and SIGKILL
+    /// after the grace period. Anything else gets SIGINT and is waited for,
+    /// however long it takes to put itself back together.
     func stop(_ reason: StopReason) {
         lock.lock()
         guard phase != .exited, stopReason == nil else {
@@ -197,6 +221,10 @@ private final class ProcessExecution: @unchecked Sendable {
         lock.unlock()
         guard isRunning else { return }
 
+        guard request.effect == .readOnly else {
+            process.interrupt()
+            return
+        }
         process.terminate()
         let gracePeriod = gracePeriod
         Task { [weak self] in

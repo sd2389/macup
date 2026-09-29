@@ -331,13 +331,20 @@ public struct ExecutionEngine: Sendable {
             )
             var verification: VerificationResult?
             if result.outcome == .succeeded {
-                verification = await verify(
-                    planned,
-                    result: result,
-                    provider: provider,
-                    providerContext: providerContext,
-                    environment: environment
-                )
+                // Verification only reads, and it confirms a change that has
+                // already happened. A run stopped while this item's command
+                // was going still owes history the truth about the item, so
+                // the read-back is not cancelled with the run.
+                let engine = self
+                verification = await Task {
+                    await engine.verify(
+                        planned,
+                        result: result,
+                        provider: provider,
+                        providerContext: providerContext,
+                        environment: environment
+                    )
+                }.value
             }
             executed.append(ExecutedUpdate(
                 item: planned.item,
@@ -379,9 +386,10 @@ public struct ExecutionEngine: Sendable {
     /// succeed. Nothing after a failed step runs: the later steps were written
     /// assuming the earlier ones worked.
     ///
-    /// Steps run on the caller's task, so a cancelled `macup update` reaches
-    /// the running command itself — the runner signals the child rather than
-    /// leaving it to finish unwatched — and the loop stops before the next one.
+    /// Steps run on the caller's task. Cancelling stops the loop before the
+    /// next step, but never the step that is running: the runner leaves a
+    /// modifying command to finish, because a package manager stopped half
+    /// way can leave the item with neither version usable.
     private func perform(
         _ plan: ExecutionPlan,
         environment: CheckEnvironment,

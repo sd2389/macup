@@ -634,6 +634,50 @@ struct ExecutionEngineTests {
         #expect(harness.runner.recordedRequests.count == 1)
     }
 
+    @Test("Stopping while an item's command runs lets that item finish and be confirmed, and starts nothing else")
+    func stopDuringACommandFinishesThatItem() async throws {
+        let harness = try ExecutionHarness()
+        harness.registerBrewUpgrade()
+        harness.runner.register(path: "/opt/homebrew/bin/npm", ["install", "-g", "typescript"], .success())
+        let loaded = try harness.save(configuration(["brew:git": .auto, "npm:typescript": .auto]))
+        let npm = PlannedUpdateFactory.planned(
+            PlannedUpdateFactory.candidate("npm:typescript", installed: "5.4.2", available: "5.4.3", kind: .globalPackage),
+            steps: [PlannedUpdateFactory.step("/opt/homebrew/bin/npm", ["install", "-g", "typescript"])]
+        )
+        // Verification that, like the real runner's read-only commands, gives
+        // up the moment its task is cancelled.
+        let provider = ScriptedUpdateProvider(id: .homebrew) { _, candidate, _ in
+            VerificationResult(
+                item: candidate.id,
+                outcome: Task.isCancelled ? .failed : .verified,
+                expectedVersion: candidate.availableVersion.raw,
+                observedVersion: Task.isCancelled ? nil : candidate.availableVersion.raw,
+                message: Task.isCancelled ? "Cancelled." : "Confirmed."
+            )
+        }
+        var environment = harness.environment
+        // The user presses Stop while brew is running; the command, as the
+        // real runner now guarantees, runs to the end regardless.
+        environment.runner = StopPressingRunner(base: harness.runner)
+
+        let report = await harness.engine(providers: [provider, ScriptedUpdateProvider.confirming(.npm)]).run(
+            PlannedUpdateFactory.report([gitPlan(), npm]),
+            configuration: loaded,
+            options: ExecutionOptions(origin: .gui),
+            environment: environment
+        )
+
+        let git = try #require(report.executed.first)
+        #expect(git.result.outcome == .succeeded, "the running item is not reported as cancelled")
+        #expect(git.verification?.outcome == .verified, "and it is still confirmed after Stop")
+        #expect(report.cancelled)
+        #expect(report.skipped.map(\.item.rawValue) == ["npm:typescript"])
+        #expect(!harness.runner.recordedRequests.contains { $0.executable.path.hasSuffix("/npm") })
+        let entry = try #require(try harness.history.load().first { $0.item.rawValue == "brew:git" })
+        #expect(entry.outcome == .succeeded)
+        #expect(entry.verification == .verified)
+    }
+
     @Test("A cancelled task launches nothing")
     func cancelledTaskLaunchesNothing() async throws {
         let harness = try ExecutionHarness()
@@ -949,5 +993,18 @@ struct ExecutionEngineTests {
         )
 
         #expect(report.summary.succeeded == 1)
+    }
+}
+
+/// Cancels the run from inside the first modifying command, as pressing Stop
+/// mid-command does, then lets the command finish.
+private struct StopPressingRunner: CommandRunning {
+    let base: any CommandRunning
+
+    func run(_ request: CommandRequest, output: CommandOutputHandler?) async throws -> CommandResult {
+        if request.effect == .modifying {
+            withUnsafeCurrentTask { $0?.cancel() }
+        }
+        return try await base.run(request, output: output)
     }
 }

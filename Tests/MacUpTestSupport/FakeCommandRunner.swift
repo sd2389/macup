@@ -54,8 +54,16 @@ public final class FakeCommandRunner: CommandRunning, @unchecked Sendable {
     private var byPath: [Key: Response] = [:]
     private var byName: [Key: Response] = [:]
     private var requests: [CommandRequest] = []
+    private var hooks: [Key: @Sendable () -> Void] = [:]
 
     public init() {}
+
+    /// Runs `perform` each time a command with this file name and these
+    /// arguments is answered: how a fake models a command that changes what
+    /// a later read reports, such as an upgrade changing `brew info`.
+    public func onRun(_ executableName: String, _ arguments: [String], perform: @escaping @Sendable () -> Void) {
+        lock.withLock { hooks[Key(executable: executableName, arguments: arguments)] = perform }
+    }
 
     /// Registers a response for an exact executable path and arguments.
     public func register(path: String, _ arguments: [String], _ response: Response) {
@@ -77,11 +85,15 @@ public final class FakeCommandRunner: CommandRunning, @unchecked Sendable {
 
     public func run(_ request: CommandRequest, output: CommandOutputHandler?) async throws -> CommandResult {
         try request.validate()
-        let response: Response? = lock.withLock {
+        let (response, hook): (Response?, (@Sendable () -> Void)?) = lock.withLock {
             requests.append(request)
-            return byPath[Key(executable: request.executable.path, arguments: request.arguments)]
-                ?? byName[Key(executable: request.executable.lastPathComponent, arguments: request.arguments)]
+            let name = Key(executable: request.executable.lastPathComponent, arguments: request.arguments)
+            return (
+                byPath[Key(executable: request.executable.path, arguments: request.arguments)] ?? byName[name],
+                hooks[name]
+            )
         }
+        hook?()
         guard let response else {
             throw MacUpError(
                 .commandFailed,
@@ -91,10 +103,22 @@ public final class FakeCommandRunner: CommandRunning, @unchecked Sendable {
         }
         let startedAt = Date()
         if let delay = response.delay {
-            do {
-                try await Task.sleep(for: delay)
-            } catch {
-                throw MacUpError(.cancelled, "The command was cancelled.", command: request.invocation.displayString)
+            if request.effect == .readOnly {
+                do {
+                    try await Task.sleep(for: delay)
+                } catch {
+                    throw MacUpError(.cancelled, "The command was cancelled.", command: request.invocation.displayString)
+                }
+            } else {
+                // As the real runner does, a command that changes something
+                // is left to finish even when its task is cancelled.
+                let nanoseconds = UInt64(max(0, delay.components.seconds)) * 1_000_000_000
+                    + UInt64(max(0, delay.components.attoseconds) / 1_000_000_000)
+                await withCheckedContinuation { continuation in
+                    DispatchQueue.global().asyncAfter(deadline: .now() + .nanoseconds(Int(nanoseconds))) {
+                        continuation.resume()
+                    }
+                }
             }
         }
         if let error = response.error { throw error }

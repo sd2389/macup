@@ -18,14 +18,15 @@ struct ProcessCommandRunnerTests {
         _ arguments: [String] = [],
         environment: [String: String] = ["PATH": "/usr/bin:/bin"],
         timeout: Duration = .seconds(20),
-        outputLimit: Int = 1 << 20
+        outputLimit: Int = 1 << 20,
+        effect: CommandEffect = .readOnly
     ) -> CommandRequest {
         CommandRequest(
             executable: URL(fileURLWithPath: executable),
             arguments: arguments,
             environment: environment,
             timeout: timeout,
-            effect: .readOnly,
+            effect: effect,
             outputLimit: outputLimit
         )
     }
@@ -130,6 +131,57 @@ struct ProcessCommandRunnerTests {
         let error = await #expect(throws: MacUpError.self) { try await task.value }
         #expect(error?.kind == .cancelled)
         #expect(clock.now - start < .seconds(10))
+    }
+
+    @Test("Cancelling never stops a command that changes the machine: it is left to finish")
+    func cancellationLetsAModifyingCommandFinish() async throws {
+        let directory = try TemporaryDirectory()
+        let marker = directory.appending("finished").path
+        // Stands in for a package manager part-way through an install.
+        let script = try directory.makeScript("install", "/bin/sleep 1\ntouch '\(marker)'\necho installed")
+        let runner = runner
+        let install = request(script.path, effect: .modifying)
+        let task = Task { try await runner.run(install) }
+        try await Task.sleep(for: .milliseconds(200))
+        task.cancel()
+        let result = try await task.value
+        #expect(result.succeeded)
+        #expect(result.standardOutputText.contains("installed"))
+        #expect(FileManager.default.fileExists(atPath: marker), "the command ran to the end")
+    }
+
+    @Test("A command that changes the machine never starts once the run is cancelled")
+    func cancelledModifyingCommandNeverLaunches() async throws {
+        let directory = try TemporaryDirectory()
+        let marker = directory.appending("launched").path
+        let script = try directory.makeScript("marker", "touch '\(marker)'")
+        let runner = runner
+        let touch = request(script.path, effect: .modifying)
+        let task = Task {
+            withUnsafeCurrentTask { $0?.cancel() }
+            return try await runner.run(touch)
+        }
+        let error = await #expect(throws: MacUpError.self) { try await task.value }
+        #expect(error?.kind == .cancelled)
+        #expect(!FileManager.default.fileExists(atPath: marker))
+    }
+
+    @Test("A command that changes the machine and runs too long is interrupted, and allowed to clean up")
+    func timedOutModifyingCommandIsInterruptedNotKilled() async throws {
+        let directory = try TemporaryDirectory()
+        let marker = directory.appending("cleaned-up").path
+        // Its cleanup takes longer than the grace period, which is exactly
+        // what a SIGKILL would cut short.
+        let script = try directory.makeScript(
+            "slow-cleanup",
+            "trap 'kill $! 2>/dev/null; /bin/sleep 1; touch \"\(marker)\"; exit 130' INT\n/bin/sleep 30 &\nwait"
+        )
+        let error = await #expect(throws: MacUpError.self) {
+            try await runner.run(request(script.path, timeout: .milliseconds(300), effect: .modifying))
+        }
+        #expect(error?.kind == .timeout)
+        #expect(error?.message.contains("interrupted it the way Ctrl+C would") == true)
+        #expect(FileManager.default.fileExists(atPath: marker), "the cleanup ran to the end")
     }
 
     @Test("A task that is already cancelled never launches the process")

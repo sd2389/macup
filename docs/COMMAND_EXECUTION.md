@@ -20,23 +20,35 @@ shell.
   32 MiB each by default, and can be streamed. A provider command whose
   output was cut off is an error: a truncated listing is never parsed as
   if it were complete.
-- **Timeouts and cancellation.** On timeout or task cancellation the
-  process gets SIGTERM, then SIGKILL after a grace period (3 s). If a
-  grandchild keeps an output pipe open, MacUp stops waiting after 2 s and
-  marks the output truncated rather than hang.
+- **Timeouts and cancellation depend on what the command does.**
+  - A read-only command is stopped on timeout or task cancellation: SIGTERM,
+    then SIGKILL after a grace period (3 s).
+  - A command that changes something (`modifying`, and a metadata refresh)
+    is never killed part-way. Cancelling only keeps it from starting; once it
+    is running it is left to finish, and the engine starts nothing after it.
+    On timeout it receives SIGINT — what Ctrl+C at a terminal sends, which
+    package managers are written to recover from — and MacUp waits for it to
+    exit, with no SIGKILL behind it.
+  - If a grandchild keeps an output pipe open, MacUp stops waiting after 2 s
+    and marks the output truncated rather than hang.
 - **Results, not exceptions, for exit codes.** A non-zero exit status is
   returned as data; some providers (`npm outdated`) exit 1 on success.
 - **Display is separate from execution.** `CommandInvocation.displayString`
   is a shell-quoted rendering for people (ANSI-C quoting makes control
   characters visible). It is never executed or parsed back.
 
-Known limitation, still open now that MacUp runs modifying commands: the
-runner signals the process it launched, not its whole process group, so a
-grandchild may briefly outlive a cancelled command. Cancelling a `macup
-update` therefore reaches the `brew`, `npm`, or `mise` process MacUp started,
-and a helper that process spawned may take a moment longer to exit. Process
-groups are the fix and are tracked in
-`docs/IMPLEMENTATION_CHECKLIST.md`.
+Why a running change is never killed: `brew upgrade` unlinks the old
+version before it builds or pours the new one, and links a version again in
+its own cleanup. An earlier MacUp sent SIGTERM and then SIGKILL three seconds
+later when the user pressed Stop during a from-source build of `mysql`;
+Homebrew was killed inside that cleanup, leaving an empty folder for the new
+version and neither version linked. A modifying command now always finishes
+or, on its time limit, stops itself the way it would at a terminal.
+
+Signals still go to the process MacUp launched rather than its whole process
+group, which now matters only for read-only commands: a helper a cancelled
+check spawned may take a moment longer to exit. Process groups are tracked
+in `docs/IMPLEMENTATION_CHECKLIST.md`.
 
 ## Environment allowlist
 
