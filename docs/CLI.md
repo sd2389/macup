@@ -14,7 +14,7 @@ enable`, `macup provider disable`, `macup schedule enable`, `macup schedule
 disable`, `macup security require`, and `macup security face enroll|forget`.
 
 **Everything else only reads**, including plain `macup`, `macup check`,
-`macup plan`, `macup doctor`, `macup history`, `macup policy list`,
+`macup plan`, `macup explain`, `macup doctor`, `macup history`, `macup policy list`,
 `macup provider list`, and `macup config`.
 
 Nothing runs on a schedule but a check. The launchd agent MacUp installs is
@@ -67,6 +67,7 @@ macup --generate-completion-script zsh > ~/.zsh/completions/_macup
 | `macup check --verbose` | Adds what changes between the two versions, a link to read about the release where the provider gives one, ownership chains, risk reasons, notes, and every command MacUp ran. |
 | `macup check --save-state` | Also writes the report to `~/.local/state/macup/last-check.json`. This is how a scheduled check leaves its result behind. |
 | `macup plan [<package-id>…] [--refresh] [--json] [--verbose]` | Shows what `macup update` would do: current → proposed version, provider, effective policy, risk and its reason, and the exact executable and arguments — plus every item it would leave alone, with the reason. Launches nothing. |
+| `macup explain <package-id> [--refresh] [--json]` | Everything MacUp knows about one item: installed and available versions, what changes and the release link, risk and every reason, notes, who manages it, the policy that decides it and the rule behind that, the exact command it would run — or exactly why it would run nothing — and its recent history. Launches nothing. The app's Copy Details copies the same text. |
 | **`macup update [<package-id>…]`** | **The only command that changes packages.** Flags below. |
 | `macup doctor [--json] [--verbose]` | Runs MacUp's deterministic diagnostics and explains each finding. Fixes nothing. |
 | `macup history [--limit N] [--json] [--verbose]` | What MacUp has changed and what it decided not to change, newest first. |
@@ -109,6 +110,7 @@ macup                                  # what is outdated
 macup check --refresh --json           # fresh metadata, machine-readable
 macup plan                             # the exact commands an update would run
 macup plan brew:git --verbose          # one item, with rollback and verification
+macup explain brew:git                 # everything about one item, and its history
 macup update --dry-run                 # the same, launching nothing
 macup update                           # apply what policy allows, asking about the rest
 macup update brew:git npm:prettier -y  # two named items, confirmed up front
@@ -320,7 +322,7 @@ finish, the output says so and the check exits with status 2.
 | 3 | The configuration is invalid. Read-only commands still ran (a file other users could change is ignored, so defaults were used); MacUp will change nothing until it is fixed, and `policy set`/`clear`, `exclude`, and `provider enable`/`disable` refuse rather than rewrite a file they misread. When `MACUP_CONFIG_DIR`/`MACUP_STATE_DIR`/`MACUP_LAUNCH_AGENTS_DIR` is not absolute, nothing runs. |
 | 4 | `update` ran and at least one item failed. Everything it did attempt is in `macup history`. |
 | 5 | `doctor` found at least one warning or error. Notes alone are exit code 0. |
-| 64 | Invalid command-line usage: an argument that is not a package ID, an unknown provider, an unknown policy, `--limit` below 1, or (for `plan` and `update`) a package ID with no update available. `update` changes nothing in that case. |
+| 64 | Invalid command-line usage: an argument that is not a package ID, an unknown provider, an unknown policy, `--limit` below 1, or (for `plan` and `update`) a package ID with no update available. `update` changes nothing in that case. For `explain`, an item MacUp knows nothing about: its provider does not list it, is turned off, or is not installed. |
 | 77 | The device owner did not approve the change, or MacUp could not ask. Nothing was changed. |
 | 130 | Interrupted with Ctrl+C. |
 | 1 | Unexpected internal error; `schedule enable`/`disable` failing to install, remove, or record the schedule; and `history` failing to read its file. |
@@ -421,6 +423,29 @@ effective one, never `inherit`), `source` (`item`, `provider`, `global`,
 strategy). Each step: `summary`, `invocation` (`executable` and
 `arguments[]`, the exact things MacUp will launch), `effect`,
 `expectsNetwork`, `mayRequirePrivilege`, `timeoutSeconds`.
+
+### `macup explain --json` (`"kind": "explain"`, schema version 1)
+
+| Field | Meaning |
+| --- | --- |
+| `createdAt`, `item` | When the explanation was built, and the package ID it is about |
+| `status` | `updateAvailable`, `upToDate` (installed, no update), `updateUnknown` (installed, but the update check failed), `notFound`, `providerDisabled`, `providerNotFound`, or `checkFailed` |
+| `summary` | One sentence saying what MacUp found |
+| `update` | The update, as in `check` (absent when there is none) |
+| `versionDifference` | `parts[]` (`name`, `from`, `to`), when both versions are clearly numeric |
+| `releaseInfoLink` | `title` and `url`, when the provider gives a page for the release |
+| `installed` | The item as its provider lists it installed: `installedVersions[]`, `activeVersion`, `pinnedByProvider`, `ownership`, `details` |
+| `policy` | `policy` (effective, never `inherit`), `source` (`item`, `provider`, `global`), `rule` (where it lives in the file, such as `items.brew:git.policy`), and `decision` (as in `plan`) when there is an update to decide about |
+| `plan` | The `ExecutionPlan` MacUp would run, as in `plan`; absent when it would run nothing |
+| `skipped` | Why MacUp would run nothing for an update it found, as in `plan`'s `skipped[]` |
+| `history` | `entries[]` (the item's own, newest first, as in `history`), `limit`, `moreAvailable`, `unreadableLines`, `problem` |
+| `providerReport` | The provider's entry from the check, as in `check`, without `items` |
+| `configuration`, `cancelled` | As in `check` |
+
+An item MacUp knows nothing about still gets a document, with exit code 64,
+so a script can read why. Exit code 2 means the item's provider could not be
+checked completely, so the explanation may be missing something; 3 means the
+configuration is invalid, so the decision is to change nothing.
 
 ### `macup update --json` (`"kind": "update"`, schema version 1)
 

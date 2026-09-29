@@ -144,33 +144,19 @@ struct HistoryRenderer {
         }
     }
 
+    // Worded in MacUpCore, so `macup explain` and the app's Copy Details
+    // describe an attempt exactly as this list does.
+
     static func timestamp(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd HH:mm"
-        return formatter.string(from: date)
+        HistoryEntry.timestampText(date)
     }
 
     static func outcome(_ entry: HistoryEntry) -> String {
-        switch entry.outcome {
-        case .succeeded:
-            switch entry.verification {
-            case .verified: return "updated, confirmed"
-            case .targetNotReached: return "updated, other version"
-            case .failed, .notPerformed, nil: return "updated, not confirmed"
-            }
-        case .failed: return "failed"
-        case .timedOut: return "timed out"
-        case .cancelled: return "cancelled"
-        case .skipped: return "left alone"
-        }
+        entry.outcomeSummary
     }
 
     static func origin(_ origin: ExecutionOrigin) -> String {
-        switch origin {
-        case .cli: "from the command line"
-        case .gui: "from the app"
-        case .scheduled: "on a schedule"
-        }
+        origin.historyPhrase
     }
 }
 

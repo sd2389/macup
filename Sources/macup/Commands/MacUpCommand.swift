@@ -19,6 +19,7 @@ struct MacUpCommand: AsyncParsableCommand {
             Examples:
               macup                   See what is outdated
               macup plan              See exactly what an update would run
+              macup explain brew:git  Everything MacUp knows about one item
               macup update --dry-run  The same, launching nothing
               macup update            Apply what your policy allows
               macup update brew:git   Apply one item
@@ -32,6 +33,7 @@ struct MacUpCommand: AsyncParsableCommand {
         subcommands: [
             CheckCommand.self,
             PlanCommand.self,
+            ExplainCommand.self,
             UpdateCommand.self,
             PolicyCommand.self,
             ExcludeCommand.self,

@@ -390,6 +390,8 @@ private struct UpdateDetail: View {
                             || model.isApplying
                     )
             }
+
+            UpdateCopySection(item: update.id)
         }
         .formStyle(.grouped)
     }

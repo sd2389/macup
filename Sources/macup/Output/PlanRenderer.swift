@@ -225,29 +225,16 @@ enum PlanText {
         return from + " → " + style.safe(proposed)
     }
 
-    /// The effective policy and what it means for this item.
+    /// The effective policy and what it means for this item. Worded in
+    /// MacUpCore, which `macup explain` and the app share.
     static func decision(_ planned: PlannedUpdate) -> String {
-        let policy = planned.decision.policy.displayName
-        switch planned.decision.action {
-        case .allow: return "\(policy) · runs without asking"
-        case .confirm: return "\(policy) · needs your confirmation"
-        case .deny: return "\(policy) · will not run"
-        }
+        planned.decision.actionSummary
     }
 
     /// What a change would touch beyond the package itself. Only the notable
     /// ones by default; a verbose plan states every field, including the
     /// reassuring ones, because CLAUDE.md §11 requires the plan to carry them.
     static func effects(_ plan: ExecutionPlan, verbose: Bool) -> [String] {
-        var effects: [String] = []
-        if plan.mayRequirePrivilege { effects.append("may ask for an administrator password") }
-        if plan.mayRequireRestart { effects.append("may require a restart") }
-        if plan.mayChangeUserConfiguration { effects.append("may change your configuration or lockfile") }
-        guard verbose else { return effects }
-        if !plan.mayRequirePrivilege { effects.append("no administrator password") }
-        if !plan.mayRequireRestart { effects.append("no restart") }
-        if !plan.mayChangeUserConfiguration { effects.append("leaves your configuration alone") }
-        effects.append(plan.expectsNetwork ? "uses the network" : "no network")
-        return effects
+        plan.effectSummaries(includingReassuring: verbose)
     }
 }

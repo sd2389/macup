@@ -214,13 +214,9 @@ struct CheckRenderer {
         return lines
     }
 
+    /// Worded in MacUpCore, which `macup explain` shares.
     private func operationName(_ operation: ProviderOperationError.Operation) -> String {
-        switch operation {
-        case .detect: "detection"
-        case .refreshMetadata: "metadata refresh"
-        case .inventory: "installed items"
-        case .outdated: "update check"
-        }
+        operation.displayName
     }
 
     private func indented(_ lines: [String]) -> [String] {
