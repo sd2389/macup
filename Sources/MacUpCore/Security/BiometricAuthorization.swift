@@ -218,11 +218,11 @@ public struct LocalAuthenticator: BiometricAuthorizing {
         switch type {
         case .touchID: return .touchID
         case .faceID: return .faceID
+        case .opticID: return .opticID
         case .none: return .none
         @unknown default:
             // A sensor this build does not know about. Reported honestly as
             // unnamed rather than guessed at.
-            if type.rawValue == 3 { return .opticID }
             return .none
         }
     }

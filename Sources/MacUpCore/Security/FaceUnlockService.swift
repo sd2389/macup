@@ -181,12 +181,7 @@ public final class FaceCamera: @unchecked Sendable {
                 recoverySuggestion: "Allow it in System Settings → Privacy & Security → Camera."
             )
         }
-        // ponytail: this resolves to the bare `init()`, not the throwing
-        // `init(device:)`, so no camera input is added and the connection
-        // below cannot go live. Kept as it was; switching to
-        // `FaceCameraSession(device: Self.preferredDevice())` changes what
-        // enrolment does, and needs a signed build and a camera to verify.
-        let session = FaceCameraSession()
+        let session = try FaceCameraSession(device: Self.preferredDevice())
         lock.withLock { self.session = session }
         try await session.start()
         try await session.waitForConnection()
@@ -253,12 +248,12 @@ final class FaceCameraSession: NSObject, AVCapturePhotoCaptureDelegate, @uncheck
     private var observers: [any NSObjectProtocol] = []
     private static let context = CIContext()
 
-    override init() {
+    /// Opens `device` for still pictures. There is deliberately no bare
+    /// `init()`: a session with no camera input starts, but its connection
+    /// never goes live, and that is how enrolment once waited for a picture
+    /// that could never come.
+    init(device: AVCaptureDevice?) throws {
         super.init()
-    }
-
-    convenience init(device: AVCaptureDevice? = FaceCamera.preferredDevice()) throws {
-        self.init()
         guard let device, let input = try? AVCaptureDeviceInput(device: device), session.canAddInput(input) else {
             throw MacUpError(.providerUnavailable, "MacUp could not open the camera.")
         }

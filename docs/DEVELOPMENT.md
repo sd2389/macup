@@ -73,6 +73,12 @@ Because it is settled rather than intermittent, both surfaces say so:
   same `CameraReadiness` value, so a diagnostic run and the screen can never
   tell different stories.
 
+Part of that observation was a bug, not macOS: until 2026-09-29 enrolment
+built its camera session with the bare `init()`, which adds no camera input,
+so the connection could never go live on any build, signed or not. The
+session can now only be made from a camera device. Signing is still what
+decides whether macOS asks at all.
+
 The way out for a local build is a signing identity that names a team.
 `scripts/build-app.sh` now uses one automatically when this Mac has one: an
 **Apple Development** certificate, free with an Apple ID (Xcode > Settings >
