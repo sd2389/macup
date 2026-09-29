@@ -12,6 +12,16 @@ extension String {
     }
 
     var capitalizedFirst: String { prefix(1).uppercased() + dropFirst() }
+
+    /// Text of several lines, each made display-safe on its own with the home
+    /// directory shortened to `~`, so the line breaks it was written with
+    /// survive: numbered repair steps read as steps, not one run-on line.
+    var displayLines: String {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        return split(separator: "\n", omittingEmptySubsequences: false)
+            .map { PathDisplay.abbreviatingHome(in: String($0), homeDirectory: home).displaySafe }
+            .joined(separator: "\n")
+    }
 }
 
 extension ProviderID {
@@ -178,10 +188,10 @@ struct FindingRow: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(finding.title.displaySafe)
                 if let detail = finding.detail {
-                    Text(detail.displayPath).font(.callout).foregroundStyle(.secondary)
+                    Text(detail.displayLines).font(.callout).foregroundStyle(.secondary)
                 }
                 if let recommendation = finding.recommendation {
-                    Text(recommendation.displaySafe).font(.callout)
+                    Text(recommendation.displayLines).font(.callout)
                 }
             }
         } icon: {

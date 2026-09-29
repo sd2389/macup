@@ -26,6 +26,7 @@ struct MacUpCommand: AsyncParsableCommand {
               macup update brew:git   Apply one item
               macup policy list       What MacUp may do with each item
               macup exclude brew:postgresql   Never update this one
+              macup dependents brew:openssl@3   What an upgrade of it could affect
               macup doctor            What is odd about this Mac
               macup diagnostics       A redacted file for a bug report
               macup history           What MacUp has changed
@@ -40,6 +41,7 @@ struct MacUpCommand: AsyncParsableCommand {
             PolicyCommand.self,
             ExcludeCommand.self,
             ProviderCommand.self,
+            DependentsCommand.self,
             DoctorCommand.self,
             DiagnosticsCommand.self,
             HistoryCommand.self,

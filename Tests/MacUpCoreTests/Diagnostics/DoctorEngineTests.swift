@@ -151,6 +151,7 @@ struct DoctorEngineTests {
             "provider.availability",
             "provider.results",
             "homebrew.installations",
+            "homebrew.state",
             "provider.architecture",
             "environment.loginShell",
             "runtime.ownership",

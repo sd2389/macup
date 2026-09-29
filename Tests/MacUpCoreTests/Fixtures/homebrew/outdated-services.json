@@ -1,0 +1,10 @@
+{
+  "formulae": [
+    {"name": "colima", "installed_versions": ["0.8.0"], "current_version": "0.8.1", "pinned": false, "pinned_version": null},
+    {"name": "jq", "installed_versions": ["1.7.1"], "current_version": "1.8.1", "pinned": false, "pinned_version": null},
+    {"name": "mysql", "installed_versions": ["8.0.40"], "current_version": "8.4.3", "pinned": false, "pinned_version": null},
+    {"name": "postgresql@16", "installed_versions": ["16.4"], "current_version": "16.6", "pinned": false, "pinned_version": null},
+    {"name": "redis", "installed_versions": ["7.2.4"], "current_version": "7.2.5", "pinned": false, "pinned_version": null}
+  ],
+  "casks": []
+}

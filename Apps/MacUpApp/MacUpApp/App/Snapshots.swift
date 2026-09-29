@@ -56,6 +56,7 @@ enum Snapshots {
                 model.showAllHistory()
             }
             await captureFilteredUpdates(model: model, main: main, into: directory, suffix: suffix)
+            await captureDependents(model: model, main: main, into: directory, suffix: suffix)
             await captureSheets(model: model, main: main, into: directory, suffix: suffix)
         }
         openSettings()
@@ -206,6 +207,39 @@ enum Snapshots {
         model.isSearchingUpdates = false
         model.showAllUpdates()
         await settle()
+    }
+
+    /// An update's details with What Depends on It answered, scrolled so the
+    /// answer is in the picture. Asking runs `brew uses --installed`, which
+    /// only reads, so this is as safe to start as the check itself.
+    @MainActor
+    private static func captureDependents(
+        model: AppModel,
+        main: NSWindow?,
+        into directory: PrivateDirectory,
+        suffix: String
+    ) async {
+        guard let main, let item = model.report?.updates.first(where: { model.canListDependents(of: $0.id) })?.id else { return }
+        model.section = .updates
+        model.selectedUpdate = item
+        if model.dependents.reports[item] == nil {
+            model.showDependents(of: item)
+            await model.dependents.task?.value
+        }
+        try? await Task.sleep(for: .milliseconds(700))
+        // The inspector is the scroll view in the window's right half.
+        var views: [NSView] = main.contentView.map { [$0] } ?? []
+        while let view = views.popLast() {
+            views += view.subviews
+            guard let scroll = view as? NSScrollView, let document = scroll.documentView,
+                  scroll.convert(scroll.bounds, to: nil).minX > main.frame.width / 2
+            else { continue }
+            let bottom = document.isFlipped ? max(0, document.frame.height - scroll.contentView.bounds.height) : 0
+            scroll.contentView.scroll(to: NSPoint(x: 0, y: bottom))
+            scroll.reflectScrolledClipView(scroll.contentView)
+        }
+        try? await Task.sleep(for: .milliseconds(500))
+        write(main, to: directory, named: "updates-dependents-\(suffix).png")
     }
 
     @MainActor

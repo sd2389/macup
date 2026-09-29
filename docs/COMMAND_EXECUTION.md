@@ -154,6 +154,9 @@ pass through `ReadOnlyCommandGuard`, which:
 - refuses any command not in `CommandAllowlist.readOnlyCheck`, matched by
   executable name, leading arguments, and an exact set of allowed options
   (so positional arguments such as package names cannot be appended).
+  Asking what depends on one formula (`macup dependents`) adds
+  `CommandAllowlist.dependentsLookup`, whose `brew uses` rules take exactly
+  one checked name; a check never has those rules.
 
 Refused commands never reach the operating system; they are recorded in
 the report with outcome `refused`. A test runs a deliberately misbehaving

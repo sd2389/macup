@@ -1,0 +1,5 @@
+{
+  "services": [
+    {"name": "mysql", "status": "started"}
+  ]
+}

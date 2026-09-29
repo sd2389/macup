@@ -102,7 +102,9 @@ overridden in those tests so the real tools can never be picked up.
 - log redaction
 
 ### Command rules and guards
-- the read-only allowlist permits no positional arguments at all
+- the check allowlist permits no positional arguments at all, and a check's
+  guard refuses `brew uses`; the dependents-lookup rules take exactly one
+  checked positional
 - a modifying rule refuses a positional that starts with `-`, that carries
   control or bidirectional-override characters, or that is padded
 - a rule's positional count is exact, so a command naming too few arguments

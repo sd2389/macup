@@ -48,6 +48,8 @@ final class AppModel {
     /// passes; a test passes fakes, and nothing here ever sees a fingerprint,
     /// a face, or a password either way.
     let environment: AppEnvironment
+    /// What depends on each item someone asked about (AppModel+Dependents.swift).
+    let dependents = DependentsModel()
 
     init(environment: AppEnvironment = .live()) {
         self.environment = environment

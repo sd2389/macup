@@ -6,7 +6,10 @@ import Foundation
 /// - `brew --version`, `brew --prefix` (detection)
 /// - `brew outdated --json=v2` (candidates, from local metadata)
 /// - `brew info --json=v2 --installed` (inventory)
+/// - `brew services list --json` (which formulae run as services, with the inventory)
 /// - `brew update` only for `macup check --refresh`
+/// - `brew uses --installed --formula|--cask <formula>` only when someone asks
+///   what depends on one formula, never during a check
 ///
 /// Every invocation sets `HOMEBREW_NO_AUTO_UPDATE=1`: `brew outdated` is one
 /// of the commands Homebrew auto-updates before, and a normal check must not
@@ -16,6 +19,7 @@ public struct HomebrewProvider: UpdateProvider {
     public let id = ProviderID.homebrew
     public let capabilities: Set<ProviderCapability> = [
         .detect, .inventory, .outdated, .refreshMetadata, .planUpdates, .updateSelectedItems, .verifyUpdates,
+        .listDependents,
     ]
     public var standardLocations: [String]
 
@@ -147,6 +151,9 @@ public struct HomebrewProvider: UpdateProvider {
 
     public func inventory(context: ProviderContext) async throws -> ProviderListing<ManagedItem> {
         let installation = try await requireInstallation(context)
+        // Asked alongside `brew info`, not after it: the two are independent,
+        // and a check should not wait for one to start the other.
+        async let services = readServices(installation, context: context)
         let result = try await run(["info", "--json=v2", "--installed"], installation, context: context)
         guard result.succeeded else {
             throw MacUpError.commandFailed(result, "`brew info` failed.")
@@ -159,6 +166,9 @@ public struct HomebrewProvider: UpdateProvider {
         if let prefix = installation.fact("prefix") {
             listing.elements = Self.annotate(listing.elements, prefix: prefix, fileSystem: context.fileSystem)
         }
+        let serviceState = Self.annotate(listing.elements, services: await services)
+        listing.elements = serviceState.items
+        listing.findings += serviceState.findings
         return listing
     }
 
@@ -208,7 +218,7 @@ public struct HomebrewProvider: UpdateProvider {
     public func refine(_ candidates: [UpdateCandidate], using inventory: [ManagedItem]) -> [UpdateCandidate] {
         let items = Dictionary(inventory.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         return candidates.map { candidate in
-            guard let item = items[candidate.id] else { return candidate }
+            guard let item = items[candidate.id] else { return Self.addingDataImpact(candidate) }
             var signals: Set<RiskSignal> = []
             var notes: [String] = []
             if item.details["usesInstallerPackage"] == "true" {
@@ -244,11 +254,15 @@ public struct HomebrewProvider: UpdateProvider {
                     notes.append("No version of \(item.displayName) is linked, so its commands are not on your PATH.")
                 }
             }
+            let service = Self.serviceImpact(of: item)
+            signals.formUnion(service.signals)
+            notes += service.notes
             var refined = candidate.adding(signals: signals, notes: notes)
             // Kept verbatim; ``UpdateCandidate/releaseInfoLink`` decides whether it is safe to offer.
             if let homepage = item.details["homepage"] { refined.details["homepage"] = homepage }
             if let incomplete { refined.details["incompleteVersions"] = incomplete }
             if item.details["buildsFromSource"] == "true" { refined.details["buildsFromSource"] = "true" }
+            if let status = item.details["serviceStatus"], status != "none" { refined.details["serviceStatus"] = status }
             // The version in use, not merely the newest folder: after an
             // interrupted upgrade the newest folder can be an empty one.
             if let inUse = Self.versionInUse(item), inUse != refined.installedVersion?.raw {
@@ -257,7 +271,7 @@ public struct HomebrewProvider: UpdateProvider {
                     scheme: RuntimeCatalog.versionScheme(for: item.displayName)
                 )
             }
-            return refined
+            return Self.addingDataImpact(refined)
         }
     }
 

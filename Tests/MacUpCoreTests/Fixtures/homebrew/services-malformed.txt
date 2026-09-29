@@ -1,0 +1,2 @@
+Name  Status  User    File
+mysql started example ~/Library/LaunchAgents/homebrew.mxcl.mysql.plist
