@@ -126,9 +126,6 @@ struct AppEnvironment {
     /// needed rather than remembered, so a bundle rebuilt underneath the
     /// running app is not reported wrongly.
     var bundledExecutablePath: String?
-    /// TypeSafe and the Keychain, for opt-in AI help. Unavailable unless set,
-    /// so an environment built without it sends nothing; tests pass fakes.
-    var ai: AIService = .unavailable
 
     static func live() -> AppEnvironment {
         let runner = ProcessCommandRunner()
@@ -154,8 +151,7 @@ struct AppEnvironment {
             processEnvironment: processEnvironment,
             system: .current(),
             bundledExecutablePath: Bundle.main.bundleURL
-                .appendingPathComponent("Contents/Helpers/macup").path,
-            ai: AIState.liveService()
+                .appendingPathComponent("Contents/Helpers/macup").path
         )
     }
 }

@@ -104,18 +104,7 @@ enum PlanWorkflow {
         let planner = UpdatePlanner.standard()
         let environment = context.checkEnvironment
         return await Interruption.run(handlingInterrupts: context.handlesInterrupts) {
-            // The same check the planner would run itself, so that saved AI
-            // cautions can be added before policy decides (AI/UpdateInsight.swift),
-            // and the plan's filter judges the very report the plan came from.
-            let report = context.aiCautioned(
-                await CheckEngine(providers: planner.providers).run(
-                    configuration: configuration,
-                    options: CheckOptions(refreshMetadata: request.refreshMetadata),
-                    environment: environment
-                ),
-                configuration: configuration
-            )
-            return (report, await planner.plan(report, request: request, configuration: configuration, environment: environment))
+            await planner.checkAndPlan(request, configuration: configuration, environment: environment)
         }
     }
 }

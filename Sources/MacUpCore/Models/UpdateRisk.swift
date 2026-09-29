@@ -49,9 +49,6 @@ public enum RiskSignal: String, Sendable, Hashable, Codable, CaseIterable, Compa
     /// A database moving to a new major version, which may convert its data
     /// files the first time it starts, in a way the old version cannot read.
     case mayMigrateData
-    /// An AI estimate the user asked for advises care (AI/UpdateInsight.swift).
-    /// It only ever adds caution: MacUp asks first.
-    case aiCaution
 
     public var explanation: String {
         switch self {
@@ -68,7 +65,6 @@ public enum RiskSignal: String, Sendable, Hashable, Codable, CaseIterable, Compa
         case .installationIncomplete: "An earlier install of it did not finish"
         case .runsAsService: "Runs as a background service, which keeps the old version until it restarts"
         case .mayMigrateData: "A database whose new major version may convert its data files, which cannot be undone"
-        case .aiCaution: "An AI estimate from TypeSafe advises care; see its note"
         }
     }
 
@@ -80,12 +76,6 @@ public enum RiskSignal: String, Sendable, Hashable, Codable, CaseIterable, Compa
             .high
         case .runtimeOrToolchain, .targetVersionNotGuaranteed, .mayRewriteConfiguration,
              .mayAffectDependents, .packageManagerSelfUpdate, .buildsFromSource, .runsAsService:
-            .moderate
-        // Moderate, not high: an unclassifiable change must stay unknown,
-        // which asks first on its own, rather than become a high risk that
-        // `confirmMajorUpdates` could wave through. The policy engine asks
-        // first for this signal regardless.
-        case .aiCaution:
             .moderate
         }
     }

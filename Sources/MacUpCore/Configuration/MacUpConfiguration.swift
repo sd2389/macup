@@ -15,9 +15,6 @@ public struct MacUpConfiguration: Sendable, Hashable, Codable {
     public var schedule: ScheduleSettings
     public var privacy: PrivacySettings
     public var security: SecuritySettings
-    /// Optional AI help, absent until the user first changes it; see
-    /// ``aiSettings`` for the value in effect (AI/AISettings.swift).
-    public var ai: AISettings?
 
     public init(
         schemaVersion: Int = MacUpConfiguration.currentSchemaVersion,
@@ -26,8 +23,7 @@ public struct MacUpConfiguration: Sendable, Hashable, Codable {
         items: [String: ItemSettings] = [:],
         schedule: ScheduleSettings = ScheduleSettings(),
         privacy: PrivacySettings = PrivacySettings(),
-        security: SecuritySettings = SecuritySettings(),
-        ai: AISettings? = nil
+        security: SecuritySettings = SecuritySettings()
     ) {
         self.schemaVersion = schemaVersion
         self.global = global
@@ -36,7 +32,6 @@ public struct MacUpConfiguration: Sendable, Hashable, Codable {
         self.schedule = schedule
         self.privacy = privacy
         self.security = security
-        self.ai = ai
     }
 
     /// Used when no configuration file exists: every provider enabled,
@@ -214,7 +209,7 @@ public struct MacUpConfiguration: Sendable, Hashable, Codable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case schemaVersion, global, providers, items, schedule, privacy, security, ai
+        case schemaVersion, global, providers, items, schedule, privacy, security
     }
 
     public init(from decoder: any Decoder) throws {
@@ -226,6 +221,5 @@ public struct MacUpConfiguration: Sendable, Hashable, Codable {
         schedule = try container.decodeIfPresent(ScheduleSettings.self, forKey: .schedule) ?? ScheduleSettings()
         privacy = try container.decodeIfPresent(PrivacySettings.self, forKey: .privacy) ?? PrivacySettings()
         security = try container.decodeIfPresent(SecuritySettings.self, forKey: .security) ?? SecuritySettings()
-        ai = try container.decodeIfPresent(AISettings.self, forKey: .ai)
     }
 }

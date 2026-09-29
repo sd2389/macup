@@ -71,11 +71,9 @@ struct CheckCommand: AsyncParsableCommand {
 
         let engine = context.engine
         let environment = context.checkEnvironment
-        let checked = await Interruption.run(handlingInterrupts: context.handlesInterrupts) {
+        let report = await Interruption.run(handlingInterrupts: context.handlesInterrupts) {
             await engine.run(configuration: loaded, options: options, environment: environment)
         }
-        // Saved AI cautions, only while AI help is on; they can only add caution.
-        let report = context.aiCautioned(checked, configuration: loaded)
 
         // A filter narrows what is printed, never what is saved: the saved
         // report is always the whole check.

@@ -18,7 +18,6 @@ struct FeaturesView: View {
                 AutomaticChecksFeature()
                 ApprovalFeature()
                 FaceMatchFeature()
-                AIHelpFeature()
             }
             .padding(20)
             .frame(maxWidth: 1180, alignment: .leading)
@@ -39,7 +38,7 @@ struct FeaturesView: View {
 ///
 /// A card rather than a form section, so the description sits with the thing
 /// it describes and the settings are visibly part of the same feature.
-struct FeatureCard<Detail: View>: View {
+private struct FeatureCard<Detail: View>: View {
     let symbol: String
     let title: String
     let summary: String

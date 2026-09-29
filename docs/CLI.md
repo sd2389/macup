@@ -12,8 +12,7 @@ These commands write **MacUp's own configuration file** and no packages:
 `macup policy set`, `macup policy clear`, `macup policy skip|unskip|note`,
 `macup exclude`, `macup provider enable`, `macup provider disable`, `macup
 schedule enable`, `macup schedule disable`, `macup security require`, and
-`macup security face enroll|forget`. So do `macup ai enable|disable`, and
-`macup ask` when you confirm the change it shows.
+`macup security face enroll|forget`.
 
 `macup diagnostics export` writes **one new file**, for a bug report, and
 nothing else.
@@ -21,11 +20,6 @@ nothing else.
 **Everything else only reads**, including plain `macup`, `macup check`,
 `macup plan`, `macup explain`, `macup dependents`, `macup doctor`, `macup diagnostics
 preview`, `macup history`, `macup policy list`, `macup provider list`, and `macup config`.
-
-**Nothing leaves this Mac** unless you turn on AI help (off by default; see
-"AI help from TypeSafe" below). Then `macup ask`, `macup insight`, and
-`macup ai test` — and nothing else — send a few listed fields to TypeSafe
-when you run them.
 
 Nothing runs on a schedule but a check. The launchd agent MacUp installs is
 only ever allowed to run `macup check --save-state`, and a static check in
@@ -105,14 +99,6 @@ macup --generate-completion-script zsh > ~/.zsh/completions/_macup
 | `macup security face` / `macup security face status [--json]` | Whether a face is enrolled, and how well it can match. Opens no camera. |
 | `macup security face enroll [--samples <n>]` | Takes a few pictures and remembers what they look like. |
 | `macup security face forget` | Deletes the enrolled face and turns the camera check off. |
-| `macup ai` / `macup ai status [--json]` | Whether AI help is on, where the key comes from (Keychain or `TYPESAFE_API_KEY`, never the key itself), and the model. Read-only. |
-| `macup ai disclosure [--json]` | Exactly what each AI feature sends and what is never sent. Read-only. |
-| `macup ai enable [--yes] [--json]` / `macup ai disable [--json]` | Turns AI help on after showing the disclosure (at a terminal it asks; elsewhere pass `--yes`), or off. Needs a key first. Sends nothing. |
-| `macup ai key set` / `macup ai key clear` | Saves your key in the Keychain (read with echo off, or piped in; never an argument), or removes it. |
-| `macup ai test [--json]` | One tiny request that says nothing about this Mac; prints the model that answered and how long it took. |
-| `macup ai forget [--json]` | Deletes the AI estimates saved on this Mac, and the cautions they added. |
-| `macup ask "<request>" [--yes] [--json]` | Turns a request in plain words into one change it shows exactly and makes only when you confirm, or explains an item. See below. |
-| `macup insight <package-id>… \| --all [--fresh] [--json]` | Asks TypeSafe whether an update needs extra care. An answer can only add caution. See below. |
 | `macup --help`, `macup --version` | Help and version. |
 
 ### `macup update`
@@ -336,107 +322,6 @@ It is therefore a shortcut, never the thing that makes a change safe:
 - `status` reports how far apart your own enrolled samples are. If that spread
   is wider than `security.faceMatchThreshold`, matching cannot work, and MacUp
   says so rather than letting you find out later.
-
-## AI help from TypeSafe
-
-Optional, and off until you turn it on. With it off MacUp makes no network
-request of its own and behaves exactly as it does without it. With it on,
-three commands send a few fields to TypeSafe (`api.typesafe.ai`), only when
-you run them: `macup ask`, `macup insight`, and `macup ai test`.
-`docs/TRUST_AND_SECURITY.md` ("The opt-in AI boundary") has the whole
-contract.
-
-```bash
-macup ai key set        # paste your TypeSafe API key; it is not shown or kept in a file
-macup ai disclosure     # exactly what each feature sends
-macup ai enable         # shows that again and asks; --yes in a script
-macup ai test           # one tiny request, to check the key works
-macup ai                # on or off, where the key comes from, the model
-macup ai disable        # MacUp sends nothing again
-```
-
-The key is looked for in MacUp's Keychain item (`dev.macup.typesafe`) and
-then in `TYPESAFE_API_KEY`. It is never printed, never accepted as an
-argument (arguments stay in your shell history), and never written to the
-configuration, history, or diagnostics. `TYPESAFE_BASE_URL` is ignored:
-nothing can change where the key is sent.
-
-### `macup ask`
-
-```bash
-macup ask "stop updating mysql"
-macup ask "ask me before any postgres update"
-macup ask "auto-update my npm tools"
-macup ask "turn off mise"
-macup ask "skip this node version"
-macup ask "note on php: waiting for 8.4 support"
-macup ask "why is mysql held?"
-```
-
-MacUp reads what is installed (read-only), then asks TypeSafe one request of
-closed questions: which action, out of MacUp's own list (set an item's
-policy, set a provider's policy, turn a provider on or off, skip the version
-on offer, stop skipping, keep a note, explain an item, or none of these);
-which package, out of the ones MacUp found (with more than 254, the closest
-to your words, chosen in code); which policy; which provider; and which
-words of your request are a note. TypeSafe picks; it never invents a package,
-a policy, or a note.
-
-MacUp trusts the result only as far as the least certain answer it uses.
-Below 60%, it says it is not sure and lists its best guesses, each with the
-command that would make it; nothing changes. Otherwise it shows the exact
-change — what, where in the file, what is there now, and the equivalent
-`macup policy` or `macup provider` command — and:
-
-- at a terminal, asks `Make this change? [y/N]`; only `y` or `yes` is a yes;
-- anywhere else, and with `--json`, asks nobody, changes nothing, and prints
-  the command;
-- with `--yes`, makes the change without asking only when TypeSafe is at
-  least 85% sure **and** the change makes MacUp more careful. Auto Update,
-  turning a provider back on, and stopping a skip always need you to see
-  them first.
-
-A confirmed change goes through the same approval and the same
-`PolicyEditor` as `macup policy set`. An explanation ("why is mysql held?")
-reads the rules and the last check and changes nothing.
-
-### `macup insight`
-
-```bash
-macup insight brew:mysql
-macup insight --all          # every update except macOS ones
-macup insight brew:mysql --fresh
-```
-
-For each update MacUp sends the package ID and name, its package manager and
-kind, and the two versions, and asks what kind of software it is and whether
-a major upgrade of it commonly migrates its data. Code decides what follows.
-Only a confident judgment (80% or more) that a database, or data that gets
-migrated, meets a major version change — or a change MacUp could not
-classify — adds a note such as:
-
-```text
-AI estimate from TypeSafe, 91%: mysql looks like a database; a major upgrade may migrate its data on first start — back up first.
-```
-
-and makes the item ask first if its rule is Auto Update, with the reason
-"An AI estimate from TypeSafe says updating mysql needs extra care, so it
-asks first." Nothing is ever judged safer than it was: risk only goes up, and
-a change that was waiting for you keeps waiting.
-
-The answer is saved in `~/.local/state/macup/ai-estimates.json` (owner-only)
-for that exact version change, so the same update is not sent twice, and
-`macup check`, `plan`, and `update` apply saved cautions while AI help is on
-— reading that file, sending nothing. `--fresh` asks again; `macup ai forget`
-deletes them. macOS updates are never sent; they always wait for you anyway.
-
-### Exit status
-
-`macup ai`, `ask`, and `insight` use the table below. AI help being off, no
-key, no network, or an answer MacUp could not read is exit 1 with the reason;
-a configuration with errors is 3 (AI help stays off while it has them); a
-refused approval is 77. MacUp not being sure is not an error: it is exit 0,
-with nothing changed.
 
 ## Scheduled checks
 
@@ -786,32 +671,3 @@ the millisecond.
   `executablePath`, `executableExists`, `nextRun`, `logPath`, `warnings[]`,
   and `lastCheck` (`path`, `finishedAt`, `updatesAvailable`,
   `providersWithErrors`, `unreadable`) when a saved report exists.
-- `macup ai status --json` → `"kind": "aiStatus"`: `enabled`, `active` (every
-  condition for sending holds), `configurationReadable`, `model`, `host`,
-  `keySource` (`keychain`, `environment`, or null), `keychainHasKey`,
-  `environmentHasKey`, `problems[]`, `summary`. Never the key.
-- `macup ai disclosure --json` → `"kind": "aiDisclosure"`: `recipient`,
-  `features[]` (`id`, `title`, `when`, `sends[]`), `withEveryRequest[]`,
-  `neverSent[]`, `dataProcessingAgreement`.
-- `macup ai enable|disable --json` → `"kind": "aiChange"`: `change`
-  (`previousValue`, `newValue`, `changed`, `path` — `ai.enabled` — `summary`).
-- `macup ai test --json` → `"kind": "aiTest"`: `model` (the versioned model
-  that answered), `milliseconds`, `keySource`, `inputTokens`.
-- `macup ai forget --json` → `"kind": "aiForget"`: `removed`.
-- `macup ask --json` → `"kind": "ask"`: `interpretation` (`request` — what
-  was sent, after redaction — `model`, `action`, `confidence` — the least
-  certain answer used — `outcome` (`proposal`, `explanation`, `unsure`,
-  `noMatch`, `notPossible`, `notUnderstood`), `message`, `proposal`,
-  `guesses[]`, `explanation`, `offeredItems`, `knownItems`), `applied` (a
-  `policyChange` entry, when a change was confirmed), `notApplied` (why not).
-  A proposal: `title`, `effect`, `path`, `currentValue`, `newValue`,
-  `loosens`, `command`, `confidence`, and `change` (`kind` —
-  `setItemPolicy`, `clearItemPolicy`, `setProviderPolicy`,
-  `setProviderEnabled`, `skipVersion`, `unskipVersion`, `setNote` — with
-  `item` or `provider`, and `policy`, `enabled`, `version`, or `note`).
-- `macup insight --json` → `"kind": "insight"`: `entries[]` (`item`,
-  `installedVersion`, `availableVersion`, `versionChange`, `estimate`
-  (`softwareKind`, `softwareKindProbability`, `softwareKindConfidence`,
-  `dataMigrationProbability`, `model`, `askedAt`), `caution` (`note`,
-  `probability`) or absent, `fromCache`, `saveProblem`, and the policy
-  `before` and `after` the estimate).

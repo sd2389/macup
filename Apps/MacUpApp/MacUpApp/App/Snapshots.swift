@@ -58,7 +58,6 @@ enum Snapshots {
             await captureFilteredUpdates(model: model, main: main, into: directory, suffix: suffix)
             await captureDependents(model: model, main: main, into: directory, suffix: suffix)
             await captureSheets(model: model, main: main, into: directory, suffix: suffix)
-            await captureAI(model: model, main: main, into: directory, suffix: suffix)
         }
         openSettings()
         try? await Task.sleep(for: .milliseconds(1200))
@@ -244,7 +243,7 @@ enum Snapshots {
     }
 
     @MainActor
-    static func write(_ window: NSWindow, to directory: PrivateDirectory, named name: String) {
+    private static func write(_ window: NSWindow, to directory: PrivateDirectory, named name: String) {
         // The frame view (content view's superview) includes the title bar and toolbar.
         guard let view = window.contentView?.superview ?? window.contentView,
               let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds)

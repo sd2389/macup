@@ -69,12 +69,10 @@ configuration error (exit status 3), never a guess.
 | `security.allowPasswordFallback` | `true`/`false` — let the login password or an unlocked Apple Watch stand in for the sensor | `true` |
 | `security.faceUnlock` | `true`/`false` — let MacUp's own camera face match approve early | `false` |
 | `security.faceMatchThreshold` | distance greater than 0 and no more than 5; smaller is stricter | `0.6` |
-| `ai.enabled` | `true`/`false` — let MacUp send the AI requests you ask for | `false` |
-| `ai.model` | a TypeSafe model name: letters, digits, `.`, `-`, `_` (for example `jev-1.13.0` to pin a version) | `jev-latest` |
 
 Omitted sections take the defaults above. When no file exists, every
-provider is enabled, everything is Ask First, scheduling is off, there
-is no telemetry, and AI help is off.
+provider is enabled, everything is Ask First, scheduling is off, and there
+is no telemetry.
 
 Every key above is now read and acted on. `providers.<id>.enabled` decides
 which providers run at all; `providers.<id>.executablePath` decides which
@@ -94,23 +92,6 @@ with `macup schedule enable` and `macup schedule disable` rather than by
 hand: those commands also install and remove the launchd agent that does the
 work. Editing `schedule.enabled` in the file on its own schedules nothing —
 `macup schedule status` will say so.
-
-The `ai` section is what `macup ai enable|disable` and the Features screen
-write:
-
-```json
-"ai": { "enabled": true, "model": "jev-latest" }
-```
-
-It is absent until you first turn AI help on, and turning it off removes it
-again when the rest of it is the default, so a MacUp that never uses AI help
-writes the same file it always did. The API key is never in this file: it
-lives in the Keychain, or in `TYPESAFE_API_KEY` (docs/TRUST_AND_SECURITY.md).
-An `ai` section MacUp cannot read with certainty — an unknown key, a model
-name that is not one, `"enabled": "yes"` — is an error like any other, so AI
-help stays off and automatic modification is disabled until it is fixed;
-MacUp never reads a doubtful section as permission to send. Saved AI
-estimates live in the state directory (`ai-estimates.json`), not here.
 
 ## Validation fails closed
 

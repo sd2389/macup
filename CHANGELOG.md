@@ -46,14 +46,6 @@ claim that 0.4.0 has been released.
   replaced by placeholders unless asked for, secrets, home paths, and the user
   name removed, no environment variables, never overwriting, readable only by
   you.
-- **Opt-in AI help from TypeSafe**, off by default. With it off MacUp makes no
-  network request of its own. With a key (kept in the Keychain) and after
-  seeing exactly what is sent: "Ask MacUp" (`macup ask`) turns a plain
-  request into a rule change you confirm, and an on-demand estimate
-  (`macup insight`) can add a labelled caution that makes an item ask first.
-  AI never lowers risk, never allows what policy denies, and never changes
-  configuration without confirmation. `macup ai status|enable|disable|key
-  set|key clear|test|disclosure|forget`, and a card on the Features screen.
 - **App layout**: the sidebar is now Dashboard, Providers, Updates,
   Features, Doctor, History. The dashboard lists pending updates first and
   the items your rules ignore or hold below them, each with the way to clear

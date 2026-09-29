@@ -389,8 +389,6 @@ private struct UpdateDetail: View {
                 }
             }
 
-            AIEstimateSection(update: update)
-
             if let ownership = update.ownership, !ownership.links.isEmpty {
                 Section("Managed By") {
                     ForEach(Array(ownership.links.enumerated()), id: \.offset) { _, link in
