@@ -43,6 +43,12 @@ public enum RiskSignal: String, Sendable, Hashable, Codable, CaseIterable, Compa
     case buildsFromSource
     /// An earlier install of this item never finished.
     case installationIncomplete
+    /// The item is running now as a background service. The update changes
+    /// the files it starts from while the running copy stays on the old version.
+    case runsAsService
+    /// A database moving to a new major version, which may convert its data
+    /// files the first time it starts, in a way the old version cannot read.
+    case mayMigrateData
 
     public var explanation: String {
         switch self {
@@ -57,6 +63,8 @@ public enum RiskSignal: String, Sendable, Hashable, Codable, CaseIterable, Compa
         case .packageManagerSelfUpdate: "Updates a package manager itself"
         case .buildsFromSource: "Will be built from source, which can take a long time"
         case .installationIncomplete: "An earlier install of it did not finish"
+        case .runsAsService: "Runs as a background service, which keeps the old version until it restarts"
+        case .mayMigrateData: "A database whose new major version may convert its data files, which cannot be undone"
         }
     }
 
@@ -64,10 +72,10 @@ public enum RiskSignal: String, Sendable, Hashable, Codable, CaseIterable, Compa
     public var minimumLevel: RiskLevel {
         switch self {
         case .operatingSystemUpdate, .restartRequired, .administratorAuthorizationMayBeRequired, .pinnedByProvider,
-             .installationIncomplete:
+             .installationIncomplete, .mayMigrateData:
             .high
         case .runtimeOrToolchain, .targetVersionNotGuaranteed, .mayRewriteConfiguration,
-             .mayAffectDependents, .packageManagerSelfUpdate, .buildsFromSource:
+             .mayAffectDependents, .packageManagerSelfUpdate, .buildsFromSource, .runsAsService:
             .moderate
         }
     }

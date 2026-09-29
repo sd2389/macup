@@ -109,6 +109,13 @@ Show:
 - config/restart/admin effects
 - verification behavior
 - rollback availability truthfully
+- whether it runs as a service right now (it keeps the old version until it
+  restarts; MacUp never restarts it), and for a database moving to a new
+  major version, that its data may be converted for good: back up first.
+  Both also get one line in the row
+- What Depends on It (Homebrew formulae): a button, since the answer is slow
+  to work out, with progress, Cancel, and the answer's time; never shown for
+  an item MacUp cannot ask about
 
 ### Policies
 

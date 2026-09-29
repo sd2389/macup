@@ -4,7 +4,7 @@ import Foundation
 ///
 /// Only a few documented fields are used: `full_name`, `installed[].version`,
 /// `installed[].installed_on_request`, `linked_keg`, `pinned`, `tap`, `desc`,
-/// `deprecated`, `disabled`, `homepage`, `bottle.stable.files[].cellar` for formulae; `token`, `name`,
+/// `deprecated`, `disabled`, `homepage`, `bottle.stable.files[].cellar`, whether `service` is set for formulae; `token`, `name`,
 /// `installed`, `pinned`, `auto_updates`, `artifacts`, `homepage` for casks. Everything else is ignored.
 enum HomebrewInventoryParser {
     static func parse(_ data: Data, ownership: OwnershipChain?, command: String? = nil) throws -> ProviderListing<ManagedItem> {
@@ -49,6 +49,9 @@ enum HomebrewInventoryParser {
             }
             if entry["deprecated"]?.boolValue == true { details["deprecated"] = "true" }
             if entry["disabled"]?.boolValue == true { details["disabled"] = "true" }
+            // A formula with a service block can run in the background under
+            // `brew services`. Whether it does is read from that command.
+            if entry["service"]?.objectValue != nil { details["definesService"] = "true" }
             listing.elements.append(ManagedItem(
                 id: id,
                 kind: .formula,

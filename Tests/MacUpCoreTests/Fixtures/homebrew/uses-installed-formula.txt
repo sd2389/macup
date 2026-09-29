@@ -1,0 +1,10 @@
+aws-c-auth
+aws-c-cal
+awscli
+ffmpeg
+krb5
+libssh2
+mysql
+postgresql@16
+python@3.14
+redis

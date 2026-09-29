@@ -147,6 +147,13 @@ names a package, so a rule that forbids positionals is exactly right, and it
 is what makes a read-only command structurally unable to act on something.
 `ReadOnlyCommandGuard` enforces it.
 
+One read-only question does have to name an item: what depends on it
+(`brew uses --installed`). Its rules live apart, in
+`CommandAllowlist.dependentsLookup`, and take exactly one positional,
+checked like a modifying command's. Only `DependentsLookup` adds them to
+the check's rules, when someone asks about that item; `CheckEngine` never
+does, so a check still cannot name anything.
+
 `ModifyingCommandRules.all` bounds what an **update** may run. A modifying
 command has to name the thing it changes, so `ModifyingCommandRule` allows
 positional arguments — and then checks them rather than trusting them. A

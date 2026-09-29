@@ -1,0 +1,86 @@
+{
+  "formulae": [
+    {
+      "name": "colima",
+      "full_name": "colima",
+      "tap": "homebrew/core",
+      "desc": "Container runtimes with minimal setup",
+      "installed": [{"version": "0.8.0", "installed_on_request": true, "installed_as_dependency": false}],
+      "linked_keg": "0.8.0",
+      "pinned": false,
+      "keg_only": false,
+      "service": {
+        "run": ["/Users/example/.homebrew/opt/colima/bin/colima", "start", "-f"],
+        "run_type": "immediate",
+        "keep_alive": {"successful_exit": true},
+        "environment_variables": {"PATH": "/Users/example/.homebrew/bin:/usr/bin:/bin"}
+      },
+      "bottle": {"stable": {"files": {"arm64_golden_gate": {"cellar": ":any_skip_relocation"}}}}
+    },
+    {
+      "name": "jq",
+      "full_name": "jq",
+      "tap": "homebrew/core",
+      "desc": "Lightweight and flexible command-line JSON processor",
+      "installed": [{"version": "1.7.1", "installed_on_request": true, "installed_as_dependency": false}],
+      "linked_keg": "1.7.1",
+      "pinned": false,
+      "keg_only": false,
+      "service": null,
+      "bottle": {"stable": {"files": {"arm64_golden_gate": {"cellar": ":any"}}}}
+    },
+    {
+      "name": "mysql",
+      "full_name": "mysql",
+      "tap": "homebrew/core",
+      "desc": "Open source relational database management system",
+      "installed": [{"version": "8.0.40", "installed_on_request": true, "installed_as_dependency": false}],
+      "linked_keg": "8.0.40",
+      "pinned": false,
+      "keg_only": false,
+      "service": {
+        "run": ["/Users/example/.homebrew/opt/mysql/bin/mysqld_safe", "--datadir=/Users/example/.homebrew/var/mysql"],
+        "run_type": "immediate",
+        "keep_alive": {"always": true},
+        "working_dir": "/Users/example/.homebrew/var/mysql"
+      },
+      "bottle": {"stable": {"files": {"arm64_golden_gate": {"cellar": ":any"}}}}
+    },
+    {
+      "name": "postgresql@16",
+      "full_name": "postgresql@16",
+      "tap": "homebrew/core",
+      "desc": "Object-relational database system",
+      "installed": [{"version": "16.4", "installed_on_request": true, "installed_as_dependency": false}],
+      "linked_keg": null,
+      "pinned": false,
+      "keg_only": true,
+      "service": {
+        "run": ["/Users/example/.homebrew/opt/postgresql@16/bin/postgres", "-D", "/Users/example/.homebrew/var/postgresql@16"],
+        "run_type": "immediate",
+        "keep_alive": {"always": true},
+        "log_path": "/Users/example/.homebrew/var/log/postgresql@16.log",
+        "working_dir": "/Users/example/.homebrew"
+      },
+      "bottle": {"stable": {"files": {"arm64_golden_gate": {"cellar": ":any"}}}}
+    },
+    {
+      "name": "redis",
+      "full_name": "redis",
+      "tap": "homebrew/core",
+      "desc": "Persistent key-value database, with built-in net interface",
+      "installed": [{"version": "7.2.4", "installed_on_request": true, "installed_as_dependency": false}],
+      "linked_keg": "7.2.4",
+      "pinned": false,
+      "keg_only": false,
+      "service": {
+        "run": ["/Users/example/.homebrew/opt/redis/bin/redis-server", "/Users/example/.homebrew/etc/redis.conf"],
+        "run_type": "immediate",
+        "keep_alive": {"always": true},
+        "working_dir": "/Users/example/.homebrew/var"
+      },
+      "bottle": {"stable": {"files": {"arm64_golden_gate": {"cellar": ":any"}}}}
+    }
+  ],
+  "casks": []
+}

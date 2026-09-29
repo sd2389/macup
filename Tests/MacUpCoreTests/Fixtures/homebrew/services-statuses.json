@@ -1,0 +1,50 @@
+[
+  {
+    "name": "certbot",
+    "status": "scheduled",
+    "user": "example",
+    "file": "/Users/example/Library/LaunchAgents/homebrew.mxcl.certbot.plist",
+    "exit_code": 0
+  },
+  {
+    "name": "unbound",
+    "status": "started",
+    "user": "root",
+    "file": "/Library/LaunchAgents/homebrew.mxcl.unbound.plist",
+    "exit_code": null
+  },
+  {
+    "name": "nginx",
+    "status": "error",
+    "user": "example",
+    "file": "/Users/example/Library/LaunchAgents/homebrew.mxcl.nginx.plist",
+    "exit_code": 78
+  },
+  {
+    "name": "dnsmasq",
+    "status": "stopped",
+    "user": "example",
+    "file": "/Users/example/Library/LaunchAgents/homebrew.mxcl.dnsmasq.plist",
+    "exit_code": 0
+  },
+  {
+    "name": "memcached",
+    "status": "other",
+    "user": "example",
+    "file": "/Users/example/Library/LaunchAgents/homebrew.mxcl.memcached.plist",
+    "exit_code": null
+  },
+  {
+    "name": "rabbitmq",
+    "status": "hibernating",
+    "user": "example",
+    "file": "/Users/example/Library/LaunchAgents/homebrew.mxcl.rabbitmq.plist",
+    "exit_code": null
+  },
+  {
+    "status": "started",
+    "user": "example",
+    "file": "/Users/example/Library/LaunchAgents/homebrew.mxcl.nameless.plist",
+    "exit_code": null
+  }
+]

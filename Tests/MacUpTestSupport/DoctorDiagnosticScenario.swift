@@ -189,12 +189,14 @@ extension ManagedItem {
         )
     }
 
+    /// A formula with nothing wrong: installed and linked.
     public static func formula(_ name: String, version: String) -> ManagedItem {
         ManagedItem(
             id: try! PackageID(.brew, name),
             kind: .formula,
             displayName: name,
-            installedVersions: [InstalledVersion(version)]
+            installedVersions: [InstalledVersion(version)],
+            activeVersion: InstalledVersion(version)
         )
     }
 }

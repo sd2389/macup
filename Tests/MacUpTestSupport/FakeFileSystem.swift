@@ -93,4 +93,16 @@ public final class FakeFileSystem: FileSystem, @unchecked Sendable {
         }
         return contents
     }
+
+    /// Every entry added directly inside the directory, by name.
+    public func contentsOfDirectory(atPath path: String) -> [String]? {
+        guard let resolved = resolvedEntry(path), case .directory = resolved.entry else { return nil }
+        let prefix = resolved.path.hasSuffix("/") ? resolved.path : resolved.path + "/"
+        return lock.withLock {
+            entries.keys
+                .filter { $0.hasPrefix(prefix) && !$0.dropFirst(prefix.count).contains("/") }
+                .map { String($0.dropFirst(prefix.count)) }
+                .sorted()
+        }
+    }
 }

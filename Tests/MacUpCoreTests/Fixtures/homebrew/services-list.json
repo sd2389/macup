@@ -1,0 +1,37 @@
+[
+  {
+    "name": "colima",
+    "status": "none",
+    "user": null,
+    "file": "/Users/example/.homebrew/opt/colima/homebrew.mxcl.colima.plist",
+    "exit_code": null
+  },
+  {
+    "name": "mysql",
+    "status": "started",
+    "user": "example",
+    "file": "/Users/example/Library/LaunchAgents/homebrew.mxcl.mysql.plist",
+    "exit_code": null
+  },
+  {
+    "name": "postgresql@16",
+    "status": "started",
+    "user": "example",
+    "file": "/Users/example/Library/LaunchAgents/homebrew.mxcl.postgresql@16.plist",
+    "exit_code": null
+  },
+  {
+    "name": "postgresql@18",
+    "status": "none",
+    "user": null,
+    "file": "/Users/example/.homebrew/opt/postgresql@18/sh.brew.postgresql@18.plist",
+    "exit_code": null
+  },
+  {
+    "name": "redis",
+    "status": "started",
+    "user": "example",
+    "file": "/Users/example/Library/LaunchAgents/homebrew.mxcl.redis.plist",
+    "exit_code": null
+  }
+]

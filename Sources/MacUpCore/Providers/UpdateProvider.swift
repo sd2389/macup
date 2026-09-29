@@ -121,6 +121,18 @@ public protocol UpdateProvider: Sendable {
     /// (CLAUDE.md §2.16, §2.17). Whatever launches a plan asks the owning
     /// provider for this rather than assembling an environment itself.
     func executionEnvironment(context: ProviderContext) -> [String: String]
+
+    /// Whether ``dependents(of:context:)`` can answer for this item. Asking
+    /// runs nothing, so a screen can decide whether to offer the question.
+    func canListDependents(of item: PackageID) -> Bool
+
+    /// What installed software depends on `item`, read-only.
+    ///
+    /// Only ever called when someone asks about that one item — never during
+    /// a check. The commands it needs name the item, and the check's
+    /// allowlist has no rule that names anything
+    /// (``CommandAllowlist/dependentsLookup``).
+    func dependents(of item: PackageID, context: ProviderContext) async throws -> ProviderListing<PackageID>
 }
 
 extension UpdateProvider {
@@ -163,6 +175,12 @@ extension UpdateProvider {
             from: context.environment,
             searchPath: SearchPath.combine(directory, SearchPath.system)
         )
+    }
+
+    public func canListDependents(of item: PackageID) -> Bool { false }
+
+    public func dependents(of item: PackageID, context: ProviderContext) async throws -> ProviderListing<PackageID> {
+        throw MacUpError(.unsupported, "MacUp cannot ask \(displayName) what depends on \(item.name).")
     }
 
     /// The installation chosen at detection, or a fresh detection when a

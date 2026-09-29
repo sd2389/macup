@@ -183,6 +183,7 @@ private struct UpdateRow: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+            ServiceImpactLabel(update: update)
             if let reason = decision?.reason {
                 Text(reason.displaySafe)
                     .font(.caption)
@@ -405,6 +406,8 @@ private struct UpdateDetail: View {
                     }
                 }
             }
+
+            DependentsSection(update: update)
 
             if !update.details.isEmpty {
                 Section("Details") {

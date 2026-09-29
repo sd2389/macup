@@ -37,17 +37,63 @@ MacUp could not parse as `failed`; neither is rounded up to success.
 ## Homebrew (`homebrew`)
 
 Capabilities: detect, inventory, outdated, refreshMetadata, planUpdates,
-verifyUpdates.
+verifyUpdates, listDependents.
 
 | Purpose | Command |
 | --- | --- |
 | Detect | `brew --version`, `brew --prefix` |
 | Candidates | `brew outdated --json=v2` |
-| Inventory | `brew info --json=v2 --installed` |
+| Inventory | `brew info --json=v2 --installed`, with `brew services list --json` beside it |
 | Refresh (`--refresh` only) | `brew update` |
+| What depends on a formula (asked for only) | `brew uses --installed --formula <name>`, `brew uses --installed --cask <name>` |
 | Update a formula | `brew upgrade --formula --yes <name>` |
 | Update a cask | `brew upgrade --cask --yes <token>` |
 | Verify | `brew info --json=v2 --installed` |
+
+### Services, dependents, and what an update affects
+
+Confirmed against Homebrew 7.0.6's own source (`cmd/services.rb`,
+`services/subcommand/list.rb`, `cmd/uses.rb`, `cmd/link.rb`,
+`cli/named_args.rb`, `caveats.rb`):
+
+- **`brew services list --json` only lists.** It prints `name`, `status`,
+  `user`, `file`, and `exit_code` for every installed formula that defines a
+  service (`[]` when none do); `status` is `started`, `scheduled`, `stopped`,
+  `none` (not registered with launchd), `error`, `unknown`, or `other`.
+  On an older Homebrew the command came from the homebrew/services tap, and
+  running it without the tap makes Homebrew clone the tap first, so MacUp
+  runs it only when `Library/Homebrew/cmd/services.rb` (built in) or the
+  tapped command file exists. Otherwise, or when the command fails or prints
+  something unreadable, formulae that define a service (`service` in
+  `brew info`) are marked unknown — never "not running" — with a
+  `homebrew.servicesUnreadable` finding.
+- **An upgrade does not restart a service.** Homebrew's own caveat says to
+  run `brew services restart` afterwards, and a service's launchd job starts
+  it through `opt/<name>`, which the upgrade points at the new version. So a
+  running service keeps the old version until it next starts — a restart, a
+  login, a reboot — and then runs the new one. A formula running now carries
+  `runsAsService` (moderate) and a note saying to restart it yourself.
+- **Databases** (`mysql`, `mariadb`, `percona-server`, `postgresql`,
+  `mongodb-community`, `redis`, `valkey`, any `@` version, any tap) moving to
+  a new major version carry `mayMigrateData` (high, and always Ask First
+  whatever `confirmMajorUpdates` says) and a note to back up first, because
+  the new version may convert the data files the first time it starts. For
+  these, a new second number counts as a new major version (MySQL 8.0 → 8.4,
+  Redis 7.2 → 7.4), except PostgreSQL, whose first number is its major
+  version. A change MacUp cannot classify is treated as possibly major.
+- **`brew uses --installed` is read-only but slow**: it reads the install
+  record of every installed formula and answers with everything that needs
+  the formula at run time, directly or through another formula. It is on its
+  own allowlist, `CommandAllowlist.dependentsLookup`, the only read-only
+  rules that take a positional (exactly one, checked like a modifying
+  command's), and only `macup dependents` and the app's Show What Depends on
+  It use it; a check's allowlist cannot run it. A name Homebrew does not know
+  gives a warning and an empty answer with exit status 0, so an empty answer
+  with a warning is reported as "could not tell", not "nothing".
+- **`brew link` links the newest version folder**, whatever state it is in,
+  and points `opt/<name>` at it. After an interrupted upgrade that is the
+  unfinished folder, which is why Doctor's `homebrew.unfinishedInstall`
+  repair moves that folder to the Trash first and links second.
 
 ### What `brew help upgrade` changed
 

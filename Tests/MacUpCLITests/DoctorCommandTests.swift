@@ -101,7 +101,7 @@ struct DoctorCommandTests {
         #expect(object["kind"] as? String == "doctor")
 
         let report = try JSONDecoder.plan.decode(DoctorReport.self, from: Data(run.standardOutput.utf8))
-        #expect(report.summary.checksRun == 11)
+        #expect(report.summary.checksRun == DoctorEngine.standard().checks.count)
         #expect(report.summary.warnings >= 1)
         #expect(!report.isHealthy)
         #expect(report.findings.contains { $0.id == "environment.loginShellUnreadable" })

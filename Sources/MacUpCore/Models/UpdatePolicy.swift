@@ -43,6 +43,9 @@ public enum ProviderCapability: String, Sendable, Hashable, Codable, CaseIterabl
     case nativePin
     /// Verify the installed version after an update (Phase 3).
     case verifyUpdates
+    /// Say what installed software depends on an item, when someone asks.
+    /// Never part of a check.
+    case listDependents
 
     public static func < (lhs: ProviderCapability, rhs: ProviderCapability) -> Bool {
         allCases.firstIndex(of: lhs)! < allCases.firstIndex(of: rhs)!

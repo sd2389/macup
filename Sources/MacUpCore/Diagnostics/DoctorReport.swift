@@ -119,6 +119,7 @@ public struct DoctorEngine: Sendable {
                 ProviderAvailabilityCheck(),
                 ProviderResultsCheck(),
                 HomebrewInstallationCheck(),
+                HomebrewStateCheck(),
                 ExecutableArchitectureCheck(),
                 ShellEnvironmentCheck(),
                 RuntimeOwnershipCheck(),

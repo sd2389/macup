@@ -16,6 +16,15 @@ public protocol FileSystem: Sendable {
     func contents(atPath path: String, maximumBytes: Int) -> Data?
     /// Owner, group, and permission bits of `path` (symlinks followed), or `nil`.
     func ownership(ofPath path: String) -> FileOwnership?
+    /// The names in the directory at `path` (symlinks followed), or `nil`
+    /// when it is not a directory MacUp can list.
+    func contentsOfDirectory(atPath path: String) -> [String]?
+}
+
+extension FileSystem {
+    /// A file system that cannot list directories says so, rather than
+    /// claiming they are empty.
+    public func contentsOfDirectory(atPath path: String) -> [String]? { nil }
 }
 
 /// Who owns a file and who may write it.
@@ -86,5 +95,10 @@ public struct LocalFileSystem: FileSystem {
         var info = stat()
         guard stat(path, &info) == 0 else { return nil }
         return FileOwnership(uid: info.st_uid, gid: info.st_gid, mode: info.st_mode)
+    }
+
+    public func contentsOfDirectory(atPath path: String) -> [String]? {
+        guard isDirectory(atPath: path) else { return nil }
+        return try? FileManager.default.contentsOfDirectory(atPath: path)
     }
 }

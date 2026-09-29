@@ -6,20 +6,30 @@ public struct CommandRule: Sendable, Hashable {
     public var executableName: String
     /// Arguments the command must start with, for example `["outdated"]`.
     public var leadingArguments: [String]
-    /// Every argument after `leadingArguments` must be one of these.
-    /// Positional arguments (such as package names) are therefore not allowed.
+    /// Every argument after `leadingArguments` must be one of these, apart
+    /// from exactly ``positionalCount`` positionals.
     public var allowedOptions: Set<String>
+    /// How many positional arguments must follow — exactly that many.
+    ///
+    /// Zero for every rule a check uses, because a check never names a
+    /// package: that is what makes a read-only command structurally unable
+    /// to act on one. A lookup someone asked for about one item has to name
+    /// it, and that name is checked the way a modifying command's is
+    /// (``ModifyingCommandRule/isAcceptablePositional(_:)``).
+    public var positionalCount: Int
     public var effect: CommandEffect
 
     public init(
         _ executableName: String,
         _ leadingArguments: [String],
         options: Set<String> = [],
+        positionalCount: Int = 0,
         effect: CommandEffect = .readOnly
     ) {
         self.executableName = executableName
         self.leadingArguments = leadingArguments
         self.allowedOptions = options
+        self.positionalCount = positionalCount
         self.effect = effect
     }
 
@@ -29,7 +39,12 @@ public struct CommandRule: Sendable, Hashable {
         guard arguments.count >= leadingArguments.count,
               Array(arguments.prefix(leadingArguments.count)) == leadingArguments
         else { return false }
-        return arguments.dropFirst(leadingArguments.count).allSatisfy(allowedOptions.contains)
+        var positionals = 0
+        for argument in arguments.dropFirst(leadingArguments.count) where !allowedOptions.contains(argument) {
+            guard ModifyingCommandRule.isAcceptablePositional(argument) else { return false }
+            positionals += 1
+        }
+        return positionals == positionalCount
     }
 }
 

@@ -18,8 +18,8 @@ schedule enable`, `macup schedule disable`, `macup security require`, and
 nothing else.
 
 **Everything else only reads**, including plain `macup`, `macup check`,
-`macup plan`, `macup explain`, `macup doctor`, `macup diagnostics preview`,
-`macup history`, `macup policy list`, `macup provider list`, and `macup config`.
+`macup plan`, `macup explain`, `macup dependents`, `macup doctor`, `macup diagnostics
+preview`, `macup history`, `macup policy list`, `macup provider list`, and `macup config`.
 
 Nothing runs on a schedule but a check. The launchd agent MacUp installs is
 only ever allowed to run `macup check --save-state`, and a static check in
@@ -74,6 +74,7 @@ macup --generate-completion-script zsh > ~/.zsh/completions/_macup
 | `macup plan [<package-id>…] [--refresh] [--json] [--verbose]` | Shows what `macup update` would do: current → proposed version, provider, effective policy, risk and its reason, and the exact executable and arguments — plus every item it would leave alone, with the reason. Launches nothing. Takes the same `--risk`, `--policy`, `--attention`, and `--sort` as `check`. |
 | `macup explain <package-id> [--refresh] [--json]` | Everything MacUp knows about one item: installed and available versions, what changes and the release link, risk and every reason, notes, who manages it, the policy that decides it and the rule behind that, the exact command it would run — or exactly why it would run nothing — and its recent history. Launches nothing. The app's Copy Details copies the same text. |
 | **`macup update [<package-id>…]`** | **The only command that changes packages.** Flags below. |
+| `macup dependents <package-id> [--json] [--verbose]` | What on this Mac needs an installed Homebrew formula, directly or through another formula: the software an upgrade of it could affect. Runs `brew uses --installed --formula` and `--cask` for that one formula, which is read-only but slow, so only when you ask; `macup check` never runs it. Something other than a formula, or a formula Homebrew does not list as installed, is exit 64. See below. |
 | `macup doctor [--json] [--verbose]` | Runs MacUp's deterministic diagnostics and explains each finding. Fixes nothing. |
 | `macup diagnostics` / `macup diagnostics preview [--include-packages]` | Prints exactly what `export` would write, and writes nothing. See [Diagnostics for a bug report](#diagnostics-for-a-bug-report). |
 | `macup diagnostics export [--output <path>] [--include-packages] [--json]` | Writes that document to a new file, readable only by you. |
@@ -397,11 +398,11 @@ finish, the output says so and the check exits with status 2.
 | Code | Meaning |
 | --- | --- |
 | 0 | The command completed. For `check`, every enabled provider was checked or is simply not installed. Updates being available is not an error, and neither is `update` deciding to change nothing. |
-| 2 | `check`, `plan`, or `update` completed but at least one provider failed or left updates out (listed updates MacUp could not read, or lookups the provider could not finish); results are partial. |
+| 2 | `check`, `plan`, or `update` completed but at least one provider failed or left updates out (listed updates MacUp could not read, or lookups the provider could not finish); results are partial. For `dependents`: Homebrew could not be asked, or named something MacUp could not read. |
 | 3 | The configuration is invalid. Read-only commands still ran (a file other users could change is ignored, so defaults were used); MacUp will change nothing until it is fixed, and `policy set`/`clear`, `exclude`, and `provider enable`/`disable` refuse rather than rewrite a file they misread. When `MACUP_CONFIG_DIR`/`MACUP_STATE_DIR`/`MACUP_LAUNCH_AGENTS_DIR` is not absolute, nothing runs. |
 | 4 | `update` ran and at least one item failed. Everything it did attempt is in `macup history`. |
 | 5 | `doctor` found at least one warning or error. Notes alone are exit code 0. |
-| 64 | Invalid command-line usage: an argument that is not a package ID, an unknown provider, an unknown policy, `--limit` below 1, or (for `plan` and `update`) a package ID with no update available. `update` changes nothing in that case. For `explain`, an item MacUp knows nothing about: its provider does not list it, is turned off, or is not installed. |
+| 64 | Invalid command-line usage: an argument that is not a package ID, an unknown provider, an unknown policy, `--limit` below 1, or (for `plan` and `update`) a package ID with no update available. `update` changes nothing in that case. For `explain`, an item MacUp knows nothing about: its provider does not list it, is turned off, or is not installed. For `dependents`, something other than an installed Homebrew formula. |
 | 73 | `diagnostics export` could not create its file: something is already at that path, it is a symbolic link, or the folder is missing or not writable. Nothing was written. What the check and Doctor found never changes `diagnostics`' exit status. |
 | 77 | The device owner did not approve the change, or MacUp could not ask. Nothing was changed. |
 | 130 | Interrupted with Ctrl+C. |
@@ -580,6 +581,19 @@ identifier: `id` such as `homebrew.multipleInstallations`, `severity`
 (`error`, `warning`, `info`), `provider`, `title`, `detail`,
 `recommendation`), `providers[]`, `configuration`, `summary` (`errors`,
 `warnings`, `notes`, `checksRun`), `cancelled`.
+
+### `macup dependents --json` (`"kind": "dependents"`, schema version 1)
+
+`item` (the package ID asked about), `outcome` (`listed`, `unsupported`,
+`notInstalled`, `failed`, `cancelled`), `dependents` (sorted package IDs,
+`brew:` for formulae and `brew-cask:` for casks; present only when the
+outcome is `listed`, so "MacUp could not find out" never reads as
+"nothing"), `resultsIncomplete`, `findings[]`, `error`, `startedAt`,
+`finishedAt`, `commands[]`.
+
+When MacUp upgrades a formula it asks Homebrew to leave these alone
+(`HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK`), so none of them changes without
+your review; they use the new version the next time they start.
 
 ### `macup history --json` (`"kind": "history"`, schema version 1)
 

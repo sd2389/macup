@@ -181,6 +181,8 @@ struct CheckRenderer {
             var flags = [update.versionChange.displayName]
             if update.signals.contains(.pinnedByProvider) { flags.append("pinned") }
             if update.signals.contains(.restartRequired) { flags.append("restart required") }
+            if update.signals.contains(.runsAsService) { flags.append("running as a service") }
+            if update.signals.contains(.mayMigrateData) { flags.append("may convert its data") }
             if update.details["configScope"] == "project" { flags.append("project config") }
             let rule = rules?.rule(for: update.id)
             if rule?.skips(update.availableVersion) == true { flags.append("you skipped this version") }

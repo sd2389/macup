@@ -214,8 +214,9 @@ public struct PolicyEngine: Sendable {
     /// switched off: macOS updates, runtime major changes, and unknown risk
     /// are always Ask First (CLAUDE.md §6, §10), MacUp never walks into an
     /// administrator prompt or a restart on its own (CLAUDE.md §2.10, §2.19),
-    /// and it does not rewrite a config file or lockfile unasked
-    /// (CLAUDE.md §2.1, §9).
+    /// it does not rewrite a config file or lockfile unasked
+    /// (CLAUDE.md §2.1, §9), and it does not move a database to a version
+    /// that may convert its data for good (CLAUDE.md §1).
     ///
     /// `confirmMajorUpdates` governs only the last rule, an ordinary package's
     /// major version bump. It is a preference about version numbers, so
@@ -243,6 +244,13 @@ public struct PolicyEngine: Sendable {
         }
         if signals.contains(.mayRewriteConfiguration) {
             return "Updating \(item.name) would mean editing your configuration or lockfile, which MacUp never does on its own."
+        }
+        // Not a preference about version numbers, so `confirmMajorUpdates`
+        // does not reach it: a database's data may be converted for good the
+        // first time the new version starts, and only its owner knows whether
+        // there is a backup.
+        if signals.contains(.mayMigrateData) {
+            return "\(item.name) is a database, and its new version may convert your data files for good, so it needs your confirmation."
         }
         // A runtime change alone is only moderate risk, so high risk here
         // means the version change itself is major, a pre-release, or a
