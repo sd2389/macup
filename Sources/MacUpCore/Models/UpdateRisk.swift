@@ -26,6 +26,8 @@ public enum RiskLevel: String, Sendable, Hashable, Codable, CaseIterable {
 }
 
 /// A fact about an update that raises its risk, reported by the provider.
+/// The ones that also mark it as needing attention are listed in
+/// ``RiskSignal/needingAttention``.
 public enum RiskSignal: String, Sendable, Hashable, Codable, CaseIterable, Comparable {
     case runtimeOrToolchain
     case operatingSystemUpdate

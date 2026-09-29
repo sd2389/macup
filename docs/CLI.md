@@ -66,7 +66,8 @@ macup --generate-completion-script zsh > ~/.zsh/completions/_macup
 | `macup check --inventory` | Also lists installed items. |
 | `macup check --verbose` | Adds what changes between the two versions, a link to read about the release where the provider gives one, ownership chains, risk reasons, notes, and every command MacUp ran. |
 | `macup check --save-state` | Also writes the report to `~/.local/state/macup/last-check.json`. This is how a scheduled check leaves its result behind. |
-| `macup plan [<package-id>…] [--refresh] [--json] [--verbose]` | Shows what `macup update` would do: current → proposed version, provider, effective policy, risk and its reason, and the exact executable and arguments — plus every item it would leave alone, with the reason. Launches nothing. |
+| `macup check --risk <level>… --policy <policy>… --attention --sort <order>` | Narrows and orders the list: by risk (`low`, `moderate`, `high`, `unknown`), by the policy in effect (`auto`, `ask`, `ignore`, `pin`), to the updates that need attention (an earlier install that did not finish, or a build from source), and sorted by `provider` (the default), `risk` (highest first), `name`, or `change` (largest version change first). `--risk` and `--policy` repeat; values within one option are alternatives and the options combine. What is checked, the counts, and the exit status do not change, and the output says how many updates the filter left out. |
+| `macup plan [<package-id>…] [--refresh] [--json] [--verbose]` | Shows what `macup update` would do: current → proposed version, provider, effective policy, risk and its reason, and the exact executable and arguments — plus every item it would leave alone, with the reason. Launches nothing. Takes the same `--risk`, `--policy`, `--attention`, and `--sort` as `check`. |
 | **`macup update [<package-id>…]`** | **The only command that changes packages.** Flags below. |
 | `macup doctor [--json] [--verbose]` | Runs MacUp's deterministic diagnostics and explains each finding. Fixes nothing. |
 | `macup history [--limit N] [--json] [--verbose]` | What MacUp has changed and what it decided not to change, newest first. |
@@ -109,6 +110,8 @@ macup                                  # what is outdated
 macup check --refresh --json           # fresh metadata, machine-readable
 macup plan                             # the exact commands an update would run
 macup plan brew:git --verbose          # one item, with rollback and verification
+macup check --risk high --sort change  # the riskiest updates, biggest jumps first
+macup plan --policy ask                # only what will wait for your confirmation
 macup update --dry-run                 # the same, launching nothing
 macup update                           # apply what policy allows, asking about the rest
 macup update brew:git npm:prettier -y  # two named items, confirmed up front
@@ -421,6 +424,28 @@ effective one, never `inherit`), `source` (`item`, `provider`, `global`,
 strategy). Each step: `summary`, `invocation` (`executable` and
 `arguments[]`, the exact things MacUp will launch), `effect`,
 `expectsNetwork`, `mayRequirePrivilege`, `timeoutSeconds`.
+
+### `filter` (`check` and `plan`, with `--risk`, `--policy`, `--attention`, or `--sort`)
+
+Without these options neither document has a `filter` field and both are
+exactly as described above. With any of them, `updates[]` (for `check`) or
+`planned[]` and `skipped[]` (for `plan`) hold only the entries that match, in
+the requested order, and the document gains:
+
+| Field | Meaning |
+| --- | --- |
+| `riskLevels[]` | The risk levels kept; empty when risk did not narrow the list |
+| `policies[]` | The policies in effect kept; empty when policy did not narrow the list |
+| `needsAttentionOnly` | `true` with `--attention` |
+| `sort` | `provider`, `risk`, `name`, or `change` |
+| `shown` | Entries the filter kept |
+| `hidden` | Entries it left out |
+
+Everything else still describes the whole run: `summary`, every provider's
+`updateCount`, and the exit status count every update, so a filtered document
+can never read as a Mac with fewer updates than it has. A plan entry whose
+update MacUp cannot find is kept, never hidden. `--save-state` always saves the
+unfiltered check.
 
 ### `macup update --json` (`"kind": "update"`, schema version 1)
 

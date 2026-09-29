@@ -18,6 +18,9 @@ struct CheckRenderer {
         .macos: ["build"],
     ]
 
+    private var order: UpdateSortOrder { report.filter?.sort ?? .provider }
+    private var groupedByProvider: Bool { order == .provider }
+
     func render() -> String {
         var lines: [String] = []
         let mode = report.mode == .metadataRefresh
@@ -27,10 +30,21 @@ struct CheckRenderer {
         if report.cancelled {
             lines.append("Cancelled before the check finished; results are incomplete.")
         }
+        if let filter = FilterText.heading(report.filter) {
+            lines.append(filter)
+        }
 
         for provider in report.providers {
             lines.append("")
             lines += section(for: provider)
+        }
+
+        // Sorted any other way than by provider, the updates are one list
+        // after the providers rather than one table under each.
+        if !groupedByProvider && !report.updates.isEmpty {
+            lines.append("")
+            lines.append(style.bold("Updates") + style.dim(" · " + FilterText.sortedHeading(order)))
+            lines += updateTable(report.updates)
         }
 
         lines.append("")
@@ -81,7 +95,14 @@ struct CheckRenderer {
         }
 
         let updates = report.updates(for: provider.provider)
-        lines += updateTable(updates)
+        if groupedByProvider {
+            lines += updateTable(updates)
+            // What the filter took out of this table, where the rows would be.
+            let hidden = (provider.updateCount ?? updates.count) - updates.count
+            if report.filter != nil && hidden > 0 {
+                lines.append("  " + style.dim(TextStyle.plural(hidden, "update") + " hidden by the filter"))
+            }
+        }
 
         if provider.provider == .macos && !updates.isEmpty {
             lines.append("  " + style.dim("Review and install macOS updates in System Settings → General → Software Update."))
@@ -231,8 +252,10 @@ struct CheckRenderer {
 
     private func summary() -> [String] {
         var lines: [String] = []
+        // Counted from the provider, not from the rows: a filter narrows the
+        // rows, and these numbers describe everything the check found.
         let counts = report.providers.compactMap { provider -> String? in
-            let count = report.updates(for: provider.provider).count
+            let count = report.filter == nil ? report.updates(for: provider.provider).count : provider.updateCount ?? 0
             return count > 0 ? "\(provider.displayName) \(count)" : nil
         }
         let updates = report.summary.updatesAvailable
@@ -240,6 +263,9 @@ struct CheckRenderer {
             lines.append(style.bold(report.isComplete ? "No updates available." : "No updates found."))
         } else {
             lines.append(style.bold(TextStyle.plural(updates, "update") + " available") + " (\(counts.joined(separator: ", "))).")
+        }
+        if let hidden = FilterText.hidden(report.filter, command: "macup check") {
+            lines.append(hidden)
         }
         lines.append(report.mode == .readOnly
             ? "Nothing was changed."

@@ -24,6 +24,7 @@ public struct MacUpRoot: App {
                     .keyboardShortcut("r")
                     .disabled(model.isChecking)
             }
+            NavigationCommands(model: model)
         }
 
         Settings {

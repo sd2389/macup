@@ -16,6 +16,10 @@ struct CheckCommand: AsyncParsableCommand {
             lists, but no installed packages) and a fresh `softwareupdate --list` scan. \
             npm and mise always ask their registries.
 
+            --risk, --policy, and --attention narrow the list and --sort orders it. They \
+            change what is printed, not what is checked: the counts still describe every \
+            update found, and the output says how many the filter left out.
+
             Exit status: 0 checked; 2 a provider failed (partial results); 3 the \
             configuration is invalid; 130 cancelled.
             """
@@ -41,6 +45,8 @@ struct CheckCommand: AsyncParsableCommand {
         help: "Also write the report to ~/.local/state/macup/last-check.json. This is how a scheduled check leaves its result behind."
     )
     var saveState = false
+
+    @OptionGroup var list: UpdateListOptions
 
     func validate() throws {
         for name in providers where !ProviderID(rawValue: name).isKnown {
@@ -69,12 +75,15 @@ struct CheckCommand: AsyncParsableCommand {
             await engine.run(configuration: loaded, options: options, environment: environment)
         }
 
-        let encoded = (json || saveState) ? try JSONOutput.encode(report) : nil
-        if let encoded, json {
-            context.print(encoded)
+        // A filter narrows what is printed, never what is saved: the saved
+        // report is always the whole check.
+        let listed = list.apply(to: report, configuration: loaded)
+        let encoded = saveState ? try JSONOutput.encode(report) : nil
+        if json {
+            context.print(try JSONOutput.encode(listed))
         } else {
             let style = TextStyle(enabled: context.allowsStyling, homeDirectory: context.homeDirectory)
-            context.print(CheckRenderer(report: report, style: style, verbose: verbose).render())
+            context.print(CheckRenderer(report: listed, style: style, verbose: verbose).render())
         }
 
         if report.cancelled { throw MacUpExitCode.cancelled.exitCode }
@@ -82,7 +91,7 @@ struct CheckCommand: AsyncParsableCommand {
         // A cancelled run has nothing worth saving; anything else is recorded
         // even when a provider failed, so a scheduled run leaves evidence.
         var saveFailed = false
-        if saveState, let encoded {
+        if let encoded {
             do {
                 try PrivateDirectory(paths.stateDirectory).write(Data(encoded.utf8), named: MacUpPaths.lastCheckFileName)
             } catch {

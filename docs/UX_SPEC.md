@@ -17,6 +17,8 @@ Do not use:
 
 Sidebar order: Dashboard, Providers, Updates, Features, Doctor, History, with
 Settings at the foot.
+⌘1 to ⌘6 open them in that order, from the View menu. ⌘F searches the Updates
+list.
 
 ### Dashboard
 
@@ -48,6 +50,31 @@ or not, version, the exact executable and the facts behind it, the update
 count, a switch that turns the provider on or off, and the rule its items
 inherit (Use the Default, Auto Update, Ask First, Ignore). Same rules as
 `macup provider enable|disable` and `macup policy set <provider>`.
+
+### Finding an update
+
+The Updates screen has a search field (name, package ID, or provider), a
+Filter menu (provider, risk, the policy in effect, Needs Attention), and a
+Sort menu (grouped by provider, the default; risk, highest first; name; size
+of change, largest first). `macup check` and `macup plan` take the same
+filter and orders (`--risk`, `--policy`, `--attention`, `--sort`); both come
+from MacUpCore, so the two cannot disagree.
+
+A filter never quietly shortens the list. While it hides anything, a bar
+above the list says so, with Show All:
+
+```text
+3 updates hidden by the current filter          [Show All]
+Showing: high risk
+```
+
+The dashboard, the sidebar badge, and the menu bar always count every update,
+and Review Updates covers every update, including the hidden ones. Opening an
+update from the dashboard clears a filter that would hide it.
+
+Needs Attention is one explicit list of signals in MacUpCore
+(`RiskSignal.needingAttention`): an earlier install that did not finish, and
+an update that will be built from source.
 
 ### Update row
 

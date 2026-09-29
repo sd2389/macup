@@ -47,6 +47,7 @@ enum Snapshots {
                 }
                 if let main { write(main, to: directory, named: "\(name)-\(suffix).png") }
             }
+            await captureFilteredUpdates(model: model, main: main, into: directory, suffix: suffix)
             await captureSheets(model: model, main: main, into: directory, suffix: suffix)
         }
         openSettings()
@@ -111,6 +112,71 @@ enum Snapshots {
         if let sheet = main?.attachedSheet { write(sheet, to: directory, named: "command-\(suffix).png") }
         model.dismissCommand()
         try? await Task.sleep(for: .milliseconds(500))
+    }
+
+    /// The Updates screen narrowed and reordered: a filter that hides part of
+    /// this Mac's list (at the window's size and at its narrowest), the list
+    /// sorted by risk, the search field focused as ⌘F leaves it, and a search
+    /// that matches nothing. Only the screen's own state changes; nothing runs.
+    @MainActor
+    private static func captureFilteredUpdates(
+        model: AppModel,
+        main: NSWindow?,
+        into directory: PrivateDirectory,
+        suffix: String
+    ) async {
+        guard let main, let updates = model.report?.updates, !updates.isEmpty else { return }
+        model.section = .updates
+        let policies = model.decisions.mapValues(\.policy)
+        // The first filter that both shows and hides something here, so the
+        // picture has a hidden count in it whatever this Mac has to update.
+        let filters = [UpdateFilter(needsAttentionOnly: true)]
+            + RiskLevel.allCases.map { UpdateFilter(riskLevels: [$0]) }
+            + [UpdatePolicy.auto, .ask, .ignore, .pin].map { UpdateFilter(policies: [$0]) }
+            + ProviderID.known.map { UpdateFilter(providers: [$0]) }
+        let filter = filters.first { filter in
+            let listing = filter.apply(to: updates, sortedBy: .provider, effectivePolicies: policies)
+            return !listing.shown.isEmpty && listing.hiddenCount > 0
+        }
+        // One change at a time, with a pause after each: resizing the window
+        // and replacing the list's rows in the same turn is something only
+        // this script does, and AppKit's table complains about it.
+        let settle = { try? await Task.sleep(for: .milliseconds(700)) }
+
+        if let filter {
+            model.updateFilter = filter
+            model.selectedUpdate = model.updateListing.shown.first?.id
+            await settle()
+            write(main, to: directory, named: "updates-filtered-\(suffix).png")
+
+            let frame = main.frame
+            main.setFrame(NSRect(origin: frame.origin, size: NSSize(width: 820, height: frame.height)), display: true)
+            await settle()
+            write(main, to: directory, named: "updates-filtered-narrow-\(suffix).png")
+            main.setFrame(frame, display: true)
+            await settle()
+        }
+
+        model.showAllUpdates()
+        await settle()
+        model.updateSort = .risk
+        await settle()
+        write(main, to: directory, named: "updates-sorted-\(suffix).png")
+        model.updateSort = .provider
+        await settle()
+
+        model.searchUpdates()
+        model.updateFilter.searchText = String(updates[0].displayName.prefix(3))
+        await settle()
+        write(main, to: directory, named: "updates-search-\(suffix).png")
+
+        model.updateFilter.searchText = "no update is called this"
+        await settle()
+        write(main, to: directory, named: "updates-no-match-\(suffix).png")
+
+        model.isSearchingUpdates = false
+        model.showAllUpdates()
+        await settle()
     }
 
     @MainActor
