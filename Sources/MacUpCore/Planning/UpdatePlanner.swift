@@ -33,12 +33,23 @@ public struct UpdatePlanner: Sendable {
         configuration: LoadedConfiguration,
         environment: CheckEnvironment
     ) async -> PlanReport {
+        await checkAndPlan(request, configuration: configuration, environment: environment).plan
+    }
+
+    /// The same, handing back the check the plan was built from as well, for
+    /// a caller that needs the updates behind the plan's skipped items: a
+    /// skip records the item, not the update.
+    public func checkAndPlan(
+        _ request: PlanRequest,
+        configuration: LoadedConfiguration,
+        environment: CheckEnvironment
+    ) async -> (check: CheckReport, plan: PlanReport) {
         let report = await CheckEngine(providers: providers).run(
             configuration: configuration,
             options: CheckOptions(refreshMetadata: request.refreshMetadata),
             environment: environment
         )
-        return await plan(report, request: request, configuration: configuration, environment: environment)
+        return (report, await plan(report, request: request, configuration: configuration, environment: environment))
     }
 
     /// Plans from candidates already found by a check, so the app and the CLI

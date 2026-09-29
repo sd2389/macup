@@ -67,8 +67,8 @@ struct DashboardView: View {
                     }
                     ForEach(model.pendingUpdates) { update in
                         Button {
-                            model.selectedUpdate = update.id
-                            model.section = .updates
+                            // Clears the Updates filter if it would hide this one.
+                            model.showUpdate(update.id)
                         } label: {
                             DashboardUpdateRow(update: update, decision: model.decisions[update.id])
                         }

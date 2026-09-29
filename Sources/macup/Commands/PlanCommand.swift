@@ -17,6 +17,10 @@ struct PlanCommand: AsyncParsableCommand {
             Planning launches nothing. It runs the same read-only check as `macup \
             check` and then asks each provider to describe its commands.
 
+            --risk, --policy, and --attention narrow what is shown and --sort orders it. \
+            The plan itself is the same: its summary still counts every item, and the \
+            output says how many the filter left out.
+
             Exit status: 0 planned; 2 a provider failed, so the plan may be missing \
             updates; 3 the configuration is invalid, so nothing may change; 64 you \
             named an item with no update available; 130 cancelled.
@@ -35,6 +39,8 @@ struct PlanCommand: AsyncParsableCommand {
     @Flag(name: .shortAndLong, help: "Show every rationale, risk reason, verification step, and whether the change can be undone.")
     var verbose = false
 
+    @OptionGroup var list: UpdateListOptions
+
     func validate() throws {
         try PackageSelection.validate(items)
     }
@@ -48,7 +54,7 @@ struct PlanCommand: AsyncParsableCommand {
             context.printError("Refreshing provider metadata first. No packages will be changed.")
         }
 
-        let report = await PlanWorkflow.plan(
+        let (check, report) = await PlanWorkflow.checkAndPlan(
             PlanRequest(
                 selection: PackageSelection.parse(items),
                 intent: .interactive,
@@ -57,12 +63,13 @@ struct PlanCommand: AsyncParsableCommand {
             configuration: loaded,
             context: context
         )
+        let listed = list.apply(to: report, candidates: check.updates)
 
         if json {
-            context.print(try JSONOutput.encode(report))
+            context.print(try JSONOutput.encode(listed))
         } else {
             let style = TextStyle(enabled: context.allowsStyling, homeDirectory: context.homeDirectory)
-            context.print(PlanRenderer(report: report, style: style, verbose: verbose).render())
+            context.print(PlanRenderer(report: listed, style: style, verbose: verbose).render())
         }
 
         if report.cancelled { throw MacUpExitCode.cancelled.exitCode }
@@ -84,10 +91,20 @@ enum PlanWorkflow {
         configuration: LoadedConfiguration,
         context: CLIContext
     ) async -> PlanReport {
+        await checkAndPlan(request, configuration: configuration, context: context).plan
+    }
+
+    /// The plan and the check it was built from, whose updates a filter needs
+    /// to judge the plan's skipped items.
+    static func checkAndPlan(
+        _ request: PlanRequest,
+        configuration: LoadedConfiguration,
+        context: CLIContext
+    ) async -> (check: CheckReport, plan: PlanReport) {
         let planner = UpdatePlanner.standard()
         let environment = context.checkEnvironment
         return await Interruption.run(handlingInterrupts: context.handlesInterrupts) {
-            await planner.plan(request, configuration: configuration, environment: environment)
+            await planner.checkAndPlan(request, configuration: configuration, environment: environment)
         }
     }
 }

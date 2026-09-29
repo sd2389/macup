@@ -49,9 +49,8 @@ extension AppModel {
         // An unfinished install blocks the update until someone repairs it,
         // and a build from source can hold the machine for an hour: both are
         // worth knowing before choosing what to review.
-        let flagged = pending.filter {
-            $0.signals.contains(.installationIncomplete) || $0.signals.contains(.buildsFromSource)
-        }
+        // The same set the Updates screen's Needs Attention filter uses.
+        let flagged = pending.filter(\.needsAttention)
         return MenuBarUpdates(
             entries: Array(entries),
             remaining: pending.count - entries.count,
@@ -67,9 +66,9 @@ extension AppModel {
             return "\(flagged.count) need attention: \(names)" + (flagged.count > 3 ? ", …" : "")
         }
         let name = first.displayName.displaySafe
-        return first.signals.contains(.installationIncomplete)
-            ? "\(name): an earlier install did not finish"
-            : "\(name) will be compiled from source"
+        if first.signals.contains(.installationIncomplete) { return "\(name): an earlier install did not finish" }
+        if first.signals.contains(.buildsFromSource) { return "\(name) will be compiled from source" }
+        return "\(name) needs attention"
     }
 
     /// Shows one update on the Updates screen, selected, as the menu bar and

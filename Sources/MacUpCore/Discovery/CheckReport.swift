@@ -136,6 +136,9 @@ public struct CheckReport: Sendable, Hashable, Codable {
     public var summary: Summary
     /// Every command MacUp ran (or refused) for this check, redacted.
     public var commands: [CommandRecord]
+    /// Set when `updates` was narrowed or reordered (``filtered(_:sortedBy:effectivePolicies:)``),
+    /// and absent otherwise, so an unfiltered report encodes as it always has.
+    public var filter: ReportFilter?
 
     public init(
         mode: Mode,

@@ -10,7 +10,8 @@ import Observation
 @MainActor
 @Observable
 final class AppModel {
-    enum Section: Hashable {
+    /// Declared in sidebar order, which ⌘1…⌘6 follow.
+    enum Section: Hashable, CaseIterable {
         case dashboard, providers, updates, features, doctor, history
     }
 
@@ -18,6 +19,13 @@ final class AppModel {
     /// Which update the Updates screen has selected. On the model so the
     /// dashboard can open a provider's first update directly.
     var selectedUpdate: PackageID?
+    /// What the Updates screen's list is narrowed to, and how it is ordered.
+    /// Only that list: the dashboard, the sidebar badge, and the menu bar
+    /// always count everything. See AppModel+UpdateList.swift.
+    var updateFilter = UpdateFilter()
+    var updateSort = UpdateSortOrder.provider
+    /// Whether the Updates screen's search field has focus; ⌘F sets it.
+    var isSearchingUpdates = false
     private(set) var report: CheckReport?
     private(set) var configuration: LoadedConfiguration?
     private(set) var isChecking = false

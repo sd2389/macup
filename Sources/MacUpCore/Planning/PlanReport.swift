@@ -113,6 +113,10 @@ public struct PlanReport: Sendable, Hashable, Codable {
     /// Provider reports behind the plan, so a failed provider is visible.
     public var providers: [ProviderReport]
     public var cancelled: Bool
+    /// Set when `planned` and `skipped` were narrowed or reordered
+    /// (``filtered(_:sortedBy:candidates:)``), and absent otherwise, so an
+    /// unfiltered plan encodes as it always has.
+    public var filter: ReportFilter?
 
     public init(
         createdAt: Date,

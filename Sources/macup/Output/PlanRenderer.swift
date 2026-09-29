@@ -31,18 +31,31 @@ struct PlanRenderer {
         if report.cancelled {
             lines.append("Cancelled before the check behind this plan finished; it may be incomplete.")
         }
+        if let filter = FilterText.heading(report.filter) {
+            lines.append(filter)
+        }
         if let configuration = report.configuration, !configuration.valid {
             lines.append("")
             lines.append("Configuration \(style.path(configuration.path)) has errors, so MacUp will change nothing "
                 + "until they are fixed. Run `macup config show` for details.")
         }
 
-        for provider in ProviderID.known + otherProviders {
-            let planned = report.planned(for: provider)
-            guard !planned.isEmpty else { continue }
-            lines.append("")
-            lines.append(style.bold(provider.displayName))
-            lines += PlanTable(items: planned, style: style, verbose: verbose).renderLines()
+        let order = report.filter?.sort ?? .provider
+        if order != .provider {
+            // One list in the order asked for, rather than one per provider.
+            if !report.planned.isEmpty {
+                lines.append("")
+                lines.append(style.bold("Changes") + style.dim(" · " + FilterText.sortedHeading(order)))
+                lines += PlanTable(items: report.planned, style: style, verbose: verbose).renderLines()
+            }
+        } else {
+            for provider in ProviderID.known + otherProviders {
+                let planned = report.planned(for: provider)
+                guard !planned.isEmpty else { continue }
+                lines.append("")
+                lines.append(style.bold(provider.displayName))
+                lines += PlanTable(items: planned, style: style, verbose: verbose).renderLines()
+            }
         }
 
         if !report.skipped.isEmpty {
@@ -82,13 +95,15 @@ struct PlanRenderer {
     private func summary() -> [String] {
         var lines: [String] = []
         let summary = report.summary
-        if report.planned.isEmpty && report.skipped.isEmpty {
+        // A plan the filter emptied is not a plan with nothing in it.
+        if report.planned.isEmpty && report.skipped.isEmpty && (report.filter?.hidden ?? 0) == 0 {
             lines.append(style.bold("No updates to plan."))
             lines.append("Nothing was changed. `macup check` shows what MacUp looked at.")
             return lines
         }
 
-
+        // The counts are the whole plan's, whatever the filter shows, so no
+        // decision in it is ever left out of them.
         var parts: [String] = []
         if summary.allowed > 0 { parts.append(TextStyle.plural(summary.allowed, "change") + " ready to run") }
         if summary.needsConfirmation > 0 {
@@ -98,6 +113,9 @@ struct PlanRenderer {
         if summary.deniedByPolicy > 0 { parts.append(TextStyle.plural(summary.deniedByPolicy, "item") + " left alone by policy") }
         if summary.unplannable > 0 { parts.append(TextStyle.plural(summary.unplannable, "item") + " MacUp cannot plan") }
         lines.append(style.bold(parts.isEmpty ? "Nothing to change." : parts.joined(separator: " · ") + "."))
+        if let hidden = FilterText.hidden(report.filter, command: "macup plan") {
+            lines.append(hidden)
+        }
 
         let failedProviders = report.providers.filter { !$0.errors.isEmpty }
         if !failedProviders.isEmpty {

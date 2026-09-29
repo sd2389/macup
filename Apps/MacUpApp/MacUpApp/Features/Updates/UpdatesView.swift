@@ -9,8 +9,11 @@ struct UpdatesView: View {
         @Bindable var model = model
         let report = model.report
         let updates = report?.updates ?? []
+        // What the search and filter keep. `updates` stays the whole list:
+        // Review Updates and the empty states are about everything found.
+        let listing = model.updateListing
         Group {
-            if let report, !updates.isEmpty {
+            if report != nil, !updates.isEmpty {
                 List(selection: $model.selectedUpdate) {
                     if !model.status.reasons.isEmpty {
                         Section {
@@ -38,15 +41,23 @@ struct UpdatesView: View {
                             Text("The rule was not changed")
                         }
                     }
-                    ForEach(report.providers.filter { !report.updates(for: $0.provider).isEmpty }, id: \.provider) { provider in
-                        Section(provider.displayName) {
-                            ForEach(report.updates(for: provider.provider)) { update in
+                    ForEach(listing.groups) { group in
+                        Section(group.provider?.displayName ?? model.updateSort.listTitle) {
+                            ForEach(group.updates) { update in
                                 UpdateRow(update: update, decision: model.decisions[update.id]).tag(update.id)
                             }
                         }
                     }
+                    if listing.shown.isEmpty {
+                        NoMatchingUpdatesRow()
+                    }
                 }
-                .onAppear { if model.selectedUpdate == nil { model.selectedUpdate = updates.first?.id } }
+                .safeAreaInset(edge: .top, spacing: 0) {
+                    if let message = model.hiddenUpdatesMessage {
+                        HiddenUpdatesBar(message: message)
+                    }
+                }
+                .onAppear { if model.selectedUpdate == nil { model.selectedUpdate = listing.shown.first?.id } }
             } else if report != nil, !model.status.reasons.isEmpty {
                 ContentUnavailableView(
                     "Check Incomplete",
@@ -61,9 +72,20 @@ struct UpdatesView: View {
                 )
             }
         }
+        .searchable(
+            text: $model.updateFilter.searchText,
+            isPresented: $model.isSearchingUpdates,
+            placement: .toolbar,
+            prompt: "Name, package ID, or provider"
+        )
+        // ⌘F in a window that has only just opened asks before this screen
+        // exists; ask again now it does. Leaving the screen drops the request,
+        // so an old one cannot take focus the next time it opens.
+        .onAppear { if model.isSearchingUpdates { model.searchUpdates() } }
+        .onDisappear { model.isSearchingUpdates = false }
         .inspector(isPresented: $showsInspector) {
             Group {
-                if let update = updates.first(where: { $0.id == model.selectedUpdate }) {
+                if let update = listing.shown.first(where: { $0.id == model.selectedUpdate }) {
                     UpdateDetail(update: update, decision: model.decisions[update.id])
                 } else {
                     ContentUnavailableView("No Selection", systemImage: "sidebar.trailing", description: Text("Select an update to see its details."))
@@ -81,7 +103,14 @@ struct UpdatesView: View {
                 .disabled(updates.isEmpty || model.isPlanning || model.isApplying)
                 // Deliberately not "Update All": the review shows what would
                 // change and what would not, and nothing runs until Apply.
-                .help("See exactly what MacUp would run, and what it would leave alone")
+                // It covers every update, including any the filter hides.
+                .help(model.updateFilter.isActive
+                    ? "See exactly what MacUp would run for every update, including the ones the filter hides"
+                    : "See exactly what MacUp would run, and what it would leave alone")
+            }
+            ToolbarItemGroup {
+                UpdateFilterMenu()
+                UpdateSortMenu()
             }
             ToolbarItem {
                 Button {
