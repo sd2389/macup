@@ -15,3 +15,8 @@ them, so a change to `HistoryEntry` is tested against what is already on
 people's disks. `before-read-back.jsonl` predates the after-state MacUp now
 reads back after an unsuccessful attempt; its last line is a real entry from
 an upgrade that was stopped part-way, anonymized.
+
+`typesafe/` holds TypeSafe System One replies shaped like the documented
+examples (https://docs.typesafe.ai/api.md), plus malformed ones MacUp must
+refuse. They are written by hand: no test has an API key, and none ever
+reaches the network.

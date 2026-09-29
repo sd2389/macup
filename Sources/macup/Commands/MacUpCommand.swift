@@ -48,6 +48,7 @@ struct MacUpCommand: AsyncParsableCommand {
             ConfigCommand.self,
             ScheduleCommand.self,
             SecurityCommand.self,
+            AICommand.self, AskCommand.self, InsightCommand.self,
         ],
         defaultSubcommand: CheckCommand.self
     )

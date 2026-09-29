@@ -105,6 +105,10 @@ struct ContentView: View {
                     .help("Check for updates. Checking never changes anything.")
                 }
             }
+            // Only while AI help is on: with it off, the toolbar is as it was.
+            ToolbarItem(placement: .automatic) {
+                if model.isAIOn { AskMacUpButton() }
+            }
             ToolbarItem(placement: .automatic) {
                 Button { openSettings() } label: {
                     Label("Settings", systemImage: "gearshape")

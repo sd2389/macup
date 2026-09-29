@@ -18,6 +18,8 @@ MacUp publicly commits to:
 12. Rollback claims are capability-specific and truthful.
 13. Ambiguity causes MacUp to stop/skip rather than guess.
 14. MacUp runs only the commands it showed you.
+15. MacUp sends nothing over the network of its own unless you turn on AI
+    help, and then only what you ask about (see "The opt-in AI boundary").
 
 Items 3, 6, 7, 11, 13, and 14 used to be descriptions of intent. They are now
 properties of the code, and "Before MacUp changes anything" below says which
@@ -427,6 +429,112 @@ It is constrained so that it cannot be mistaken for a lock:
 If this feature were ever presented as protecting anything, that would be
 misrepresentation. It is a convenience for its owner, on their own machine,
 and every surface that shows it says so.
+
+## The opt-in AI boundary
+
+MacUp can ask TypeSafe (a System One model, `api.typesafe.ai`) two kinds of
+question: what a request typed in plain words means ("Ask MacUp", `macup
+ask`), and whether an update needs extra care ("AI caution", `macup
+insight`). v1's rule is no cloud dependency and no AI assistant, so this is
+built as an extension that is off by default, and every rule above still
+holds with it on.
+
+**Off means off.** With AI help off — the default — MacUp makes no network
+request of its own and behaves exactly as it does without the feature: the
+configuration file has no `ai` section, saved estimates are not applied, the
+toolbar has no Ask MacUp button, and the Updates screen has no AI section.
+Nothing leaves the Mac until the user has saved their own API key **and**
+switched AI help on after being shown exactly what is sent. There are no
+background, scheduled, or retrying-later requests: every request is caused by
+a command or a button, and the scheduled job still runs only `macup check`.
+
+**What is sent is listed, and nothing else is.** `macup ai disclosure` and
+"What MacUp sends" in the app show `AIDisclosure.standard`, and the tests
+read the bodies MacUp builds and check them against it:
+
+- Ask MacUp: what the user typed (at most 300 characters, after `Redactor`
+  removes anything secret-shaped and the home folder becomes `~`), and the
+  IDs and names of packages the last check found, each with its package
+  manager (at most 254); plus MacUp's fixed questions and answer choices.
+- AI caution: one update's package ID and name, its package manager and
+  kind, and its installed and available versions.
+- Connection test: a fixed sentence and one fixed question.
+- With every request: the key in the `Authorization` header, the model name,
+  and `MacUp/<version>` as the user agent, set explicitly with a fixed
+  `Accept-Language` so macOS does not add the system's version and language.
+
+Never sent: environment variables, file paths, file contents (the
+configuration included), shell history, tokens other than the TypeSafe key,
+and anything the user did not ask about. How TypeSafe handles what it
+receives, retention included, is TypeSafe's to state; MacUp links its [Data
+Processing Agreement](https://typesafe.ai/legal/data-processing) rather than
+paraphrasing it.
+
+**One host, one file, checked by CI.** `LiveTypeSafeTransport` is the only
+code in MacUp that opens a network connection, and
+`scripts/check-trust-invariants.sh` fails the build if networking appears
+anywhere else. It sends HTTPS to `https://api.typesafe.ai/v1/systemone` and
+nowhere else: the host is a constant, checked before the request and again on
+the response; every redirect is refused, so the key cannot follow one; the
+session is ephemeral (no cookies, cache, or stored credentials) and is not
+even created until the first request. `TYPESAFE_BASE_URL`, which TypeSafe's
+own SDKs honor, is ignored, so nothing in the environment can choose where
+the key goes. A request times out after 20 seconds; HTTP 429 and 529 are
+retried at most twice, after 0.5 and 1 second (or a `Retry-After` of up to
+5 seconds), and nothing else is retried.
+
+**The key.** It is looked for in MacUp's Keychain item (generic password,
+service `dev.macup.typesafe`, account `api-key`, in the login keychain), then
+in `TYPESAFE_API_KEY`; a Keychain item that cannot be read is an error, not a
+reason to use a different key. It is never written to the configuration,
+history, logs, or diagnostics. `TypeSafeAPIKey` prints as `<redacted>` in
+every form, the request's description and mirror leave the header out, the
+only thing logged about a request is its status and timing, and anything
+TypeSafe sends back is scrubbed of the key and redacted before it is kept.
+The CLI reads a key with echo off or from a pipe and refuses one given as an
+argument, without repeating it. Status screens only ask whether an item
+exists and never read the key itself; it is read when a request is about to
+be made, and any prompt about that comes from macOS, not MacUp.
+
+**An answer can only add caution or propose.** TypeSafe answers closed
+questions — a Choice over MacUp's own list of actions, over the packages
+MacUp found, over the four policies and four providers, over stretches of the
+user's own words for a note — so it can pick, never invent. Code composes
+the answers:
+
+- Ask MacUp trusts a reading only as far as the least confident answer it
+  uses; under 60% it shows best guesses and changes nothing. A change is
+  shown exactly (what, where in the file, the current value, the equivalent
+  command) and made only after the user confirms it, through the approval
+  gate and `PolicyEditor`, the one path every rule change takes. `macup ask
+  --yes` applies a change unseen only when it is at least 85% sure and the
+  change makes MacUp more careful; it never sets Auto Update, turns a
+  provider back on, or stops skipping a version. "Why is X held?" reads the
+  rules and the last check and changes nothing.
+- AI caution adds, at most, a note that says it is an AI estimate from
+  TypeSafe and how sure it was, and the `aiCaution` risk signal. The signal
+  raises risk to at least moderate — never lowering it, and leaving an
+  unclassifiable change unknown so it still asks on its own — and the policy
+  engine asks first for it whatever `confirmMajorUpdates` says, so an Auto
+  Update item waits for a person. The signal travels in the plan, so the
+  re-check immediately before execution sees it too. Estimates are saved
+  (owner-only, in the state directory) per version change and applied only
+  while AI help is on; `macup ai forget` or Clear Estimates deletes them.
+
+**It fails closed.** A reply that does not fit its questions — an option
+MacUp did not offer, a probability outside 0…1, a missing or extra answer, a
+choice that is not the most probable, a status MacUp does not expect — is not
+used at all. An `ai` section MacUp cannot read is a configuration error, so
+AI help stays off. A question MacUp built wrongly, or a request larger than
+128 KiB, is never sent. macOS updates are never sent: they always wait for
+the user anyway.
+
+Threats this adds, and what answers them: a package name or typed request
+written to steer the model (closed options, code composition, and the
+user's confirmation of the exact change); the key leaking (redaction in every
+printable form, the Keychain, no arguments); traffic going somewhere else
+(one pinned host, refused redirects, a CI check); and silent use (off by
+default, an explicit disclosure, no background requests).
 
 ## Remote architecture rule
 

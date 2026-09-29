@@ -1,0 +1,38 @@
+{
+  "answers": {
+    "department": {
+      "choice": "billing",
+      "confidence": 0.81,
+      "probabilities": {
+        "billing": 0.4,
+        "sales": 0.0,
+        "technical": 0.1
+      },
+      "type": "choice"
+    },
+    "frustration": {
+      "confidence": 0.92,
+      "legend": {
+        "0": "Calm",
+        "1": "Frustrated",
+        "2": "Very angry"
+      },
+      "probabilities": {
+        "0": 0.0,
+        "1": 0.95,
+        "2": 0.05
+      },
+      "score": 1.05,
+      "type": "score"
+    },
+    "is_urgent": {
+      "noul": 0.95,
+      "type": "noul"
+    }
+  },
+  "model": "jev-1.13.0",
+  "usage": {
+    "input_tokens": 318,
+    "output_tokens": 34
+  }
+}

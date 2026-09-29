@@ -91,6 +91,18 @@ can schedule is `macup check`. The label (`com.macup.check`) and the agent path
 are MacUp's own constants, so no part of the `launchctl` invocation comes from
 user text.
 
+### AI (opt-in)
+`Sources/MacUpCore/AI/` holds optional AI help from TypeSafe, off by default.
+`AIService` is the one gate: it hands out a `TypeSafeClient` only when the
+configuration is readable, `ai.enabled` is on, and a key exists (Keychain,
+then `TYPESAFE_API_KEY`). `LiveTypeSafeTransport` is the only networking in
+MacUp, to one pinned host. TypeSafe answers closed questions; `AskMacUp`
+and `UpdateInsight` compose the answers in code, a proposed rule change is
+applied only by `PolicyEditor` after the user confirms it, and an estimate
+can only add the `aiCaution` signal, which `PolicyEngine` turns into Ask
+First. The CLI (`macup ai`, `ask`, `insight`) and the app (`AppModel+AI`)
+both use `AIService` and nothing else. See docs/TRUST_AND_SECURITY.md.
+
 ## Data flow
 
 ### Check
