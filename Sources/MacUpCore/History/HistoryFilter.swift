@@ -22,7 +22,7 @@ public struct HistoryFilter: Sendable, Hashable {
     public var isEmpty: Bool { items.isEmpty && searchWords.isEmpty }
 
     public func includes(_ entry: HistoryEntry) -> Bool {
-        (items.isEmpty || items.contains(entry.item)) && matchesSearch(entry)
+        (items.isEmpty || entry.item.map(items.contains) == true) && matchesSearch(entry)
     }
 
     /// Whether every word of ``search`` appears somewhere in what the entry is
@@ -32,13 +32,10 @@ public struct HistoryFilter: Sendable, Hashable {
     public func matchesSearch(_ entry: HistoryEntry) -> Bool {
         let words = searchWords
         guard !words.isEmpty else { return true }
-        let text = [
-            entry.item.rawValue,
-            entry.provider.displayName,
-            entry.provider.rawValue,
-            entry.headline.text,
-            entry.outcome.rawValue,
-        ].joined(separator: "\n")
+        var fields = [entry.subjectID, entry.headline.text, entry.outcome.rawValue]
+        if let provider = entry.provider { fields += [provider.displayName, provider.rawValue] }
+        if let record = entry.uninstall { fields += [record.name, "uninstall", "uninstalled", record.kind.displayName] }
+        let text = fields.joined(separator: "\n")
         return words.allSatisfy { text.range(of: $0, options: [.caseInsensitive, .diacriticInsensitive]) != nil }
     }
 

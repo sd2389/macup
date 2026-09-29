@@ -389,6 +389,12 @@ public struct UninstallPlan: Sendable, Hashable, Codable, Identifiable {
     /// The Homebrew installation's prefix, whose `var` and `etc` hold the
     /// formula data a plan may offer.
     public var homebrewPrefix: String?
+    /// Which package manager runs ``steps``, when it is not the subject's
+    /// own: Homebrew, when MacUp itself was installed with it.
+    public var stepsProvider: ProviderID?
+
+    /// The package manager whose environment ``steps`` run with.
+    public var runner: ProviderID? { stepsProvider ?? subject.provider }
 
     public init(
         id: UUID = UUID(),

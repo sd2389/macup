@@ -175,6 +175,21 @@ public struct HistoryStore: Sendable {
         copy.versionTarget = entry.versionTarget.map(redactor.redact)
         copy.versionAfter = entry.versionAfter.map(redactor.redact)
         copy.stateAfter = entry.stateAfter.map(redactor.redact)
+        if var record = entry.uninstall {
+            func scrub(_ paths: [UninstallRecord.RecordedPath]) -> [UninstallRecord.RecordedPath] {
+                paths.map { path in
+                    var copy = path
+                    copy.note = path.note.map(redactor.redact)
+                    return copy
+                }
+            }
+            record.removed = scrub(record.removed)
+            record.skipped = scrub(record.skipped)
+            record.failed = scrub(record.failed)
+            record.actions = record.actions?.map(redactor.redact)
+            record.unconfirmed = record.unconfirmed?.map(redactor.redact)
+            copy.uninstall = record
+        }
         return copy
     }
 
@@ -186,7 +201,7 @@ public struct HistoryStore: Sendable {
         } catch {
             throw MacUpError(
                 .configurationInvalid,
-                "MacUp could not encode a history entry, so it recorded nothing for \(entry.item.rawValue)."
+                "MacUp could not encode a history entry, so it recorded nothing for \(entry.subjectID)."
             )
         }
         // One entry per line is the whole format, so a newline inside the
