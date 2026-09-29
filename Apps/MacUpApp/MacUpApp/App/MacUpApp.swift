@@ -152,6 +152,8 @@ struct MenuBarContent: View {
         if let report = model.report {
             Text("Last checked at \(report.finishedAt.formatted(date: .omitted, time: .shortened))")
         }
+        // Each pending update by name, opening it in the Updates screen.
+        MenuBarUpdateList()
         Divider()
         Button("Review Updates…") { show(.updates) }
             .disabled(model.updateCount == 0)
