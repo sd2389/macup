@@ -94,6 +94,9 @@ struct UpdatesView: View {
         }
         .sheet(isPresented: $model.isReviewingPlan) {
             ReviewSheet()
+                // Nothing may close the sheet while an update is running: the
+                // run would carry on with nobody able to see it.
+                .interactiveDismissDisabled(model.isApplying)
         }
         .sheet(isPresented: $model.isShowingCommand) {
             CommandSheet()
@@ -132,8 +135,21 @@ private struct UpdateRow: View {
             }
             .font(.caption)
             .foregroundStyle(.secondary)
-            if let difference = update.versionDifference {
+            if let difference = update.versionDifference, !difference.changedParts.isEmpty {
                 Text("Changes: \(difference.summary.displaySafe)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            if update.signals.contains(.installationIncomplete) {
+                Label(
+                    "An earlier install of \(update.displayName.displaySafe) did not finish. MacUp will not upgrade it until that is repaired; see the details.",
+                    systemImage: "exclamationmark.triangle.fill"
+                )
+                .font(.caption)
+                .foregroundStyle(.orange)
+                .fixedSize(horizontal: false, vertical: true)
+            } else if update.signals.contains(.buildsFromSource) {
+                Label("Will be compiled from source, which can take an hour or more.", systemImage: "hourglass")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -168,9 +184,13 @@ private struct UpdateRow: View {
     /// instead of a button that would fail.
     private var canApply: Bool {
         model.canApplyUpdates(of: update.provider) && decision?.allowsExecution != false
+            && !update.signals.contains(.installationIncomplete)
     }
 
     private var applyHelp: String {
+        if update.signals.contains(.installationIncomplete) {
+            return "An earlier install of \(update.displayName) did not finish, so MacUp will not start another upgrade on top of it."
+        }
         if !model.canApplyUpdates(of: update.provider) {
             return "MacUp reports \(update.provider.displayName) updates but does not apply them. Use View Command to see what it would take."
         }

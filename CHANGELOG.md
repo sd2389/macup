@@ -50,6 +50,30 @@ claim that 0.4.0 has been released.
   one wins, and where the global packages actually live.
 
 ### Fixed
+- **Stop no longer breaks what it stops.** Pressing Stop in the app (or
+  Escape, which was bound to it), or Ctrl+C in the CLI, sent the running
+  package manager SIGTERM and then SIGKILL three seconds later. During a
+  `brew upgrade` that could kill Homebrew between unlinking the old version
+  and linking the new one, which is what happened to a `mysql` upgrade:
+  an empty folder for the new version and neither version linked. A command
+  that changes something is now never killed; Stop means "after this item",
+  and on its time limit such a command is interrupted the way Ctrl+C would,
+  then waited for. Escape no longer triggers Stop.
+- **An unfinished Homebrew install is recognized.** A version folder with no
+  `INSTALL_RECEIPT.json` is reported as an install that did not finish, the
+  version shown is the one in use (the linked keg or `opt` link), and MacUp
+  refuses to plan another upgrade on top of it. Verification no longer takes
+  an empty folder named after the target as a successful upgrade.
+- **A build from source is said up front.** When Homebrew has no ready-made
+  build for where it is installed (any prefix other than the one a bottle was
+  made for), the update, its plan, and the running sheet say it will be
+  compiled and can take an hour or more; its time limit is four hours.
+- **The running sheet explains itself**: how long the command has been
+  running, its latest output lines, and a progress bar that no longer reads
+  as finished while the only item is still running. `macup update` prints the
+  package manager's output as it arrives.
+- The update list no longer shows "Changes: The two versions are the same."
+
 - The app now offers Pin for every item, as `macup policy set <id> pin`
   always has. It used to hide Pin behind a provider capability no provider
   declares, and said Homebrew had no pin of its own. Both surfaces now say

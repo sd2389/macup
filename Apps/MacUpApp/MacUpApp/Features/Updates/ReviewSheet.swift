@@ -121,7 +121,7 @@ struct ReviewSheet: View {
             return parts.joined(separator: " ")
         }
         if model.isApplying {
-            return "MacUp runs one item at a time and stops when you tell it to."
+            return "MacUp runs one item at a time and lets each one finish."
         }
         let waiting = model.itemsAwaitingConfirmation.filter { !model.confirmedItems.contains($0.item) }.count
         var parts = ["Nothing has run yet."]
@@ -263,28 +263,99 @@ struct ReviewSheet: View {
 
     private var progress: some View {
         Section {
-            VStack(alignment: .leading, spacing: 8) {
-                ProgressView(
-                    value: Double(model.startedItems.count),
-                    total: Double(max(model.itemsThatWouldRun.count, model.startedItems.count, 1))
-                )
-                Text(progressLine)
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 10) {
+                    ProgressView().controlSize(.small).accessibilityHidden(true)
+                    Text(progressLine).font(.headline)
+                }
+                // Refreshed on a timer rather than on every line of output, so
+                // a build printing thousands of lines cannot swamp the window.
+                TimelineView(.periodic(from: .now, by: 1)) { context in
+                    VStack(alignment: .leading, spacing: 8) {
+                        if let since = model.runningSince {
+                            Text("Running for \(Self.elapsed(since: since, now: context.date)).")
+                                .foregroundStyle(.secondary)
+                                .monospacedDigit()
+                        }
+                        let lines = model.runningOutput.recent
+                        if !lines.isEmpty {
+                            VStack(alignment: .leading, spacing: 2) {
+                                ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
+                                    Text(line)
+                                        .lineLimit(1)
+                                        .truncationMode(.tail)
+                                }
+                            }
+                            .font(.caption.monospaced())
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(8)
+                            .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 6))
+                            .accessibilityElement(children: .combine)
+                            .accessibilityLabel("Latest output: \(lines.last ?? "")")
+                        }
+                    }
+                }
+                if let note = longRunningNote {
+                    Label(note, systemImage: "hourglass")
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                if model.isStopRequested {
+                    Label(stoppingNote, systemImage: "hand.raised")
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                if total > 1 {
+                    ProgressView(value: Double(finished), total: Double(total))
+                        .accessibilityLabel("\(finished) of \(total) finished")
+                }
             }
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel(progressLine)
+            .padding(.vertical, 2)
         }
     }
 
+    private var total: Int { max(model.itemsThatWouldRun.count, model.startedItems.count) }
+
+    /// Items whose command has ended. The running one has started but not
+    /// finished, so a bar never shows a batch as done while it is working.
+    private var finished: Int {
+        max(0, model.startedItems.count - (model.runningItem == nil ? 0 : 1))
+    }
+
+    private var runningCandidate: UpdateCandidate? {
+        guard let running = model.runningItem else { return nil }
+        return model.updatePlan?.planned.first { $0.item == running }?.candidate
+    }
+
+    /// Said up front when the provider has told MacUp this will be slow, so
+    /// a long wait reads as expected rather than as a hang.
+    private var longRunningNote: String? {
+        guard let candidate = runningCandidate, candidate.signals.contains(.buildsFromSource) else { return nil }
+        return "Homebrew is compiling \(candidate.displayName.displaySafe) from source. That can take an hour or more, and it is working even when the output is quiet."
+    }
+
+    private var stoppingNote: String {
+        let name = model.runningItem.map { $0.name.displaySafe } ?? "the current item"
+        return "MacUp will stop once \(name) finishes, and nothing after it will start. It does not cut the running command short: stopping a package manager part-way can leave the item with no usable version."
+    }
+
+    static func elapsed(since start: Date, now: Date) -> String {
+        let formatter = DateComponentsFormatter()
+        formatter.unitsStyle = .full
+        formatter.allowedUnits = [.hour, .minute, .second]
+        formatter.maximumUnitCount = 2
+        return formatter.string(from: max(0, now.timeIntervalSince(start))) ?? ""
+    }
+
     private var progressLine: String {
-        let total = max(model.itemsThatWouldRun.count, model.startedItems.count)
         guard let running = model.runningItem else {
             return model.startedItems.isEmpty
                 ? "Waiting for the first command to start."
                 : "Finishing up."
         }
-        return "Updating \(running.name.displaySafe) — \(model.startedItems.count) of \(total)."
+        return total > 1
+            ? "Updating \(running.name.displaySafe) (\(model.startedItems.count) of \(total))"
+            : "Updating \(running.name.displaySafe)"
     }
 
     // MARK: Results
@@ -321,9 +392,11 @@ struct ReviewSheet: View {
             }
             Spacer()
             if model.isApplying {
-                Button("Stop") { model.cancelApply() }
-                    .keyboardShortcut(.cancelAction)
-                    .help("Stop after the command that is running now")
+                // No Escape shortcut: a key pressed to close a sheet must not
+                // be the one that changes what an update does.
+                Button(model.isStopRequested ? "Stopping After This Item" : "Stop After This Item") { model.cancelApply() }
+                    .disabled(model.isStopRequested)
+                    .help("Start nothing further. The update running now finishes first, because stopping a package manager part-way can break what it is installing.")
             } else if model.executionReport != nil {
                 Button("Done") { model.endReview() }
                     .keyboardShortcut(.defaultAction)

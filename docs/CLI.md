@@ -172,9 +172,15 @@ Items run strictly one after another. After a failure MacUp stops before any
 remaining `high` or `unknown` risk change, because a failure means it no
 longer knows the state of the machine as well as the plan assumed.
 
-Ctrl+C cancels: the running command receives SIGTERM (then SIGKILL after a
-grace period), nothing further is started, and the report says which items
-ran and which never did. A second Ctrl+C exits immediately.
+While an update runs, MacUp prints the package manager's own output, a line
+at a time, under the command it is running, so a long build is visibly
+working.
+
+Ctrl+C stops the run after the item that is running: nothing further is
+started, and the report says which items ran and which never did. The running
+command itself is left to finish, because stopping a package manager part-way
+can leave the item with no usable version. A second Ctrl+C quits MacUp at
+once; the running command may carry on by itself.
 
 ## Approval before a change
 
@@ -333,10 +339,11 @@ Two things deliberately do **not** change the exit code:
 - Updates being available at all. `macup check` and `macup plan` exit 0 with
   a full list.
 
-Ctrl+C cancels cleanly: in-flight provider commands receive SIGTERM (then
-SIGKILL after a grace period), the partial report is marked
-`"cancelled": true`, and `update` reports which items ran and which never
-started. A second Ctrl+C exits immediately.
+Ctrl+C cancels cleanly: read-only provider commands are stopped (SIGTERM,
+then SIGKILL after a grace period), a command that is changing something is
+left to finish, the partial report is marked `"cancelled": true`, and
+`update` reports which items ran and which never started. A second Ctrl+C
+exits immediately.
 
 ## JSON (schema version 1)
 

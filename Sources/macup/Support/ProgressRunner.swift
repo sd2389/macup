@@ -35,8 +35,17 @@ struct ProgressRunner: CommandRunning {
             return String(format: "%.1fs", seconds)
         }
 
+        // The package manager's own words, a line at a time, so a long
+        // install reads as work in progress rather than as a hang.
+        let lines = OutputLines(limit: 1)
+        let report = report
+        let streaming: CommandOutputHandler = { chunk in
+            for line in lines.append(chunk) { report("    " + line) }
+            output?(chunk)
+        }
+
         do {
-            let result = try await base.run(request, output: output)
+            let result = try await base.run(request, output: streaming)
             if result.succeeded {
                 report("  Finished in \(elapsed()).")
             } else {

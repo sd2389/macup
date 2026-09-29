@@ -79,6 +79,19 @@ enum Snapshots {
         await model.reviewUpdates()
         try? await Task.sleep(for: .milliseconds(900))
         if let sheet = main?.attachedSheet { write(sheet, to: directory, named: "review-\(suffix).png") }
+
+        // What the sheet shows while an update runs, and after Stop. Only the
+        // model's display state is set; no command is started.
+        if let running = model.updatePlan?.planned.first?.item {
+            let output = ["==> Upgrading \(running.name)", "==> Downloading and verifying", "==> Installing \(running.name)"]
+            model.showRunningForSnapshot(running, output: output, since: Date().addingTimeInterval(-95), stopRequested: false)
+            try? await Task.sleep(for: .milliseconds(1200))
+            if let sheet = main?.attachedSheet { write(sheet, to: directory, named: "review-running-\(suffix).png") }
+            model.showRunningForSnapshot(running, output: output, since: Date().addingTimeInterval(-95), stopRequested: true)
+            try? await Task.sleep(for: .milliseconds(900))
+            if let sheet = main?.attachedSheet { write(sheet, to: directory, named: "review-stopping-\(suffix).png") }
+            model.endRunningForSnapshot()
+        }
         model.endReview()
         try? await Task.sleep(for: .milliseconds(500))
 

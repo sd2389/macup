@@ -127,6 +127,7 @@ struct UpdateCommandTests {
         #expect(harness.modifyingRequests.map(\.arguments) == [["upgrade", "--formula", "--yes", "git"]])
         #expect(run.standardOutput.contains("Running 1 change."))
         #expect(run.standardOutput.contains("Running: "))
+        #expect(run.standardOutput.contains("\n    Upgrading git\n"), "Homebrew's own words, as they arrive")
         #expect(run.standardOutput.contains("1 of 1 item updated"))
     }
 

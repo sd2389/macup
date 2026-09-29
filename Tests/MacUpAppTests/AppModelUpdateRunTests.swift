@@ -212,6 +212,30 @@ struct AppModelUpdateRunTests {
         #expect(harness.model.runningItem == nil)
     }
 
+    @Test("Stop while an update runs lets it finish and be confirmed, and starts nothing after it")
+    func stopLetsTheRunningUpdateFinish() async throws {
+        let harness = try harness(["brew:git", "brew:wget"], auto: ["brew:git", "brew:wget"])
+        // git's upgrade takes a moment, as a real one does.
+        harness.allowUpdate(of: "git", FakeCommandRunner.Response(standardOutput: "==> Upgrading git\n", delay: .milliseconds(400)))
+        await harness.reviewEverything()
+
+        harness.model.applyReviewedPlan()
+        while harness.model.runningItem != Self.git { await Task.yield() }
+        harness.model.cancelApply()
+        #expect(harness.model.isStopRequested)
+        await harness.model.applyTask?.value
+
+        let report = try #require(harness.model.executionReport)
+        let git = try #require(report.executed.first { $0.item == Self.git })
+        #expect(git.result.outcome == .succeeded, "the running update was not cut short")
+        #expect(git.verification?.outcome == .verified)
+        #expect(report.skipped.contains { $0.item == Self.wget && $0.reason.contains("cancelled") })
+        #expect(harness.runner.recordedRequests.filter { $0.effect == .modifying }.count == 1, "wget never started")
+        #expect(harness.model.runningOutput.recent == ["==> Upgrading git"])
+        #expect(!harness.model.isStopRequested, "Stop is forgotten once the run is over")
+        #expect(try harness.recordedHistory().contains { $0.item == Self.git && $0.outcome == .succeeded })
+    }
+
     @Test("A plan whose provider MacUp can no longer find is skipped, not run")
     func anUndetectableProviderIsSkipped() async throws {
         let harness = try harness(["brew:git"])

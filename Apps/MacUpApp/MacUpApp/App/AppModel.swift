@@ -357,6 +357,16 @@ final class AppModel {
     /// Items whose commands have started, in the order they started, so the
     /// sheet can say "3 of 5" without claiming an outcome it does not have.
     private(set) var startedItems: [PackageID] = []
+    /// When the running item's command started, so the sheet can say how
+    /// long it has been going instead of leaving a still bar to guess at.
+    private(set) var runningSince: Date?
+    /// The running command's latest lines, redacted and display-safe. Not
+    /// observed: the sheet reads it on a timer, so a noisy build cannot flood
+    /// the main thread with redraws.
+    let runningOutput = OutputLines(limit: 6)
+    /// Stop was pressed: nothing further starts, and the running command is
+    /// left to finish.
+    private(set) var isStopRequested = false
     private(set) var executionReport: ExecutionReport?
     /// Why nothing was applied, when nothing was.
     private(set) var executionProblem: String?
@@ -373,18 +383,25 @@ final class AppModel {
         }
     }
 
-    /// Stops a batch in progress. The engine stops before the next item, and
-    /// the running command is signalled rather than left to finish unwatched.
+    /// Stops a batch in progress after the item that is running. That item's
+    /// command is left to finish — the runner never kills a command that is
+    /// changing something, because a package manager stopped part-way can
+    /// leave the item with no usable version — and nothing after it starts.
     func cancelApply() {
+        guard applyTask != nil else { return }
+        isStopRequested = true
         applyTask?.cancel()
     }
 
     private func apply(_ plan: PlanReport) async {
         guard !isApplying else { return }
         isApplying = true
+        isStopRequested = false
         defer {
             isApplying = false
             runningItem = nil
+            runningSince = nil
+            isStopRequested = false
         }
         executionProblem = nil
         executionReport = nil
@@ -409,7 +426,8 @@ final class AppModel {
         var runEnvironment = checkEnvironment(await loadEnvironment())
         runEnvironment.runner = PlanProgressRunner(
             base: environment.runner,
-            planned: plan.planned
+            planned: plan.planned,
+            output: runningOutput
         ) { [weak self] item in
             self?.noteRunning(item)
         }
@@ -427,12 +445,41 @@ final class AppModel {
         runningItem = nil
         loadHistory()
         // The versions on this Mac have moved, so what the Updates screen is
-        // showing is now out of date. Checking again is read-only.
-        await checkNow()
+        // showing is now out of date. Checking again is read-only, and it runs
+        // even after Stop: the screen must show what the stopped run left.
+        await Task { await self.checkNow() }.value
     }
+
+    #if DEBUG
+    /// Snapshots only: puts the review sheet in the state it shows while
+    /// `item` is running, and optionally after Stop, without running anything.
+    func showRunningForSnapshot(_ item: PackageID, output: [String], since: Date, stopRequested: Bool) {
+        isApplying = true
+        runningItem = item
+        runningSince = since
+        startedItems = [item]
+        isStopRequested = stopRequested
+        runningOutput.reset()
+        for line in output {
+            runningOutput.append(CommandOutputChunk(stream: .standardOutput, data: Data((line + "\n").utf8)))
+        }
+    }
+
+    /// Snapshots only: undoes ``showRunningForSnapshot(_:output:since:stopRequested:)``.
+    func endRunningForSnapshot() {
+        isApplying = false
+        runningItem = nil
+        runningSince = nil
+        startedItems = []
+        isStopRequested = false
+        runningOutput.reset()
+    }
+    #endif
 
     private func noteRunning(_ item: PackageID) {
         runningItem = item
+        runningSince = Date()
+        runningOutput.reset()
         if !startedItems.contains(item) { startedItems.append(item) }
     }
 

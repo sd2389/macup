@@ -10,7 +10,8 @@ import MacUpCore
 /// behind it — the app wraps the command runner and recognizes each request by
 /// the plan it came from.
 ///
-/// It recognizes and nothing more. The map is built from the plans the user
+/// It recognizes, and passes the planned command's output on to the sheet as
+/// it arrives, and nothing more. The map is built from the plans the user
 /// reviewed, so a command that is not in one of them is simply not reported;
 /// refusing it is the execution guard's job, not this type's. Nothing here
 /// decides whether a command may run, and nothing here alters a request.
@@ -20,6 +21,8 @@ struct PlanProgressRunner: CommandRunning {
     var owners: [CommandInvocation: PackageID]
     /// Called with the item whose command is about to start.
     var reachedItem: @MainActor @Sendable (PackageID) -> Void
+    /// Where a planned command's output goes as it arrives, for the sheet.
+    var lines: OutputLines?
 
     /// Builds the map from a plan report. Only the steps that change something
     /// are included: a verification command runs after the item is finished,
@@ -27,10 +30,12 @@ struct PlanProgressRunner: CommandRunning {
     init(
         base: any CommandRunning,
         planned: [PlannedUpdate],
+        output lines: OutputLines? = nil,
         reachedItem: @MainActor @Sendable @escaping (PackageID) -> Void
     ) {
         self.base = base
         self.reachedItem = reachedItem
+        self.lines = lines
         var owners: [CommandInvocation: PackageID] = [:]
         for update in planned {
             for step in update.plan.steps {
@@ -43,9 +48,14 @@ struct PlanProgressRunner: CommandRunning {
     func run(_ request: CommandRequest, output: CommandOutputHandler?) async throws -> CommandResult {
         // Awaited rather than detached, so the window's idea of which item is
         // running cannot arrive after the item has already finished.
-        if let item = owners[request.invocation] {
-            await reachedItem(item)
+        guard let item = owners[request.invocation] else {
+            return try await base.run(request, output: output)
         }
-        return try await base.run(request, output: output)
+        await reachedItem(item)
+        guard let lines else { return try await base.run(request, output: output) }
+        return try await base.run(request) { chunk in
+            lines.append(chunk)
+            output?(chunk)
+        }
     }
 }
