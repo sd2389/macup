@@ -108,4 +108,34 @@ public enum ModifyingCommandRules {
         // MacUp was started; its value is the second positional.
         ModifyingCommandRule("mise", ["upgrade", "--cd"], positionalCount: 2),
     ]
+
+    /// The shapes an uninstall plan may run, and only an uninstall plan: the
+    /// execution engine that applies updates is given ``all`` and never
+    /// these, so no update can remove anything.
+    ///
+    /// Each was confirmed against the installed tool's own help
+    /// (docs/PROVIDER_NOTES.md), and each names exactly one item:
+    ///
+    /// - Homebrew's `--formula` and `--cask` are explicit for the same reason
+    ///   as an upgrade's. `--force` is part of the formula shape because it is
+    ///   what removes every installed version rather than only the linked
+    ///   one. `--ignore-dependencies` and `--zap` are in no shape: the first
+    ///   would remove something other software needs, and the second would
+    ///   delete the cask's zap list wholesale instead of the paths the reader
+    ///   ticked, in the mode they chose.
+    /// - `brew services stop` unregisters a formula's service before the
+    ///   formula goes, so no launch agent is left pointing at nothing.
+    /// - npm is global scope only.
+    /// - mise names one `tool@version`; `--all` is in no shape.
+    ///
+    /// Nothing here cleans up after itself: Homebrew's automatic removal of
+    /// dependencies, and its `sudo`, are switched off in the environment an
+    /// uninstall runs with (``HomebrewProvider/uninstallEnvironment(context:)``).
+    public static let uninstall: [ModifyingCommandRule] = [
+        ModifyingCommandRule("brew", ["uninstall", "--formula", "--force"], positionalCount: 1),
+        ModifyingCommandRule("brew", ["uninstall", "--cask"], positionalCount: 1),
+        ModifyingCommandRule("brew", ["services", "stop"], positionalCount: 1),
+        ModifyingCommandRule("npm", ["uninstall", "-g"], positionalCount: 1),
+        ModifyingCommandRule("mise", ["uninstall"], positionalCount: 1),
+    ]
 }
