@@ -315,13 +315,13 @@ public struct HistoryStore: Sendable {
         try directory.write(data, named: temporary)
         let descriptor = open(directory.path, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
         guard descriptor >= 0 else {
-            try? directory.remove(named: temporary)
+            _ = try? directory.remove(named: temporary)
             throw Self.failure("\(directory.path) is no longer a directory MacUp can use.")
         }
         defer { close(descriptor) }
         guard renameat(descriptor, temporary, descriptor, fileURL.lastPathComponent) == 0 else {
             let reason = String(cString: strerror(errno))
-            try? directory.remove(named: temporary)
+            _ = try? directory.remove(named: temporary)
             throw Self.failure("MacUp could not trim its history file: \(reason).")
         }
         fsync(descriptor)

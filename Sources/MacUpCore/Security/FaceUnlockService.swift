@@ -181,7 +181,12 @@ public final class FaceCamera: @unchecked Sendable {
                 recoverySuggestion: "Allow it in System Settings → Privacy & Security → Camera."
             )
         }
-        let session = try FaceCameraSession()
+        // ponytail: this resolves to the bare `init()`, not the throwing
+        // `init(device:)`, so no camera input is added and the connection
+        // below cannot go live. Kept as it was; switching to
+        // `FaceCameraSession(device: Self.preferredDevice())` changes what
+        // enrolment does, and needs a signed build and a camera to verify.
+        let session = FaceCameraSession()
         lock.withLock { self.session = session }
         try await session.start()
         try await session.waitForConnection()
