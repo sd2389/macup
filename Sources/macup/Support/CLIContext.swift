@@ -46,6 +46,9 @@ struct CLIContext: Sendable {
     /// Returns `nil` when there is nobody to read from, which every caller
     /// treats as "no" rather than as consent.
     var readLine: @Sendable () -> String?
+    /// TypeSafe and the Keychain, for the opt-in AI commands. Unavailable
+    /// unless set, so a context built without it can send nothing.
+    var ai: CLIAIServices = .unavailable
 
     /// Asks the device owner to approve a change, when the configuration says
     /// to. Returns the outcome; the caller refuses the change unless it allows
@@ -100,7 +103,8 @@ struct CLIContext: Sendable {
             schedulerRunner: ProcessCommandRunner(),
             schedulerFileSystem: LocalFileSystem(),
             authorizer: LocalAuthenticator(),
-            readLine: { Swift.readLine(strippingNewline: true) }
+            readLine: { Swift.readLine(strippingNewline: true) },
+            ai: .live()
         )
     }
 

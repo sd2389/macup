@@ -65,9 +65,11 @@ struct CheckCommand: AsyncParsableCommand {
 
         let engine = context.engine
         let environment = context.checkEnvironment
-        let report = await Interruption.run(handlingInterrupts: context.handlesInterrupts) {
+        let checked = await Interruption.run(handlingInterrupts: context.handlesInterrupts) {
             await engine.run(configuration: loaded, options: options, environment: environment)
         }
+        // Saved AI cautions, only while AI help is on; they can only add caution.
+        let report = context.aiCautioned(checked, configuration: loaded)
 
         let encoded = (json || saveState) ? try JSONOutput.encode(report) : nil
         if let encoded, json {

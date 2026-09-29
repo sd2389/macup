@@ -40,6 +40,9 @@ final class AppModel {
     /// passes; a test passes fakes, and nothing here ever sees a fingerprint,
     /// a face, or a password either way.
     let environment: AppEnvironment
+    /// Opt-in AI help: its own state, apart from everything above, so with it
+    /// off none of it is shown or acted on (AppModel+AI.swift).
+    let ai = AIState()
 
     init(environment: AppEnvironment = .live()) {
         self.environment = environment
@@ -72,10 +75,20 @@ final class AppModel {
 
         let processEnvironment = await loadEnvironment()
         let configuration = loadConfiguration()
-        report = await environment.checkEngine.run(
+        // With AI help on, the installed items are kept for Ask MacUp, and
+        // saved AI cautions are added; with it off, this is the plain check.
+        report = applyingAICautions(to: await environment.checkEngine.run(
             configuration: configuration,
+            options: CheckOptions(includeInventoryItems: isAIOn(configuration)),
             environment: checkEnvironment(processEnvironment)
-        )
+        ))
+    }
+
+    /// Adds the cautions of saved AI estimates to the last check again, or
+    /// takes them away, after the estimates or the setting change.
+    func reapplyAICautions() {
+        guard let base = ai.baseReport else { return }
+        report = applyingAICautions(to: base)
     }
 
     /// The outside world an engine runs against, with the login shell's
@@ -584,7 +597,7 @@ final class AppModel {
     /// camera can actually be used. `nil` otherwise, so the camera is never
     /// opened for someone who did not turn it on, and approval is not delayed
     /// by a shortcut that cannot answer.
-    private func faceUnlock(_ configuration: MacUpConfiguration, paths: MacUpPaths) -> FaceUnlockService? {
+    func faceUnlock(_ configuration: MacUpConfiguration, paths: MacUpPaths) -> FaceUnlockService? {
         guard configuration.security.faceUnlock, cameraReadiness.canUse else { return nil }
         return FaceUnlockService(
             store: faceStore(paths),
@@ -872,7 +885,7 @@ final class AppModel {
     /// app started from Finder does not inherit it, and without it MacUp would
     /// miss tools installed outside the standard locations. A failed read is
     /// retried on the next check rather than cached.
-    private func loadEnvironment() async -> [String: String] {
+    func loadEnvironment() async -> [String: String] {
         if let shellEnvironment { return shellEnvironment }
         let shell = environment.loginShell.shell()
         self.shell = shell

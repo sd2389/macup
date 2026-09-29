@@ -64,6 +64,9 @@ final class CLIHarness: @unchecked Sendable {
     /// What someone at a terminal types when MacUp asks. Empty means nobody
     /// answers, so nothing that needs confirmation runs.
     var answers: [String] = []
+    /// TypeSafe and the Keychain for the AI commands: unavailable unless a
+    /// test supplies fakes (AITestSupport.swift), so none can reach either.
+    var ai: CLIAIServices = .unavailable
 
     static let brewOutdated = """
         {"formulae": [{"name": "git", "installed_versions": ["2.43.0"], "current_version": "2.44.0", "pinned": false, "pinned_version": null},
@@ -233,7 +236,8 @@ final class CLIHarness: @unchecked Sendable {
             schedulerRunner: schedulerRunner,
             schedulerFileSystem: schedulerFileSystem,
             authorizer: authorizer,
-            readLine: { scripted.next() }
+            readLine: { scripted.next() },
+            ai: ai
         )
         return try await runCLI(arguments, context: context, stdout: stdout, stderr: stderr)
     }
