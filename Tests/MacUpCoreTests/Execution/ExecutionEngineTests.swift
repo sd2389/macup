@@ -507,14 +507,196 @@ struct ExecutionEngineTests {
         #expect(update.result.steps.count == 1, "the second step must not run after the first failed")
         #expect(update.result.steps.first?.errorExcerpt == "Error: git could not be upgraded")
         #expect(update.result.error?.exitStatus == 1)
-        #expect(update.verification == nil, "a failed update is not verified")
+        #expect(report.summary.verified == 0, "a failed update is never counted as confirmed")
         #expect(report.hasFailures)
         #expect(harness.runner.recordedRequests.count == 1)
 
         let entry = try #require(try harness.history.load().first)
         #expect(entry.outcome == .failed)
         #expect(entry.errorSummary?.isEmpty == false)
+    }
+
+    // MARK: What an unsuccessful attempt left
+
+    /// A provider whose read-back finds the item still at the version it
+    /// started from and no longer linked, as an interrupted `brew upgrade`
+    /// leaves it. It answers only while its task has not been cancelled, as
+    /// the real runner's read-only commands do, so a test that gets an answer
+    /// has proved the read-back was not cancelled with the run.
+    private static let stillOld = ScriptedUpdateProvider(id: .homebrew) { _, candidate, _ in
+        guard !Task.isCancelled else {
+            return VerificationResult(
+                item: candidate.id,
+                outcome: .failed,
+                expectedVersion: candidate.availableVersion.raw,
+                observedVersion: nil,
+                message: "Cancelled before it could read anything."
+            )
+        }
+        return VerificationResult(
+            item: candidate.id,
+            outcome: .targetNotReached,
+            expectedVersion: candidate.availableVersion.raw,
+            observedVersion: candidate.installedVersion?.raw,
+            observedState: "No version of git is linked, so its commands are not on your PATH.",
+            message: "git is still \(candidate.installedVersion?.raw ?? "unknown")."
+        )
+    }
+
+    @Test("Which results MacUp reads the item back after")
+    func readsBackAfterAnyCommandThatRan() {
+        let id = try! PackageID(parsing: "brew:git")
+        let step = ExecutionResult.StepResult(command: "/opt/homebrew/bin/brew upgrade --formula git", exitStatus: 1, durationSeconds: 1)
+        func result(_ outcome: ExecutionResult.Outcome, ran: Bool) -> ExecutionResult {
+            ExecutionResult(planID: UUID(), item: id, outcome: outcome, startedAt: .distantPast, finishedAt: .distantPast, steps: ran ? [step] : [])
+        }
+        #expect(ExecutionEngine.readsBack(after: result(.succeeded, ran: true)))
+        for outcome in [ExecutionResult.Outcome.failed, .timedOut, .cancelled] {
+            #expect(ExecutionEngine.readsBack(after: result(outcome, ran: true)), "\(outcome) after a command ran")
+            #expect(!ExecutionEngine.readsBack(after: result(outcome, ran: false)), "\(outcome) before any command ran")
+        }
+        #expect(!ExecutionEngine.readsBack(after: result(.skipped, ran: false)))
+    }
+
+    @Test("After a failed command MacUp reads the item back and records what it left")
+    func failureIsReadBack() async throws {
+        let harness = try ExecutionHarness()
+        harness.registerBrewUpgrade(.exit(1, standardError: "Error: git could not be linked"))
+        let loaded = try harness.save(configuration(["brew:git": .auto]))
+
+        let report = await harness.engine(providers: [Self.stillOld]).run(
+            PlannedUpdateFactory.report([gitPlan()]),
+            configuration: loaded,
+            options: ExecutionOptions(origin: .cli),
+            environment: harness.environment
+        )
+
+        let update = try #require(report.executed.first)
+        #expect(update.result.outcome == .failed)
+        #expect(update.verification?.outcome == .targetNotReached)
+        #expect(update.verification?.observedVersion == "2.50.0")
+        #expect(report.summary == .init(attempted: 1, succeeded: 0, failed: 1, skipped: 0, verified: 0, unverified: 0))
+
+        let entry = try #require(try harness.history.load().first)
+        #expect(entry.outcome == .failed)
+        #expect(entry.verification == .targetNotReached)
+        #expect(entry.versionAfter == "2.50.0")
+        #expect(entry.stateAfter == "No version of git is linked, so its commands are not on your PATH.")
+        #expect(entry.headline.text == "Failed — git was not upgraded")
+        // The upgrade ran once and nothing else changing was attempted.
+        #expect(harness.runner.recordedRequests.filter { $0.effect == .modifying }.count == 1)
+    }
+
+    @Test("A failure whose read-back finds the new version is still a failure, never a confirmation")
+    func failureAtTheTargetIsNotConfirmed() async throws {
+        let harness = try ExecutionHarness()
+        harness.registerBrewUpgrade(.exit(1, standardError: "Error: a post-install step failed"))
+        let loaded = try harness.save(configuration(["brew:git": .auto]))
+
+        let report = await harness.engine().run(
+            PlannedUpdateFactory.report([gitPlan()]),
+            configuration: loaded,
+            options: ExecutionOptions(origin: .cli),
+            environment: harness.environment
+        )
+
+        #expect(report.executed.first?.verification?.outcome == .verified)
+        #expect(report.summary.verified == 0)
+        #expect(report.summary.unverified == 0)
+        #expect(report.summary.failed == 1)
+        let entry = try #require(try harness.history.load().first)
+        #expect(entry.outcome == .failed)
+        #expect(entry.versionAfter == "2.50.1")
+        #expect(entry.headline.kind == .failed)
+        #expect(entry.headline.text == "Failed, but git is at the new version")
+    }
+
+    @Test("Stopping in the middle of a command still reads the item back, and nothing after it starts")
+    func stopMidCommandIsReadBack() async throws {
+        let harness = try ExecutionHarness()
+        // The command is cut short the way an older MacUp cut one short when
+        // Stop was pressed: it ends cancelled, part-way through.
+        harness.registerBrewUpgrade(.throwing(MacUpError(.cancelled, "The command was cancelled.")))
+        harness.runner.register(path: "/opt/homebrew/bin/npm", ["install", "-g", "typescript"], .success())
+        let loaded = try harness.save(configuration(["brew:git": .auto, "npm:typescript": .auto]))
+        let npm = PlannedUpdateFactory.planned(
+            PlannedUpdateFactory.candidate("npm:typescript", installed: "5.4.2", available: "5.4.3", kind: .globalPackage),
+            steps: [PlannedUpdateFactory.step("/opt/homebrew/bin/npm", ["install", "-g", "typescript"])]
+        )
+        var environment = harness.environment
+        environment.runner = StopPressingRunner(base: harness.runner)
+
+        let report = await harness.engine(providers: [Self.stillOld, ScriptedUpdateProvider.confirming(.npm)]).run(
+            PlannedUpdateFactory.report([gitPlan(), npm]),
+            configuration: loaded,
+            options: ExecutionOptions(origin: .gui),
+            environment: environment
+        )
+
+        let git = try #require(report.executed.first)
+        #expect(git.result.outcome == .cancelled)
+        #expect(git.verification?.outcome == .targetNotReached, "the read-back ran to the end despite the stop")
+        #expect(report.cancelled)
+        #expect(report.skipped.map(\.item.rawValue) == ["npm:typescript"])
+        #expect(!harness.runner.recordedRequests.contains { $0.executable.path.hasSuffix("/npm") })
+
+        let entry = try #require(try harness.history.load().first { $0.item.rawValue == "brew:git" })
+        #expect(entry.outcome == .cancelled)
+        #expect(entry.versionAfter == "2.50.0")
+        #expect(entry.stateAfter == "No version of git is linked, so its commands are not on your PATH.")
+        #expect(entry.errorSummary == "The command was cancelled.")
+        #expect(entry.headline.text == "Stopped — git was not upgraded")
+    }
+
+    @Test("A command that ran past its time limit is read back too")
+    func timeoutIsReadBack() async throws {
+        let harness = try ExecutionHarness()
+        harness.registerBrewUpgrade(.throwing(MacUpError(
+            .timeout,
+            "The command did not finish within 10 minutes, so MacUp interrupted it the way Ctrl+C would and waited for it to exit."
+        )))
+        let loaded = try harness.save(configuration(["brew:git": .auto]))
+
+        let report = await harness.engine(providers: [Self.stillOld]).run(
+            PlannedUpdateFactory.report([gitPlan()]),
+            configuration: loaded,
+            options: ExecutionOptions(origin: .cli),
+            environment: harness.environment
+        )
+
+        #expect(report.executed.first?.result.outcome == .timedOut)
+        let entry = try #require(try harness.history.load().first)
+        #expect(entry.versionAfter == "2.50.0")
+        #expect(entry.verification == .targetNotReached)
+        #expect(entry.headline.text == "Timed out — git was not upgraded")
+    }
+
+    @Test("An attempt stopped before its first command reads nothing back, because nothing ran")
+    func nothingRanNothingReadBack() async throws {
+        let harness = try ExecutionHarness()
+        harness.registerBrewUpgrade()
+        let loaded = try harness.save(configuration(["brew:git": .auto]))
+        let provider = StopDuringDetectionProvider()
+
+        let report = await harness.engine(providers: [provider]).run(
+            PlannedUpdateFactory.report([gitPlan()]),
+            configuration: loaded,
+            options: ExecutionOptions(origin: .gui),
+            environment: harness.environment
+        )
+
+        let git = try #require(report.executed.first)
+        #expect(git.result.outcome == .cancelled)
+        #expect(git.result.steps.isEmpty)
+        #expect(git.verification == nil)
+        #expect(!provider.wasAskedToVerify)
+        #expect(harness.runner.recordedRequests.isEmpty)
+
+        let entry = try #require(try harness.history.load().first)
+        #expect(entry.command == nil)
         #expect(entry.versionAfter == nil)
+        #expect(entry.verification == nil)
+        #expect(entry.headline.text == "Stopped before anything ran")
     }
 
     @Test("A command the guard refuses fails the item and never reaches the machine")
@@ -993,6 +1175,41 @@ struct ExecutionEngineTests {
         )
 
         #expect(report.summary.succeeded == 1)
+    }
+}
+
+/// A provider MacUp finds, but whose detection is when Stop is pressed: the
+/// run is cancelled after the item was allowed and before its first command.
+/// Records whether MacUp then asked it to read anything back.
+private final class StopDuringDetectionProvider: UpdateProvider, @unchecked Sendable {
+    let id = ProviderID.homebrew
+    let capabilities: Set<ProviderCapability> = [.detect, .planUpdates, .updateSelectedItems, .verifyUpdates]
+    private let lock = NSLock()
+    private var askedToVerify = false
+
+    var wasAskedToVerify: Bool { lock.withLock { askedToVerify } }
+
+    func detect(context: ProviderContext) async -> ProviderStatus {
+        withUnsafeCurrentTask { $0?.cancel() }
+        return ProviderStatus(provider: id, availability: .available, installation: ScriptedUpdateProvider.stubInstallation)
+    }
+
+    func inventory(context: ProviderContext) async throws -> ProviderListing<ManagedItem> { ProviderListing() }
+    func outdated(context: ProviderContext) async throws -> ProviderListing<UpdateCandidate> { ProviderListing() }
+
+    func verify(
+        _ result: ExecutionResult,
+        for candidate: UpdateCandidate,
+        context: ProviderContext
+    ) async throws -> VerificationResult {
+        lock.withLock { askedToVerify = true }
+        return VerificationResult(
+            item: candidate.id,
+            outcome: .verified,
+            expectedVersion: candidate.availableVersion.raw,
+            observedVersion: candidate.availableVersion.raw,
+            message: "Nothing ran, so this should never have been asked."
+        )
     }
 }
 

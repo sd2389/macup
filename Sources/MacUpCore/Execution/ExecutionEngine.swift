@@ -33,6 +33,10 @@ public struct ExecutedUpdate: Sendable, Hashable, Codable, Identifiable {
     public var displayName: String
     public var plan: ExecutionPlan
     public var result: ExecutionResult
+    /// What MacUp read back afterwards. After a success, whether it reached
+    /// its target. After an attempt that ran a command and did not succeed,
+    /// what that attempt left behind — which is never counted as confirmed.
+    /// `nil` when nothing was read back.
     public var verification: VerificationResult?
 
     public init(
@@ -66,6 +70,9 @@ public struct ExecutionReport: Sendable, Hashable, Codable {
         public var succeeded: Int
         public var failed: Int
         public var skipped: Int
+        /// Attempts that succeeded and that MacUp confirmed. A failed attempt
+        /// whose read-back happens to find the new version is still a
+        /// failure, so it is not counted here.
         public var verified: Int
         /// Attempts that succeeded but could not be confirmed.
         public var unverified: Int
@@ -116,7 +123,7 @@ public struct ExecutionReport: Sendable, Hashable, Codable {
             succeeded: executed.filter { $0.result.outcome == .succeeded }.count,
             failed: executed.filter { $0.result.outcome == .failed || $0.result.outcome == .timedOut }.count,
             skipped: skipped.count,
-            verified: executed.filter { $0.verification?.outcome == .verified }.count,
+            verified: executed.filter { $0.result.outcome == .succeeded && $0.verification?.outcome == .verified }.count,
             unverified: executed.filter { $0.result.outcome == .succeeded && $0.verification?.outcome != .verified }.count
         )
     }
@@ -330,11 +337,14 @@ public struct ExecutionEngine: Sendable {
                     ?? provider.executionEnvironment(context: providerContext)
             )
             var verification: VerificationResult?
-            if result.outcome == .succeeded {
-                // Verification only reads, and it confirms a change that has
-                // already happened. A run stopped while this item's command
-                // was going still owes history the truth about the item, so
-                // the read-back is not cancelled with the run.
+            if Self.readsBack(after: result) {
+                // Verification only reads. After a success it confirms a
+                // change that has already happened; after a command that did
+                // not succeed it finds out what that command left, which is
+                // what history owes the user most. A run stopped while this
+                // item's command was going still owes history the truth
+                // about the item, so the read-back is not cancelled with the
+                // run.
                 let engine = self
                 verification = await Task {
                     await engine.verify(
@@ -501,11 +511,22 @@ public struct ExecutionEngine: Sendable {
 
     // MARK: Verification
 
-    /// Asks the owning provider to confirm the new version.
+    /// Whether MacUp reads the item back after `result`.
     ///
-    /// An update MacUp could not confirm is reported as unconfirmed, never as
-    /// confirmed: claiming otherwise would make the one field a user checks
-    /// afterwards worthless (CLAUDE.md §25).
+    /// Always after a success, to confirm it. After a failure, a timeout, or a
+    /// stop, only when a command was started: a package manager that stops
+    /// part-way can leave an item changed — at the old version but no longer
+    /// linked, or with a half-installed new one — and saying so is the point
+    /// of recording the attempt at all. An attempt that started no command
+    /// changed nothing, so there is nothing to read.
+    static func readsBack(after result: ExecutionResult) -> Bool {
+        switch result.outcome {
+        case .succeeded: true
+        case .failed, .timedOut, .cancelled: !result.steps.isEmpty
+        case .skipped: false
+        }
+    }
+
     /// Locates the provider again before MacUp changes anything with it.
     ///
     /// The environment a plan needs depends on which installation it is
@@ -541,6 +562,12 @@ public struct ExecutionEngine: Sendable {
         )
     }
 
+    /// Asks the owning provider to confirm the new version, or, after an
+    /// attempt that did not succeed, to say what is there now.
+    ///
+    /// An update MacUp could not confirm is reported as unconfirmed, never as
+    /// confirmed: claiming otherwise would make the one field a user checks
+    /// afterwards worthless (CLAUDE.md §25).
     private func verify(
         _ planned: PlannedUpdate,
         result: ExecutionResult,
@@ -593,6 +620,7 @@ public struct ExecutionEngine: Sendable {
             versionBefore: planned.plan.currentVersion?.raw,
             versionTarget: planned.plan.proposedVersion.raw,
             versionAfter: verification?.observedVersion,
+            stateAfter: verification?.observedState,
             command: result.steps.isEmpty ? nil : result.steps.map(\.command).joined(separator: "\n"),
             outcome: result.outcome,
             verification: verification?.outcome,

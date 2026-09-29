@@ -102,6 +102,9 @@ struct ExecutionRenderer {
         if let verification = update.verification, verification.outcome != .verified {
             lines.append(style.text(verification.message))
         }
+        if let state = update.verification?.observedState {
+            lines.append(style.text(state))
+        }
         if let error = update.result.error {
             lines.append(style.text(error.message))
             if let suggestion = error.recoverySuggestion {
@@ -140,8 +143,10 @@ struct ExecutionRenderer {
             lines.append("The run was cancelled. Everything above is what MacUp had already done; nothing else was started.")
         }
         if counts.failed > 0 {
-            lines.append("A failed update leaves the item as it was, as far as MacUp can tell. Its provider's own "
-                + "output is above.")
+            // MacUp reads a failed item back rather than assuming it is as it
+            // was: a package manager that stops part-way can leave it changed.
+            lines.append("MacUp read each failed item back afterwards; what it found is above, with the provider's own "
+                + "output.")
         }
         if counts.attempted > 0 {
             lines.append(style.dim("Recorded in MacUp's history. `macup history` shows it."))

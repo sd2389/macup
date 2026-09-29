@@ -47,6 +47,14 @@ enum Snapshots {
                 }
                 if let main { write(main, to: directory, named: "\(name)-\(suffix).png") }
             }
+            // History narrowed to one item, as the Updates screen's "Show All
+            // in History" opens it. Reading the file is all this does.
+            if let item = model.history?.entries.first?.item {
+                model.showHistory(for: item)
+                try? await Task.sleep(for: .milliseconds(700))
+                if let main { write(main, to: directory, named: "history-item-\(suffix).png") }
+                model.showAllHistory()
+            }
             await captureSheets(model: model, main: main, into: directory, suffix: suffix)
         }
         openSettings()

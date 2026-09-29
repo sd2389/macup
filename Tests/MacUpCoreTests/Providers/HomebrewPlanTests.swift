@@ -255,6 +255,8 @@ struct HomebrewPlanTests {
         let result = try await provider.verify(.stub(candidate.id), for: candidate, context: context)
         #expect(result.outcome == .failed)
         #expect(result.observedVersion == nil)
+        // Gone is a state of its own, and the one history most needs.
+        #expect(result.observedState == "Homebrew no longer lists mise.")
     }
 
     @Test("Output MacUp cannot parse is a failed verification, never a verified one")

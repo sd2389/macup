@@ -108,6 +108,14 @@ struct ModelCodingTests {
 
         let verification = VerificationResult(item: id, outcome: .targetNotReached, expectedVersion: "2.44.0", observedVersion: "2.43.0", message: "Still 2.43.0.")
         #expect(try roundTrip(verification) == verification)
+        #expect(try jsonObject(verification)["observedState"] == nil, "absent, not null, when there is nothing to say")
+
+        var leftBehind = verification
+        leftBehind.observedState = "No version of git is linked, so its commands are not on your PATH."
+        #expect(try roundTrip(leftBehind) == leftBehind)
+        // An update report written before the field existed still decodes.
+        let earlier = #"{"item":"brew:git","outcome":"verified","expectedVersion":"2.44.0","observedVersion":"2.44.0","message":"git is now 2.44.0."}"#
+        #expect(try JSONDecoder().decode(VerificationResult.self, from: Data(earlier.utf8)).observedState == nil)
 
         let entry = HistoryEntry(
             timestamp: date,

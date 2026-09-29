@@ -96,13 +96,17 @@ public struct HistoryStore: Sendable {
     }
 
     /// Reads history newest first. `limit` caps how many entries are returned.
-    public func load(limit: Int? = nil) throws -> [HistoryEntry] {
-        try read(limit: limit).entries
+    public func load(limit: Int? = nil, filter: HistoryFilter = HistoryFilter()) throws -> [HistoryEntry] {
+        try read(limit: limit, filter: filter).entries
     }
 
     /// Reads history and says what it could not read, for `macup history` and
     /// for Doctor.
-    public func read(limit: Int? = nil) throws -> HistoryReading {
+    ///
+    /// `filter` is applied as the file is read, so `limit` counts the entries
+    /// that match: the last three attempts at one item are found however many
+    /// other entries were written after them.
+    public func read(limit: Int? = nil, filter: HistoryFilter = HistoryFilter()) throws -> HistoryReading {
         guard let (data, olderEntriesNotRead) = try contents() else {
             return HistoryReading(entries: [])
         }
@@ -113,7 +117,8 @@ public struct HistoryStore: Sendable {
         for line in data.split(separator: 0x0A, omittingEmptySubsequences: true).reversed() {
             if let limit, entries.count >= limit { break }
             do {
-                entries.append(try decoder.decode(HistoryEntry.self, from: Data(line)))
+                let entry = try decoder.decode(HistoryEntry.self, from: Data(line))
+                if filter.includes(entry) { entries.append(entry) }
             } catch {
                 unreadable += 1
             }
@@ -140,6 +145,7 @@ public struct HistoryStore: Sendable {
         copy.versionBefore = entry.versionBefore.map(redactor.redact)
         copy.versionTarget = entry.versionTarget.map(redactor.redact)
         copy.versionAfter = entry.versionAfter.map(redactor.redact)
+        copy.stateAfter = entry.stateAfter.map(redactor.redact)
         return copy
     }
 

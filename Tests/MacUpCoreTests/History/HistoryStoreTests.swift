@@ -263,6 +263,77 @@ struct HistoryStoreTests {
         #expect(text.contains("\"timestamp\":\"2023-11-14T22:13:20.250Z\""))
     }
 
+    @Test("Lines an earlier MacUp wrote still decode, with nothing invented for what they lack")
+    func earlierLinesStillDecode() async throws {
+        let directory = try TemporaryDirectory(prefix: "macup-history")
+        let store = store(directory)
+        try FileManager.default.createDirectory(
+            at: store.fileURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true,
+            attributes: [.posixPermissions: 0o700]
+        )
+        try Fixture.data("history/before-read-back.jsonl").write(to: store.fileURL)
+
+        let reading = try store.read()
+        #expect(reading.unreadableLines == 0)
+        #expect(reading.entries.count == 5)
+        #expect(reading.entries.allSatisfy { $0.stateAfter == nil })
+
+        let mysql = try #require(reading.entries.first)
+        #expect(mysql.item.rawValue == "brew:mysql")
+        #expect(mysql.outcome == .cancelled)
+        #expect(mysql.versionBefore == "9.7.1")
+        #expect(mysql.versionTarget == "26.7.0_2")
+        #expect(mysql.versionAfter == nil)
+        #expect(mysql.verification == nil)
+        #expect(mysql.errorSummary == "The command was cancelled.")
+        #expect(mysql.durationSeconds == 94.8895890712738)
+
+        // Appending an entry of today's shape beside them leaves them readable.
+        try store.append(try entry(outcome: .failed, verification: .targetNotReached))
+        #expect(try store.read().entries.count == 6)
+        #expect(try store.read().unreadableLines == 0)
+    }
+
+    @Test("A filter is applied as the file is read, so a limit counts the entries that match")
+    func filterAppliesBeforeTheLimit() async throws {
+        let directory = try TemporaryDirectory(prefix: "macup-history")
+        let store = store(directory)
+        for offset in 0..<3 {
+            try store.append(try entry("brew:git", at: Self.moment.addingTimeInterval(Double(offset))))
+        }
+        // Everything written since is for other items: a skip for an
+        // ignored item on every run adds up.
+        for offset in 3..<40 {
+            try store.append(try entry("brew:wget", at: Self.moment.addingTimeInterval(Double(offset)), outcome: .skipped))
+        }
+
+        let git = try PackageID(parsing: "brew:git")
+        let entries = try store.load(limit: 2, filter: HistoryFilter(items: [git]))
+        #expect(entries.map(\.item) == [git, git])
+        #expect(entries.map(\.timestamp) == [Self.moment.addingTimeInterval(2), Self.moment.addingTimeInterval(1)])
+        #expect(try store.load(limit: 2).allSatisfy { $0.item.rawValue == "brew:wget" }, "unfiltered, the newest win")
+        #expect(try store.load(filter: HistoryFilter(search: "left alone")).count == 37)
+    }
+
+    @Test("What an attempt left is stored with it, and redacted like everything else")
+    func stateAfterIsStoredAndRedacted() async throws {
+        let directory = try TemporaryDirectory(prefix: "macup-history")
+        let store = store(directory)
+        var written = try entry(outcome: .failed, verification: .targetNotReached)
+        written.versionAfter = "2.50.0"
+        written.stateAfter = "No version of git is linked, so its commands are not on your PATH."
+        try store.append(written)
+        #expect(try store.load().first == written)
+
+        var secret = written
+        secret.stateAfter = "git left https://user:hunter2@example.com in its receipt."
+        try store.append(secret)
+        let text = try String(contentsOf: store.fileURL, encoding: .utf8)
+        #expect(!text.contains("hunter2"))
+        #expect(try store.load().first?.stateAfter?.contains(Redactor.placeholder) == true)
+    }
+
     @Test("A history path that is not a regular file MacUp owns is refused")
     func refusesAnythingButARegularFile() async throws {
         let directory = try TemporaryDirectory(prefix: "macup-history")

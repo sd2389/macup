@@ -80,7 +80,8 @@ struct AppModelHistoryTests {
         let entry = try #require(harness.model.history?.entries.first)
         #expect(entry.outcome == .skipped)
         #expect(entry.skipReason?.contains("is ignored") == true)
-        #expect(OutcomeLabel.wording(entry.outcome, entry.verification).text == "Not changed")
+        #expect(entry.headline.text == "Left alone")
+        #expect(entry.headline.kind == .leftAlone)
     }
 
     @Test("A line MacUp could not decode is reported, not quietly dropped")

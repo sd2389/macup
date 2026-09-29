@@ -489,8 +489,12 @@ final class AppModel {
     private(set) var history: HistoryReading?
     /// Why the history could not be read, if it could not.
     private(set) var historyProblem: String?
+    /// What the History screen is narrowed to: one item, and search text.
+    /// See AppModel+History.swift.
+    var historyFilter = HistoryFilter()
 
-    /// Reads the history file. Reading never creates or changes it.
+    /// Reads the history file, for the item the History screen is narrowed
+    /// to when it is. Reading never creates or changes it.
     func loadHistory(limit: Int = 250) {
         historyProblem = nil
         guard let paths = try? resolvedPaths() else {
@@ -498,7 +502,7 @@ final class AppModel {
             return
         }
         do {
-            history = try HistoryStore(paths: paths).read(limit: limit)
+            history = try HistoryStore(paths: paths).read(limit: limit, filter: HistoryFilter(items: historyFilter.items))
         } catch let error as MacUpError {
             history = nil
             historyProblem = [error.message, error.recoverySuggestion].compactMap { $0 }.joined(separator: " ")
@@ -840,7 +844,7 @@ final class AppModel {
         )
     }
 
-    private func resolvedPaths() throws -> MacUpPaths {
+    func resolvedPaths() throws -> MacUpPaths {
         try MacUpPaths.resolve(homeDirectory: home, environment: environment.processEnvironment)
     }
 

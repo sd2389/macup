@@ -98,26 +98,32 @@ struct AppModelUpdateRunTests {
             == "Ran, but a different version is installed")
     }
 
-    @Test("A failure carries the provider's own words, and says nothing more changed")
+    @Test("A failure carries the provider's own words, and what MacUp found when it read the item back")
     func aFailureCarriesTheProvidersError() async throws {
         let harness = try AppModelHarness(planning: StubPlanningProvider(
             candidates: [PlannedUpdateFactory.candidate("brew:git")]
         ))
         try harness.rule(.auto, for: Self.git)
         harness.allowUpdate(of: "git", .exit(1, standardError: "Error: git could not be linked."))
+        harness.planning?.verifies(.targetNotReached, observed: "1.0.0")
         await harness.reviewEverything()
         await harness.applyAndWait()
 
         let report = try #require(harness.model.executionReport)
         #expect(report.hasFailures)
         #expect(report.summary.failed == 1)
+        #expect(report.summary.verified == 0)
         let executed = try #require(report.executed.first)
         #expect(executed.result.outcome == .failed)
         let error = try #require(executed.result.error)
         #expect(error.detail?.contains("could not be linked") == true)
-        // Verification is not even attempted for something that did not work.
-        #expect(executed.verification == nil)
-        #expect(try harness.recordedHistory().first?.outcome == .failed)
+        // Read back, because a command that failed part-way can leave the
+        // item changed; never counted as confirmed.
+        #expect(executed.verification?.outcome == .targetNotReached)
+        let entry = try #require(try harness.recordedHistory().first)
+        #expect(entry.outcome == .failed)
+        #expect(entry.versionAfter == "1.0.0")
+        #expect(entry.headline.text == "Failed — git was not upgraded")
     }
 
     @Test("An item waiting for confirmation is left alone until it is confirmed")

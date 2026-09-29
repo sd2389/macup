@@ -58,6 +58,10 @@ public struct ExecutionResult: Sendable, Hashable, Codable {
 }
 
 /// Whether an update actually reached its target.
+///
+/// MacUp also reads an item back after an attempt that ran a command and did
+/// not succeed, and this is what it found then: not a confirmation, but the
+/// state the attempt left behind.
 public struct VerificationResult: Sendable, Hashable, Codable {
     public enum Outcome: String, Sendable, Hashable, Codable {
         /// The expected version is installed.
@@ -74,6 +78,11 @@ public struct VerificationResult: Sendable, Hashable, Codable {
     public var outcome: Outcome
     public var expectedVersion: String?
     public var observedVersion: String?
+    /// What else the read-back showed that a person would want to know,
+    /// beyond the version: for example that no version is linked, or that an
+    /// install never finished. `nil` when there is nothing to add. Built from
+    /// provider output, so it is made display-safe wherever it is shown.
+    public var observedState: String?
     public var message: String
 
     public init(
@@ -81,18 +90,25 @@ public struct VerificationResult: Sendable, Hashable, Codable {
         outcome: Outcome,
         expectedVersion: String?,
         observedVersion: String?,
+        observedState: String? = nil,
         message: String
     ) {
         self.item = item
         self.outcome = outcome
         self.expectedVersion = expectedVersion
         self.observedVersion = observedVersion
+        self.observedState = observedState
         self.message = message
     }
 }
 
 /// One line of MacUp's update history (CLAUDE.md §13, §16).
 /// History records attempts and skips, never secrets.
+///
+/// Fields are only ever added, and every added one is optional, so a line
+/// written by an older MacUp still decodes. Such a line simply lacks what
+/// that version did not record, and is shown without it rather than with a
+/// guess (``HistoryHeadline``).
 public struct HistoryEntry: Sendable, Hashable, Codable, Identifiable {
     public static let schemaVersion = 1
 
@@ -103,7 +119,14 @@ public struct HistoryEntry: Sendable, Hashable, Codable, Identifiable {
     public var item: PackageID
     public var versionBefore: String?
     public var versionTarget: String?
+    /// The version MacUp read back afterwards. Recorded after a success, and
+    /// after an attempt that ran a command and did not succeed; `nil` when
+    /// nothing was read back.
     public var versionAfter: String?
+    /// What else that read-back showed, in a sentence, when there was
+    /// something worth saying: for example that no version is linked any
+    /// more. Redacted like every other string here.
+    public var stateAfter: String?
     /// Redacted display form of the command(s) run.
     public var command: String?
     public var outcome: ExecutionResult.Outcome
@@ -121,6 +144,7 @@ public struct HistoryEntry: Sendable, Hashable, Codable, Identifiable {
         versionBefore: String?,
         versionTarget: String?,
         versionAfter: String?,
+        stateAfter: String? = nil,
         command: String?,
         outcome: ExecutionResult.Outcome,
         verification: VerificationResult.Outcome?,
@@ -136,6 +160,7 @@ public struct HistoryEntry: Sendable, Hashable, Codable, Identifiable {
         self.versionBefore = versionBefore
         self.versionTarget = versionTarget
         self.versionAfter = versionAfter
+        self.stateAfter = stateAfter
         self.command = command
         self.outcome = outcome
         self.verification = verification
