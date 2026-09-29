@@ -292,6 +292,8 @@ private struct UpdateDetail: View {
                 LabeledContent("Change", value: update.versionChange.displayName.capitalizedFirst)
             }
 
+            RecentAttemptsSection(item: update.id, name: update.displayName)
+
             Section {
                 if let difference = update.versionDifference {
                     ForEach(difference.parts, id: \.name) { part in

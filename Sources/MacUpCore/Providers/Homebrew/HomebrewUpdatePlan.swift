@@ -165,7 +165,9 @@ extension HomebrewProvider {
             guard let item = items.elements.first(where: { $0.id == candidate.id }) else {
                 return PlanSupport.compare(candidate.id, expected: expected, observed: nil)
             }
-            return PlanSupport.compare(candidate.id, expected: expected, observed: Self.observedVersion(of: item))
+            var verification = PlanSupport.compare(candidate.id, expected: expected, observed: Self.observedVersion(of: item))
+            verification.observedState = Self.observedState(of: item)
+            return verification
         } catch {
             return PlanSupport.unverifiable(
                 candidate.id,
@@ -188,5 +190,26 @@ extension HomebrewProvider {
         if let inUse = versionInUse(item) { return inUse }
         let versions = item.installedVersions.map(\.raw)
         return versions.isEmpty ? nil : HomebrewOutdatedParser.newest(versions)
+    }
+
+    /// What else the read-back shows that the version alone does not: that no
+    /// version of a formula is linked, or that an install never finished.
+    /// Both are what a `brew upgrade` stopped part-way leaves — Homebrew
+    /// unlinks the old version before it installs the new one — and both are
+    /// read from Homebrew's own files by ``annotate(_:prefix:fileSystem:)``,
+    /// never guessed. `nil` when there is nothing to add.
+    static func observedState(of item: ManagedItem) -> String? {
+        guard item.kind == .formula else { return nil }
+        var sentences: [String] = []
+        // A keg-only formula is never linked, on purpose; saying so would be
+        // noise.
+        if item.activeVersion == nil, item.details["kegOnly"] != "true", !item.installedVersions.isEmpty {
+            sentences.append("No version of \(item.displayName) is linked, so its commands are not on your PATH.")
+        }
+        if let incomplete = item.details["incompleteVersions"] {
+            let several = incomplete.contains(", ")
+            sentences.append("The \(item.displayName) \(incomplete) install\(several ? "s" : "") did not finish.")
+        }
+        return sentences.isEmpty ? nil : sentences.joined(separator: " ")
     }
 }

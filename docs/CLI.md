@@ -70,7 +70,7 @@ macup --generate-completion-script zsh > ~/.zsh/completions/_macup
 | `macup plan [<package-id>…] [--refresh] [--json] [--verbose]` | Shows what `macup update` would do: current → proposed version, provider, effective policy, risk and its reason, and the exact executable and arguments — plus every item it would leave alone, with the reason. Launches nothing. |
 | **`macup update [<package-id>…]`** | **The only command that changes packages.** Flags below. |
 | `macup doctor [--json] [--verbose]` | Runs MacUp's deterministic diagnostics and explains each finding. Fixes nothing. |
-| `macup history [--limit N] [--json] [--verbose]` | What MacUp has changed and what it decided not to change, newest first. |
+| `macup history [<package-id>…] [--search <text>] [--limit N] [--json] [--verbose]` | What MacUp has changed and what it decided not to change, newest first, each opening with one line that says what happened. Name package IDs to see only those items; `--search` keeps the entries whose item, provider, or outcome contains every word. See below. |
 | `macup policy` / `macup policy list [--json]` | Every policy rule, the global default, and where each lives in the file. Read-only. |
 | `macup policy set <target> <auto\|ask\|ignore\|pin\|inherit> [--json]` | Sets the rule for a package ID, a provider name, or `default`. |
 | `macup policy clear <target>… [--json]` | Removes an item's rule, or sets a provider back to `inherit`. |
@@ -129,7 +129,29 @@ macup provider enable mise
 macup doctor                           # what is odd about this Mac
 macup doctor --json                    # the same, machine-readable
 macup history --limit 50               # what MacUp has done
+macup history brew:mysql               # every attempt at one item, and what each left
+macup history --search stopped         # the runs that were stopped
 ```
+
+### What `macup history` says
+
+Each entry opens with one headline chosen from what happened to the attempt
+and what MacUp found when it read the item back — for example "Upgraded and
+confirmed", "Upgraded, but MacUp could not confirm the new version", "Failed
+— git was not upgraded", or "Stopped before the upgrade finished". Under it:
+the version before, the one the plan aimed for, and, when MacUp read it back,
+the one in use afterwards (`9.7.1 → 26.7.0_2 · now 9.7.1`); anything else the
+read-back showed, such as a formula left unlinked; and the labelled facts
+(`via Homebrew · started from the MacUp app · ran for 1 minute, 35 seconds`).
+The provider's own error text follows as `Details:`, never as a second
+verdict. `--verbose` adds the commands MacUp ran.
+
+MacUp reads an item back after a success, to confirm it, and also after an
+attempt that started a command and failed, timed out, or was stopped, because
+a package manager stopped part-way can leave the item changed. An entry
+written before MacUp did that has no after-state, and says nothing about one
+rather than guess. `macup history <package-id>` with a limit counts that
+item's entries, however many others were written since.
 
 ## How `macup update` decides to run something
 
@@ -447,7 +469,11 @@ strategy). Each step: `summary`, `invocation` (`executable` and
 — the redacted display form, `exitStatus`, `durationSeconds`,
 `errorExcerpt`), `error`. `verification`: `item`, `outcome` (`verified`,
 `targetNotReached`, `failed`, `notPerformed`), `expectedVersion`,
-`observedVersion`, `message`.
+`observedVersion`, `observedState` (absent unless the read-back showed more
+than a version, for example that no version is linked), `message`. It is
+present after a success, and also after an attempt that started a command and
+did not succeed, where it is what that attempt left; `summary.verified` counts
+only attempts that succeeded and were confirmed.
 
 ### `macup doctor --json` (`"kind": "doctor"`, schema version 1)
 
@@ -459,13 +485,19 @@ identifier: `id` such as `homebrew.multipleInstallations`, `severity`
 
 ### `macup history --json` (`"kind": "history"`, schema version 1)
 
-`path`, `limit`, `entries[]` (newest first), `unreadableLines` (lines MacUp
-could not decode — reported, never guessed at), `olderEntriesNotRead`.
+`path`, `limit`, `items[]` (the package IDs asked for; empty for every
+item), `search` (absent when there was none), `entries[]` (newest first,
+after both), `unreadableLines` (lines MacUp could not decode — reported,
+never guessed at), `olderEntriesNotRead`.
 
 Each entry: `schemaVersion`, `id`, `timestamp`, `origin` (`cli`, `gui`,
-`scheduled`), `item`, `versionBefore`, `versionTarget`, `versionAfter`,
-`command` (redacted display form), `outcome`, `verification`,
-`errorSummary`, `skipReason`, `durationSeconds`.
+`scheduled`), `item`, `versionBefore`, `versionTarget`, `versionAfter` (what
+MacUp read back, after a success or after an attempt that started a command
+and did not succeed), `stateAfter` (what else that read-back showed, when
+there was something), `command` (redacted display form), `outcome`,
+`verification`, `errorSummary`, `skipReason`, `durationSeconds`. Fields are
+only ever added and every added one is optional, so lines written by an
+earlier MacUp still decode; they simply lack the newer fields.
 
 ### Other documents
 

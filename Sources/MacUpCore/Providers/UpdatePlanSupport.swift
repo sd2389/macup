@@ -69,6 +69,9 @@ enum PlanSupport {
                 outcome: .failed,
                 expectedVersion: expected,
                 observedVersion: nil,
+                // An item that is gone is a state in its own right, and the
+                // one history most needs to carry.
+                observedState: "\(item.provider.displayName) no longer lists \(item.name).",
                 message: "\(item.provider.displayName) no longer lists \(item.name), so MacUp cannot confirm what happened."
             )
         }

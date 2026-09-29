@@ -109,6 +109,39 @@ struct HomebrewInterruptedUpgradeTests {
         let result = try await provider.verify(.stub(candidate.id), for: candidate, context: context)
         #expect(result.outcome == .targetNotReached)
         #expect(result.observedVersion == "9.7.1")
+        // What the stopped upgrade left, which is what history records.
+        #expect(result.observedState == "No version of mysql is linked, so its commands are not on your PATH. "
+            + "The mysql 26.7.0_2 install did not finish.")
+    }
+
+    @Test("A read-back says nothing more when there is nothing more to say")
+    func observedStateOnlyWhenNoteworthy() {
+        let linked = ManagedItem(
+            id: try! PackageID(.brew, "jq"), kind: .formula, displayName: "jq",
+            installedVersions: ["1.8.1"], activeVersion: "1.8.1"
+        )
+        #expect(HomebrewProvider.observedState(of: linked) == nil)
+
+        // Keg-only formulae are never linked on purpose.
+        var kegOnly = linked
+        kegOnly.activeVersion = nil
+        kegOnly.details["kegOnly"] = "true"
+        #expect(HomebrewProvider.observedState(of: kegOnly) == nil)
+
+        var unlinked = linked
+        unlinked.activeVersion = nil
+        #expect(HomebrewProvider.observedState(of: unlinked) == "No version of jq is linked, so its commands are not on your PATH.")
+
+        var unfinished = linked
+        unfinished.installedVersions = ["1.8.1", "1.9.0", "1.9.1"]
+        unfinished.details["incompleteVersions"] = "1.9.0, 1.9.1"
+        #expect(HomebrewProvider.observedState(of: unfinished) == "The jq 1.9.0, 1.9.1 installs did not finish.")
+
+        let cask = ManagedItem(
+            id: try! PackageID(.brewCask, "firefox"), kind: .cask, displayName: "firefox",
+            installedVersions: ["143.0"]
+        )
+        #expect(HomebrewProvider.observedState(of: cask) == nil, "a cask has no links or receipts to speak of")
     }
 
     @Test("A Homebrew in the standard prefix pours the same build, so nothing is said about compiling")

@@ -170,7 +170,9 @@ It records, one JSON object per line in `~/.local/state/macup/history.jsonl`:
 - when, and where the run came from — CLI, app, or scheduled
 - the item and its provider
 - the version before, the version the plan targeted, and the version MacUp
-  observed afterwards
+  observed afterwards — read back, with a read-only command, after a success
+  and after an attempt that started a command and did not succeed, together
+  with anything else that read-back showed, such as a formula left unlinked
 - the exact commands as they were displayed to the user
 - the outcome, and the verification outcome
 - an error summary when something failed
