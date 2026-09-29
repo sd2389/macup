@@ -82,9 +82,18 @@ public struct MacUpConfiguration: Sendable, Hashable, Codable {
 
     public struct ItemSettings: Sendable, Hashable, Codable {
         public var policy: UpdatePolicy
+        /// One available version to leave out of plans, written exactly as
+        /// the provider reports it. When a different version is on offer the
+        /// item follows its policy again, with no need to remove this.
+        public var skipVersion: String?
+        /// The user's own words about the item, such as why it is held.
+        /// Stored verbatim and never interpreted.
+        public var note: String?
 
-        public init(policy: UpdatePolicy) {
+        public init(policy: UpdatePolicy, skipVersion: String? = nil, note: String? = nil) {
             self.policy = policy
+            self.skipVersion = skipVersion
+            self.note = note
         }
     }
 

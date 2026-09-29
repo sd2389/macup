@@ -198,8 +198,14 @@ private struct ItemRuleRow: View {
         LabeledContent {
             HStack(spacing: 12) {
                 ItemPolicyPicker(item: rule.item)
+                // An entry that inherits and keeps a skipped version or a
+                // note has no rule of its own to clear; the menu and the
+                // Updates screen change those.
                 Button("Clear") { Task { await model.clearPolicy(for: rule.item) } }
-                    .disabled(model.isChangingPolicy)
+                    .disabled(
+                        model.isChangingPolicy
+                            || (rule.policy == .inherit && (rule.skipVersion != nil || rule.note != nil))
+                    )
                     .accessibilityLabel("Clear the rule for \(rule.item.name)")
                     .help("Remove this rule so the item follows its provider again")
             }
@@ -208,6 +214,12 @@ private struct ItemRuleRow: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(rule.item.name.displaySafe)
                     Text(rule.item.rawValue.displaySafe).font(.caption).foregroundStyle(.secondary)
+                    if let skipped = rule.skipVersion {
+                        Label("Skips \(skipped.displaySafe)", systemImage: "forward.end")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    if let note = rule.note { ItemNoteText(note: note) }
                 }
             } icon: {
                 Image(systemName: rule.provider.symbolName).accessibilityHidden(true)

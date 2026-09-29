@@ -12,9 +12,9 @@ struct MacUpCommand: AsyncParsableCommand {
             One command changes packages: `macup update`. It shows the plan first, \
             asks about anything set to Ask First, runs one item at a time, and records \
             what happened. A few commands change MacUp's own configuration file and no \
-            packages: `macup policy set|clear` (and `macup exclude`), `macup provider \
-            enable|disable`, `macup schedule enable|disable`, and `macup security \
-            require`. Everything else — including plain `macup` — only reads.
+            packages: `macup policy set|clear|skip|unskip|note` (and `macup exclude`), \
+            `macup provider enable|disable`, `macup schedule enable|disable`, and `macup \
+            security require`. Everything else — including plain `macup` — only reads.
 
             Examples:
               macup                   See what is outdated

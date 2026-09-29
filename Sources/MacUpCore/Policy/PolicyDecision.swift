@@ -35,6 +35,8 @@ public struct PolicyDecision: Sendable, Hashable, Codable {
         case providerDisabled
         /// The provider itself holds the item back (for example `brew pin`).
         case providerPin
+        /// The user skipped the version on offer (`items.<id>.skipVersion`).
+        case skippedVersion
         /// Risk raised the bar (unknown risk, a major change, an OS update).
         case risk
         /// The configuration could not be trusted, so nothing automatic may run.
@@ -52,6 +54,10 @@ public struct PolicyDecision: Sendable, Hashable, Codable {
     public var reason: String
     /// True when risk turned an otherwise automatic update into a confirmation.
     public var escalated: Bool
+    /// The user's own note on the item, verbatim, so every screen that shows
+    /// a decision can show it beside the reason. It never affects the
+    /// decision. Not display-safe: it is the user's text as written.
+    public var note: String?
 
     public init(
         item: PackageID,
@@ -59,7 +65,8 @@ public struct PolicyDecision: Sendable, Hashable, Codable {
         policy: UpdatePolicy,
         source: Source,
         reason: String,
-        escalated: Bool = false
+        escalated: Bool = false,
+        note: String? = nil
     ) {
         self.item = item
         self.action = action
@@ -67,6 +74,7 @@ public struct PolicyDecision: Sendable, Hashable, Codable {
         self.source = source
         self.reason = reason
         self.escalated = escalated
+        self.note = note
     }
 
     public var allowsExecution: Bool { action != .deny }

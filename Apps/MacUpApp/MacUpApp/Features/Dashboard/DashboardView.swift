@@ -85,7 +85,7 @@ struct DashboardView: View {
 
                 Section {
                     if model.leftAloneUpdates.isEmpty && model.heldRulesWithoutUpdate.isEmpty {
-                        Text("No item is ignored or pinned. Choose Ignore or Pin for an item on the Updates screen.")
+                        Text("No item is ignored, pinned, or skipped. Choose Ignore, Pin, or Skip This Version for an item on the Updates screen.")
                             .foregroundStyle(.secondary)
                     }
                     ForEach(model.leftAloneUpdates) { update in
@@ -95,7 +95,9 @@ struct DashboardView: View {
                             detail: model.decisions[update.id]?.reason ?? "",
                             versions: "\(update.installedVersion?.raw ?? "Unknown") → \(update.availableVersion.raw)",
                             policy: model.decisions[update.id]?.policy ?? .ignore,
-                            canClear: model.decisions[update.id]?.source == .item
+                            canClear: model.decisions[update.id]?.source == .item,
+                            isSkipped: model.decisions[update.id]?.source == .skippedVersion,
+                            note: model.decisions[update.id]?.note
                         )
                     }
                     ForEach(model.heldRulesWithoutUpdate) { rule in
@@ -105,13 +107,14 @@ struct DashboardView: View {
                             detail: "No update right now. The rule applies to the next one.",
                             versions: nil,
                             policy: rule.effectivePolicy,
-                            canClear: true
+                            canClear: true,
+                            note: rule.note
                         )
                     }
                 } header: {
                     Text("Ignored and Held")
                 } footer: {
-                    Text("MacUp never updates these. Clearing a rule makes the item follow its provider again.")
+                    Text("MacUp does not update these. Clearing a rule makes the item follow its provider again; a skipped version comes back by itself when a different one is offered.")
                         .leadingFooter()
                 }
 
@@ -175,6 +178,9 @@ struct DashboardView: View {
         if model.pinnedUpdateCount > 0 {
             facts.append(Fact(label: "Held at this version", value: "\(model.pinnedUpdateCount)"))
         }
+        if model.skippedUpdateCount > 0 {
+            facts.append(Fact(label: "Version skipped", value: "\(model.skippedUpdateCount)"))
+        }
         facts.append(Fact(
             label: "Providers checked",
             value: "\(report.summary.providersChecked) of \(report.providers.count)"
@@ -206,8 +212,11 @@ struct DashboardView: View {
         var decided: [String] = []
         if model.ignoredUpdateCount > 0 { decided.append("\(model.ignoredUpdateCount) ignored") }
         if model.pinnedUpdateCount > 0 { decided.append("\(model.pinnedUpdateCount) held at the current version") }
+        if model.skippedUpdateCount > 0 { decided.append("\(model.skippedUpdateCount) skipped") }
         if !decided.isEmpty {
-            parts.append("MacUp is leaving \(decided.joined(separator: " and ")) alone, as you asked.")
+            // English like the sentence around it, whatever the Mac's locale.
+            let list = decided.formatted(.list(type: .and).locale(Locale(identifier: "en_US")))
+            parts.append("MacUp is leaving \(list) alone, as you asked.")
         }
         return parts.joined(separator: " ")
     }
@@ -281,6 +290,9 @@ private struct HeldRow: View {
     /// from the provider, or a pin in the package manager, is changed where
     /// it lives.
     let canClear: Bool
+    /// Left alone only because the user skipped the version on offer.
+    var isSkipped = false
+    var note: String?
 
     var body: some View {
         HStack(spacing: 12) {
@@ -292,18 +304,28 @@ private struct HeldRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 8) {
                     Text(title.displaySafe)
-                    PolicyLabel(policy: policy).font(.caption).foregroundStyle(.secondary)
+                    Group {
+                        if isSkipped { SkippedLabel() } else { PolicyLabel(policy: policy) }
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 }
                 Text(detail.displaySafe)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
+                if let note { ItemNoteText(note: note) }
             }
             Spacer()
             if let versions {
                 Text(versions.displaySafe).monospacedDigit().foregroundStyle(.secondary)
             }
-            if canClear {
+            if isSkipped {
+                Button("Stop Skipping") { Task { await model.stopSkipping(item) } }
+                    .disabled(model.isChangingPolicy)
+                    .accessibilityLabel("Stop skipping this version of \(item.name)")
+                    .help("Let this version follow the item's rule again")
+            } else if canClear {
                 Button(policy == .pin ? "Unpin" : "Stop Ignoring") {
                     Task { await model.clearPolicy(for: item) }
                 }

@@ -118,8 +118,9 @@ final class AppModel {
         return (report?.updates ?? []).filter { decisions[$0.id]?.allowsExecution != false }
     }
 
-    /// Updates a rule or a provider's own pin keeps back. Listed under the
-    /// pending ones, with the reason, so a decision is never hidden.
+    /// Updates a rule, a skipped version, or a provider's own pin keeps back.
+    /// Listed under the pending ones, with the reason, so a decision is never
+    /// hidden.
     var leftAloneUpdates: [UpdateCandidate] {
         let decisions = decisions
         return (report?.updates ?? []).filter { decisions[$0.id]?.allowsExecution == false }
@@ -200,7 +201,7 @@ final class AppModel {
     /// to make them (CLAUDE.md §12). The app validates nothing itself: the
     /// editor refuses a configuration it could not read and a result it would
     /// not use, and its refusal is what the user is shown.
-    private func editPolicy(
+    func editPolicy(
         _ action: String,
         _ edit: (PolicyEditor) throws -> PolicyChange
     ) async {

@@ -139,6 +139,9 @@ struct PlanTable {
             if planned.needsConfirmation || verbose {
                 lines.append("      " + style.dim("Why: " + style.text(planned.decision.reason)))
             }
+            if let note = planned.decision.note {
+                lines.append("      " + style.dim("Note: " + style.safe(note)))
+            }
             if verbose {
                 lines.append("      " + style.dim(style.text(planned.plan.rationale)))
             }
@@ -187,6 +190,9 @@ struct SkipTable {
                 + "  " + TextStyle.pad(versions[index], to: versionWidth)
                 + "  " + (reason.first.map(String.init) ?? ""))
             lines += reason.dropFirst().map { "      " + style.dim(String($0)) }
+            if let note = skipped.decision?.note {
+                lines.append("      " + style.dim("Note: " + style.safe(note)))
+            }
             if let error = skipped.error, verbose {
                 if let detail = error.detail {
                     lines += detail.split(separator: "\n").prefix(6).map { "      " + style.dim(style.text(String($0))) }

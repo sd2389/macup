@@ -33,7 +33,9 @@ configuration error (exit status 3), never a guess.
   },
   "items": {
     "npm:@anthropic-ai/claude-code": { "policy": "ask" },
-    "brew:postgresql": { "policy": "ignore" }
+    "brew:postgresql": { "policy": "ignore" },
+    "brew:mysql": { "policy": "inherit", "skipVersion": "26.7.0_2" },
+    "brew:php": { "policy": "pin", "note": "waiting for PHP 8.4 support" }
   },
   "schedule": { "enabled": false, "frequency": "daily", "time": "23:00", "refresh": true },
   "privacy": { "telemetry": false },
@@ -54,7 +56,9 @@ configuration error (exit status 3), never a guess.
 | `providers.<id>.enabled` | `true`/`false` | `true` |
 | `providers.<id>.policy` | `auto`, `ask`, `ignore`, `inherit` | `inherit` |
 | `providers.<id>.executablePath` | absolute path to `brew`/`npm`/`mise` | search |
-| `items.<package-id>.policy` | `auto`, `ask`, `ignore`, `pin`, `inherit` | — |
+| `items.<package-id>.policy` | `auto`, `ask`, `ignore`, `pin`, `inherit` (required for every item entry) | — |
+| `items.<package-id>.skipVersion` | one version to leave out of plans, exactly as the provider reports it (see below) | none |
+| `items.<package-id>.note` | your note on the item: one line, at most 200 characters, never interpreted | none |
 | `schedule.enabled` | `true`/`false` | `false` |
 | `schedule.frequency` | `daily`, `weekly` | `daily` |
 | `schedule.time` | `HH:mm`, 24-hour | `23:00` |
@@ -103,6 +107,10 @@ error disables automatic modification until it is fixed
   outside the allowed set for their level (`pin` at provider level; `pin`
   or `inherit` as the global default), malformed schedule times;
 - an `executablePath` that is relative or not named after the tool;
+- a `skipVersion` or `note` that is not a string, is empty, contains a line
+  break, tab, or other control or text-direction character, or is too long
+  (a note over 200 characters; a version over 128), and a `skipVersion`
+  with leading or trailing whitespace, which could never match;
 - a file or directory that is owned by another user or writable by group
   or others. For a symlinked file, the directory holding the file it points
   to is checked as well. The checks and the read use the same open file, so
@@ -124,12 +132,70 @@ modification stays off.
 the reason that MacUp cannot tell which items you excluded, and `PolicyEditor`
 refuses to write. Nothing is changed until the configuration is fixed.
 
+## Skipping one version, and notes
+
+`items.<id>.skipVersion` is Ignore for one version. While that exact version
+is the one on offer, MacUp leaves the item out of plans, with the reason
+"You skipped mysql 26.7.0_2. MacUp will offer the next version." When a
+different version is offered, the item follows its rule again by itself, and
+the old skip, still in the file, simply matches nothing. Set it with `macup
+policy skip <id>` (which runs a read-only check for the version on offer) or
+Skip This Version in the app; remove it with `macup policy unskip <id>` or
+Stop Skipping.
+
+How it combines with the item's policy, in the order `PolicyEngine` applies
+them:
+
+| Situation | What happens |
+| --- | --- |
+| Configuration unreadable, provider turned off, or pinned by the provider itself (`brew pin`) | Those refusals come first, with their own reasons. |
+| `ignore` | Ignored, whatever the skip says. The reason stays "is ignored": telling you it comes back with the next version would be untrue. |
+| `pin` | Stays pinned at its current version, for the same reason. |
+| `ask`, skipped version on offer | Left alone: not offered for confirmation, even if you name it in `macup update` and pass `--yes`. |
+| `auto`, skipped version on offer | Left alone: never run, interactively or by a scheduled run. |
+| any rule, a different version on offer | The skip does not apply; the rule and the risk rules decide, exactly as without a skip. |
+
+Every item entry still needs `policy`, so an item that skips a version but
+has no rule of its own is written `"policy": "inherit"`. Clearing a rule
+(`macup policy clear`) keeps a skip and a note, so clearing a Pin cannot
+quietly bring back a version you skipped; an entry left with nothing but
+`inherit` is removed.
+
+Versions are compared exactly, as text, with no SemVer assumptions: a skip of
+`26.7.0` does not skip `26.7.0_2`. This is why `macup policy skip` and the app
+take the version from a check rather than from you by default. If the version
+on offer cannot be known when a decision is taken, an item with a skip is left
+alone rather than guessed at.
+
+The execution engine re-reads the file immediately before each item, so a
+version skipped after the plan was built, in the CLI or the app, is still not
+run.
+
+`items.<id>.note` is your own text, such as why an item is held. It is stored
+verbatim — nothing is trimmed or normalized — shown sanitized beside the item
+(`macup policy list`, `macup check`, `macup plan`, the app's Updates detail,
+Settings, and the dashboard), and never read by any decision. Set it with
+`macup policy note <id> "…"` or in the Updates detail pane; remove it with
+`--clear` or Remove. It carries through `macup plan --json` as `decision.note`.
+
+### Why this is not a new schema version
+
+Both keys are additive and optional, so a schema 1 file without them reads
+exactly as before, and MacUp writes neither key when it is unset. A bump would
+have migrated every existing file, with a backup, on its next save, and made
+it unreadable to an older MacUp, even for people who never skip anything.
+
+An older MacUp reading a file that uses these keys stays safe without a bump:
+an unknown key is an error there, so it disables automatic changes, refuses to
+edit the file, and names the key. It can never silently ignore a skip and
+update the version you skipped.
+
 ## Editing policy through `PolicyEditor`
 
 `PolicyEditor` is the one place MacUp changes a rule. `macup policy set`,
-`macup policy clear`, `macup exclude` (which is `policy set … ignore` on the
-same path), `macup provider enable`, `macup provider disable`, and the app's
-policy controls all go through it, so there is a single source of truth for
+`macup policy clear`, `macup policy skip|unskip|note`, `macup exclude` (which
+is `policy set … ignore` on the same path), `macup provider enable`, `macup
+provider disable`, and the app's policy controls all go through it, so there is a single source of truth for
 what a policy edit is allowed to do (CLAUDE.md §12). It refuses more than it
 accepts, and the refusals are the interesting part.
 

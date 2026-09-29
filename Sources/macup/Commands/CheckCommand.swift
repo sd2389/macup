@@ -74,7 +74,7 @@ struct CheckCommand: AsyncParsableCommand {
             context.print(encoded)
         } else {
             let style = TextStyle(enabled: context.allowsStyling, homeDirectory: context.homeDirectory)
-            context.print(CheckRenderer(report: report, style: style, verbose: verbose).render())
+            context.print(CheckRenderer(report: report, style: style, verbose: verbose, rules: PolicyListing(loaded)).render())
         }
 
         if report.cancelled { throw MacUpExitCode.cancelled.exitCode }
