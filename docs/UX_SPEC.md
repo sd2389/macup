@@ -32,6 +32,8 @@ Pending Updates
 
 Ignored and Held
   mysql     Pin     held at its current version   9.7.1 → 26.7.0_2  [Unpin]
+            “waiting for PHP 8.4 support”
+  node      Skipped you skipped 26.1.0            24.19.0 → 26.1.0  [Stop Skipping]
   wget      Ignore  no update right now                             [Stop Ignoring]
 
 Last checked: Today, 5:42 PM

@@ -131,6 +131,7 @@ private struct UpdateRow: View {
                 if let decision {
                     PolicyLabel(policy: decision.policy)
                 }
+                if decision?.source == .skippedVersion { SkippedLabel() }
                 RiskLabel(level: update.risk.level)
             }
             .font(.caption)
@@ -226,6 +227,7 @@ struct ItemPolicyPicker: View {
             }
             .pickerStyle(.inline)
             .labelsHidden()
+            SkipVersionMenuItems(item: item)
         } label: {
             Label(effective.displayName, systemImage: effective.symbolName)
         }
@@ -241,8 +243,10 @@ struct ItemPolicyPicker: View {
     /// What this item gets today, whether from its own rule or inherited.
     private var effective: UpdatePolicy { rule ?? inherited }
 
+    /// `nil` for an entry that says `inherit`, which is how an item with a
+    /// skipped version or a note but no rule of its own is written.
     private var rule: UpdatePolicy? {
-        model.policyRules.rule(for: item)?.policy
+        model.policyRules.rule(for: item).flatMap { $0.policy == .inherit ? nil : $0.policy }
     }
 
     /// What this item would get with no rule of its own.
@@ -326,6 +330,7 @@ private struct UpdateDetail: View {
                     Text(decision.reason.displaySafe).foregroundStyle(.secondary)
                 }
                 LabeledContent("Rule for this item") { ItemPolicyPicker(item: update.id) }
+                SkippedVersionDetail(update: update)
                 if decision?.policy == .pin {
                     Text("Pin is MacUp's own hold: MacUp will not update \(update.displayName.displaySafe). It does not pin the item in \(update.provider.displayName), so running \(update.provider.displayName) yourself can still update it.")
                         .font(.callout)
@@ -337,6 +342,8 @@ private struct UpdateDetail: View {
                         .foregroundStyle(.secondary)
                 }
             }
+
+            ItemNoteSection(item: update.id)
 
             Section("Risk") {
                 RiskLabel(level: update.risk.level)

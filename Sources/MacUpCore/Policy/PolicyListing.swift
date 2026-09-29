@@ -19,17 +19,36 @@ public struct PolicyListing: Sendable, Hashable, Codable {
         /// Where the rule lives in the file, such as `items.brew:git.policy`.
         public var path: String
         public var source: PolicyDecision.Source
+        /// The one version the user skipped, as written. Whether it is the
+        /// version on offer now takes a check to say; see ``skips(_:)``.
+        public var skipVersion: String?
+        /// The user's note on the item, verbatim.
+        public var note: String?
 
-        public init(item: PackageID, policy: UpdatePolicy, effectivePolicy: UpdatePolicy) {
+        public init(
+            item: PackageID,
+            policy: UpdatePolicy,
+            effectivePolicy: UpdatePolicy,
+            skipVersion: String? = nil,
+            note: String? = nil
+        ) {
             self.item = item
             self.policy = policy
             self.effectivePolicy = effectivePolicy
             self.path = "items.\(item.rawValue).policy"
             self.source = .item
+            self.skipVersion = skipVersion
+            self.note = note
         }
 
         public var id: PackageID { item }
         public var provider: ProviderID { item.provider }
+
+        /// Whether `offered` is the version this rule skips, compared the way
+        /// the engine compares it.
+        public func skips(_ offered: AvailableVersion) -> Bool {
+            MacUpConfiguration.ItemSettings(policy: policy, skipVersion: skipVersion).skips(offered)
+        }
     }
 
     /// One provider's rule. Every known provider appears, whether or not the
@@ -132,7 +151,9 @@ public struct PolicyListing: Sendable, Hashable, Codable {
             rules.append(ItemRule(
                 item: item,
                 policy: settings.policy,
-                effectivePolicy: engine.effectivePolicy(for: item).policy
+                effectivePolicy: engine.effectivePolicy(for: item).policy,
+                skipVersion: settings.skipVersion,
+                note: settings.note
             ))
         }
         items = rules.sorted { $0.item < $1.item }

@@ -116,6 +116,8 @@ macup policy list
 macup policy set brew:postgresql ignore
 macup policy set npm:@anthropic-ai/claude-code auto
 macup policy clear brew:postgresql
+macup policy skip brew:mysql        # not this version; the next one comes back by itself
+macup policy note brew:php "waiting for PHP 8.4 support"
 macup provider disable mise
 ```
 

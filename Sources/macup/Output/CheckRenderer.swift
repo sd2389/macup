@@ -10,6 +10,9 @@ struct CheckRenderer {
     let report: CheckReport
     let style: TextStyle
     let verbose: Bool
+    /// The rules as written, for the skipped version and the note shown
+    /// beside an item. A check decides nothing, so no policy is shown.
+    var rules: PolicyListing?
 
     /// Facts worth a line under each provider's heading (npm has its own summary).
     private static let headlineFacts: [ProviderID: [String]] = [
@@ -158,9 +161,14 @@ struct CheckRenderer {
             if update.signals.contains(.pinnedByProvider) { flags.append("pinned") }
             if update.signals.contains(.restartRequired) { flags.append("restart required") }
             if update.details["configScope"] == "project" { flags.append("project config") }
+            let rule = rules?.rule(for: update.id)
+            if rule?.skips(update.availableVersion) == true { flags.append("you skipped this version") }
             lines.append("  " + TextStyle.pad(ids[index], to: idWidth) + "  "
                          + TextStyle.pad(versions[index], to: versionWidth) + "  "
                          + style.risk(update.risk.level) + style.dim(" · " + flags.joined(separator: " · ")))
+            if let rule {
+                lines += userLines(rule, for: update)
+            }
             if verbose {
                 if let difference = update.versionDifference {
                     lines.append("      " + style.dim("Changes: " + style.text(difference.summary)))
@@ -178,6 +186,21 @@ struct CheckRenderer {
                     lines.append("      " + style.dim(style.text(note)))
                 }
             }
+        }
+        return lines
+    }
+
+    /// What the user wrote about an item: its note, and a skip that has
+    /// stopped applying because a different version is on offer, so the
+    /// item's return is explained rather than a surprise.
+    private func userLines(_ rule: PolicyListing.ItemRule, for update: UpdateCandidate) -> [String] {
+        var lines: [String] = []
+        if let skipped = rule.skipVersion, !rule.skips(update.availableVersion) {
+            lines.append("      " + style.dim("You skipped " + style.safe(skipped) + "; "
+                + style.safe(update.availableVersion.raw) + " is a different version, so the skip no longer applies."))
+        }
+        if let note = rule.note {
+            lines.append("      " + style.dim("Note: " + style.safe(note)))
         }
         return lines
     }

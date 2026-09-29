@@ -1,10 +1,10 @@
 /// What one policy edit changed, so a caller can say so instead of just
 /// reporting success.
 ///
-/// `previousValue` and `newValue` are display strings — a policy name, or
-/// `true`/`false` for a provider being on or off — because that is what the
-/// CLI prints and what `--json` consumers read. The caller already knows the
-/// type it asked for.
+/// `previousValue` and `newValue` are display strings — a policy name,
+/// `true`/`false` for a provider being on or off, a skipped version, or a
+/// note — because that is what the CLI prints and what `--json` consumers
+/// read. The caller already knows the type it asked for.
 public struct PolicyChange: Sendable, Hashable, Codable {
     public enum Subject: Sendable, Hashable, Codable {
         case item(PackageID)
@@ -52,6 +52,10 @@ public struct PolicyChange: Sendable, Hashable, Codable {
     public enum Setting: String, Sendable, Hashable, Codable, CaseIterable {
         case policy
         case enabled
+        /// The one version of an item to leave out of plans.
+        case skipVersion
+        /// The user's note on an item.
+        case note
     }
 
     public var subject: Subject
@@ -93,10 +97,11 @@ public struct PolicyChange: Sendable, Hashable, Codable {
 
 /// The one place MacUp changes a policy.
 ///
-/// `macup policy set`, `macup policy clear`, `macup provider enable`,
-/// `macup provider disable`, and the app's Settings and Updates screens all go
-/// through this, so there is a single source of truth for what a policy edit
-/// is allowed to do (CLAUDE.md §12).
+/// `macup policy set`, `macup policy clear`, `macup policy skip|unskip`,
+/// `macup policy note`, `macup provider enable`, `macup provider disable`,
+/// and the app's Settings, Updates, and Dashboard screens all go through
+/// this, so there is a single source of truth for what a policy edit is
+/// allowed to do (CLAUDE.md §12).
 ///
 /// Three rules shape it, and all three are refusals.
 ///
@@ -132,12 +137,15 @@ public struct PolicyEditor: Sendable {
 
     // MARK: Item policies
 
-    /// Sets the rule for one item.
+    /// Sets the rule for one item. A skipped version and a note on the item
+    /// are kept: changing the rule is not a reason to forget either.
     @discardableResult
     public func setPolicy(_ policy: UpdatePolicy, for item: PackageID) throws -> PolicyChange {
         try apply(.item(item), .policy) { configuration in
             let previous = configuration.items[item.rawValue]?.policy
-            configuration.items[item.rawValue] = MacUpConfiguration.ItemSettings(policy: policy)
+            var settings = configuration.items[item.rawValue] ?? MacUpConfiguration.ItemSettings(policy: policy)
+            settings.policy = policy
+            configuration.items[item.rawValue] = settings
             return (previous?.rawValue, policy.rawValue)
         }
     }
@@ -152,11 +160,18 @@ public struct PolicyEditor: Sendable {
     }
 
     /// Removes the rule for one item, so it inherits again.
+    ///
+    /// Only the rule: a skipped version or a note stays, under an entry
+    /// that says `inherit`, because clearing a rule should not quietly bring
+    /// back a version the user skipped. With neither, the entry goes.
     @discardableResult
     public func clearPolicy(for item: PackageID) throws -> PolicyChange {
         try apply(.item(item), .policy) { configuration in
-            let previous = configuration.items.removeValue(forKey: item.rawValue)?.policy
-            return (previous?.rawValue, nil)
+            guard var settings = configuration.items[item.rawValue] else { return (nil, nil) }
+            let previous = settings.policy
+            settings.policy = .inherit
+            configuration.items[item.rawValue] = settings.isEmpty ? nil : settings
+            return (previous.rawValue, nil)
         }
     }
 
@@ -164,6 +179,80 @@ public struct PolicyEditor: Sendable {
     @discardableResult
     public func clearPolicy(forItem item: String) throws -> PolicyChange {
         try clearPolicy(for: try PackageID(parsing: item))
+    }
+
+    // MARK: Skipped versions
+
+    /// Leaves one version of an item out of plans (`items.<id>.skipVersion`).
+    ///
+    /// The item keeps its rule, and a different version on offer brings it
+    /// back under that rule. `version` is compared exactly with what the
+    /// provider offers, so pass it as a check reported it. A second skip
+    /// replaces the first: there is one skipped version per item.
+    @discardableResult
+    public func skipVersion(_ version: String, for item: PackageID) throws -> PolicyChange {
+        try apply(.item(item), .skipVersion, warnings: { Self.skipWarnings(for: item, in: $0) }) { configuration in
+            var settings = configuration.items[item.rawValue] ?? MacUpConfiguration.ItemSettings(policy: .inherit)
+            let previous = settings.skipVersion
+            settings.skipVersion = version
+            configuration.items[item.rawValue] = settings
+            return (previous, version)
+        }
+    }
+
+    /// Stops skipping a version, so it follows the item's rule again.
+    @discardableResult
+    public func clearSkippedVersion(for item: PackageID) throws -> PolicyChange {
+        try apply(.item(item), .skipVersion) { configuration in
+            guard var settings = configuration.items[item.rawValue], let previous = settings.skipVersion else {
+                return (nil, nil)
+            }
+            settings.skipVersion = nil
+            configuration.items[item.rawValue] = settings.isEmpty ? nil : settings
+            return (previous, nil)
+        }
+    }
+
+    // MARK: Notes
+
+    /// Stores the user's note on an item (`items.<id>.note`), exactly as
+    /// given. Nothing MacUp decides reads it.
+    @discardableResult
+    public func setNote(_ note: String, for item: PackageID) throws -> PolicyChange {
+        try apply(.item(item), .note) { configuration in
+            var settings = configuration.items[item.rawValue] ?? MacUpConfiguration.ItemSettings(policy: .inherit)
+            let previous = settings.note
+            settings.note = note
+            configuration.items[item.rawValue] = settings
+            return (previous, note)
+        }
+    }
+
+    /// Removes the note on an item.
+    @discardableResult
+    public func clearNote(for item: PackageID) throws -> PolicyChange {
+        try apply(.item(item), .note) { configuration in
+            guard var settings = configuration.items[item.rawValue], let previous = settings.note else {
+                return (nil, nil)
+            }
+            settings.note = nil
+            configuration.items[item.rawValue] = settings.isEmpty ? nil : settings
+            return (previous, nil)
+        }
+    }
+
+    /// A skip on an item a rule already holds does nothing until that rule
+    /// changes. It is stored anyway — the user may be about to change the
+    /// rule — and the change says so.
+    private static func skipWarnings(for item: PackageID, in configuration: MacUpConfiguration) -> [String] {
+        switch PolicyEngine(configuration: configuration).effectivePolicy(for: item).policy {
+        case .ignore:
+            ["\(item.rawValue) is ignored, so MacUp leaves every version of it alone; the skip matters only if that changes."]
+        case .pin:
+            ["\(item.rawValue) is pinned in MacUp, so it stays at its current version; the skip matters only if that changes."]
+        case .auto, .ask, .inherit:
+            []
+        }
     }
 
     // MARK: Provider policies
@@ -215,9 +304,12 @@ public struct PolicyEditor: Sendable {
 
     /// Loads, checks, mutates, re-checks, and writes — the only path that
     /// changes a policy, so every rule above is enforced exactly once.
+    /// `extraWarnings` reads the edited configuration, for warnings that are
+    /// about what the edit means rather than about a value in the file.
     private func apply(
         _ subject: PolicyChange.Subject,
         _ setting: PolicyChange.Setting,
+        warnings extraWarnings: (MacUpConfiguration) -> [String] = { _ in [] },
         _ mutate: (inout MacUpConfiguration) -> (previous: String?, new: String?)
     ) throws -> PolicyChange {
         let loaded = store.load()
@@ -238,7 +330,7 @@ public struct PolicyEditor: Sendable {
             guard errors.isEmpty else { throw Self.wouldBreak(errors, path: path) }
             warnings = issues
                 .filter { $0.severity == .warning && $0.path.hasPrefix(path) }
-                .map(\.message)
+                .map(\.message) + extraWarnings(configuration)
 
             // A file MacUp read at an older schema version has been upgraded
             // in memory, and writing the edit would persist that upgrade. Back
@@ -286,6 +378,35 @@ public struct PolicyEditor: Sendable {
         case .global: name = "The default policy"
         }
 
+        // Both are the user's own text, so they are sanitized for display.
+        let previousText = previous.map(TerminalText.sanitize)
+        let newText = new.map(TerminalText.sanitize)
+        switch (setting, changed, previousText, newText) {
+        case (.skipVersion, false, _, nil):
+            return "\(name) skips no version, so there was nothing to stop skipping."
+        case (.skipVersion, false, _, let version?):
+            return "\(name) already skips \(version); nothing was changed."
+        case (.skipVersion, true, let version?, nil):
+            return "\(name) no longer skips \(version), so that version follows the item's rule again."
+        case (.skipVersion, true, let replaced?, let version?):
+            return "\(name) now skips \(version) instead of \(replaced)."
+        case (.skipVersion, true, nil, let version?):
+            return "\(name) now skips \(version). MacUp will leave that version alone and offer the next one."
+        case (.note, false, _, nil):
+            return "\(name) has no note, so there was nothing to remove."
+        case (.note, false, _, _?):
+            return "\(name) already has this note; nothing was changed."
+        case (.note, true, _?, nil):
+            return "\(name) no longer has a note."
+        case (.note, true, _?, let note?):
+            return "\(name)'s note is now \"\(note)\"."
+        case (.note, true, nil, let note?):
+            return "\(name) now has a note: \"\(note)\"."
+        default:
+            // A policy or a provider switch, described below.
+            break
+        }
+
         guard changed else {
             if new == nil {
                 return "No rule was set for \(name), so there was nothing to clear."
@@ -311,6 +432,8 @@ public struct PolicyEditor: Sendable {
             return UpdatePolicy(rawValue: value)?.displayName ?? value
         case .enabled:
             return value == "true" ? "enabled" : "disabled"
+        case .skipVersion, .note:
+            return TerminalText.sanitize(value)
         }
     }
 

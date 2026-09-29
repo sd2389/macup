@@ -181,6 +181,9 @@ struct MenuBarContent: View {
         if model.pinnedUpdateCount > 0 {
             lines.append("\(model.pinnedUpdateCount) held at the current version")
         }
+        if model.skippedUpdateCount > 0 {
+            lines.append("\(model.skippedUpdateCount) skipped until a different version is offered")
+        }
         // Only when a check will really happen: an agent that is installed and
         // loaded, not merely a schedule written in the configuration.
         if let status = model.scheduleStatus, status.isActive, let next = status.nextRun {

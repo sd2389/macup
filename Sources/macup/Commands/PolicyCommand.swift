@@ -10,16 +10,20 @@ struct PolicyCommand: AsyncParsableCommand {
         abstract: "Read and change what MacUp may do with each item.",
         discussion: """
             A policy is one of Auto Update, Ask First, Ignore, or Pin. The rule for an \
-            item wins over the rule for its provider, which wins over the default. \
-            `macup policy list` reads; `set` and `clear` change MacUp's own \
-            configuration file and no packages.
+            item wins over the rule for its provider, which wins over the default. An \
+            item can also skip one version, and keep a note saying why it is held. \
+            `macup policy list` reads; `set`, `clear`, `skip`, `unskip`, and `note` \
+            change MacUp's own configuration file and no packages.
 
             Policy is the only thing standing between `macup update` and an item you \
             do not want touched, so MacUp is careful with it: it refuses to write a \
             configuration file it could not read completely, and refuses an edit whose \
             result it would not accept.
             """,
-        subcommands: [PolicyListCommand.self, PolicySetCommand.self, PolicyClearCommand.self],
+        subcommands: [
+            PolicyListCommand.self, PolicySetCommand.self, PolicyClearCommand.self,
+            PolicySkipCommand.self, PolicyUnskipCommand.self, PolicyNoteCommand.self,
+        ],
         defaultSubcommand: PolicyListCommand.self,
         aliases: ["policies"]
     )
@@ -232,21 +236,24 @@ enum PolicyTarget {
 
 /// The one path every policy edit in the CLI takes.
 ///
-/// `policy set`, `policy clear`, `exclude`, and `provider enable|disable` all
-/// come through here, so the configuration is checked, the device owner is
+/// `policy set|clear|skip|unskip|note`, `exclude`, and `provider
+/// enable|disable` all come through here, so the configuration is checked, the device owner is
 /// asked, and the result is reported the same way for all of them. The edit
 /// itself is always ``PolicyEditor``'s: the CLI never writes the
 /// configuration file.
 enum PolicyEditing {
+    /// `action` completes the approval prompt, "MacUp is trying to …".
     static func apply(
         json: Bool,
+        approving action: String = "change what MacUp may update",
         _ edit: (PolicyEditor) throws -> PolicyChange
     ) async throws {
-        try await applyEach(json: json) { editor in [try edit(editor)] }
+        try await applyEach(json: json, approving: action) { editor in [try edit(editor)] }
     }
 
     static func applyEach(
         json: Bool,
+        approving action: String = "change what MacUp may update",
         _ edit: (PolicyEditor) throws -> [PolicyChange]
     ) async throws {
         let context = CLIContext.current
@@ -254,7 +261,7 @@ enum PolicyEditing {
         let store = ConfigurationStore(paths: paths)
         let loaded = store.load()
         try context.requireReadableConfiguration(loaded)
-        try await context.requireApproval("change what MacUp may update", loaded.configuration, paths: paths)
+        try await context.requireApproval(action, loaded.configuration, paths: paths)
 
         let changes: [PolicyChange]
         do {
@@ -284,13 +291,16 @@ enum PolicyEditing {
                 context.print("  warning: " + style.text(warning))
             }
             // The same words the app shows beside a pinned item.
-            if change.changed, change.newValue == UpdatePolicy.pin.rawValue {
+            if change.changed, change.setting == .policy, change.newValue == UpdatePolicy.pin.rawValue {
                 context.print("  Pin is MacUp's own hold. It does not pin the item in its package manager, so running that tool yourself can still update it.")
             }
         }
         if changes.contains(where: \.changed) {
             context.print(style.dim("Saved to " + style.path(loaded.path) + "."))
-            context.print(style.dim("`macup plan` shows what this means for the updates available now."))
+            // A note changes nothing a plan decides, so there is nothing to go and look at.
+            if changes.contains(where: { $0.changed && $0.setting != .note }) {
+                context.print(style.dim("`macup plan` shows what this means for the updates available now."))
+            }
         }
     }
 }
@@ -338,10 +348,19 @@ struct PolicyRenderer {
             lines.append(style.bold("Items") + style.dim(" · " + TextStyle.plural(listing.items.count, "rule")))
             let idWidth = listing.items.map { style.safe($0.item.rawValue).count }.max() ?? 0
             let itemPolicyWidth = listing.items.map { effective($0).count }.max() ?? 0
+            // A skipped version and a note sit under the item's own line.
+            let indent = String(repeating: " ", count: idWidth + 4)
             for rule in listing.items {
                 lines.append("  " + TextStyle.pad(style.safe(rule.item.rawValue), to: idWidth)
                     + "  " + TextStyle.pad(effective(rule), to: itemPolicyWidth)
                     + "  " + style.dim(style.safe(rule.path)))
+                if let version = rule.skipVersion {
+                    lines.append(indent + "Skips " + style.safe(version)
+                        + style.dim("  " + style.safe("items.\(rule.item.rawValue).skipVersion")))
+                }
+                if let note = rule.note {
+                    lines.append(indent + "Note: " + style.safe(note))
+                }
             }
         }
         for key in listing.unreadableItemKeys {
@@ -353,6 +372,8 @@ struct PolicyRenderer {
             lines.append("Nothing is customized: every provider is on and everything is \(listing.defaultPolicy.displayName).")
         }
         lines.append("Change one with `macup policy set <package-id> <auto|ask|ignore|pin>`.")
+        lines.append(style.dim("Skip one version with `macup policy skip <package-id>`; "
+            + "keep a note with `macup policy note <package-id> \"…\"`."))
         return lines.joined(separator: "\n")
     }
 

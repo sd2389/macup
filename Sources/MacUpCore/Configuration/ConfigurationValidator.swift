@@ -28,7 +28,7 @@ public enum ConfigurationValidator {
     static let topLevelKeys: Set<String> = ["schemaVersion", "global", "providers", "items", "schedule", "privacy", "security"]
     static let globalKeys: Set<String> = ["defaultPolicy", "confirmMajorUpdates"]
     static let providerKeys: Set<String> = ["enabled", "policy", "executablePath"]
-    static let itemKeys: Set<String> = ["policy"]
+    static let itemKeys: Set<String> = ["policy", "skipVersion", "note"]
     static let scheduleKeys: Set<String> = ["enabled", "frequency", "time", "weekday", "refresh"]
     static let securityKeys: Set<String> = ["requireApproval", "allowPasswordFallback", "faceUnlock", "faceMatchThreshold"]
     static let privacyKeys: Set<String> = ["telemetry"]
@@ -129,6 +129,16 @@ public enum ConfigurationValidator {
                     "\(path).policy",
                     "macOS updates are always Ask First in this version of MacUp; 'auto' has no effect."
                 ))
+            }
+            // Errors rather than warnings, like every other value MacUp cannot
+            // take as written. A skipped version with a stray space would
+            // never match, so it would quietly stop holding its version back.
+            if let version = settings.skipVersion,
+               let problem = MacUpConfiguration.ItemSettings.problem(withSkipVersion: version) {
+                issues.append(ConfigurationIssue(.error, "\(path).skipVersion", problem))
+            }
+            if let note = settings.note, let problem = MacUpConfiguration.ItemSettings.problem(withNote: note) {
+                issues.append(ConfigurationIssue(.error, "\(path).note", problem))
             }
         }
 

@@ -8,6 +8,14 @@
 /// configuration allows nothing. An item the provider itself holds back
 /// (`brew pin`) allows nothing, so a MacUp update never silently unpins it.
 ///
+/// A skipped version (`items.<id>.skipVersion`) comes next. When the version
+/// on offer is exactly the one the user skipped, an item that would otherwise
+/// be offered (Ask First) or run (Auto Update) is left alone instead, and a
+/// different version brings it back under its rule with nothing to undo.
+/// Ignore and Pin already leave every version alone, so they keep their own
+/// reason: telling someone a pinned item will come back with the next version
+/// would be untrue.
+///
 /// Risk then raises the bar, because `auto` means "update this without asking
 /// me", not "decide anything on my behalf": see ``escalation(item:risk:signals:configuration:)``
 /// for the cases where an `auto` item still waits for a person. In an
@@ -63,6 +71,7 @@ public struct PolicyEngine: Sendable {
     public func decide(_ candidate: UpdateCandidate, intent: PolicyIntent) -> PolicyDecision {
         decide(
             item: candidate.id,
+            availableVersion: candidate.availableVersion,
             risk: candidate.risk,
             signals: Set(candidate.signals),
             intent: intent
@@ -71,11 +80,32 @@ public struct PolicyEngine: Sendable {
 
     /// What policy says about one item, and why.
     ///
-    /// Callers pass the risk and signals the provider reported, so the same
-    /// decision can be re-taken from a stored plan immediately before
-    /// execution (CLAUDE.md §2.20).
+    /// Callers pass the version on offer and the risk and signals the provider
+    /// reported, so the same decision can be re-taken from a stored plan
+    /// immediately before execution (CLAUDE.md §2.20). Without the version,
+    /// an item with a skipped version is left alone: MacUp cannot tell
+    /// whether this is the version the user skipped.
     public func decide(
         item: PackageID,
+        availableVersion: AvailableVersion? = nil,
+        risk: RiskAssessment,
+        signals: Set<RiskSignal>,
+        intent: PolicyIntent
+    ) -> PolicyDecision {
+        var decision = ruling(
+            item: item,
+            availableVersion: availableVersion,
+            risk: risk,
+            signals: signals,
+            intent: intent
+        )
+        decision.note = configuration.items[item.rawValue]?.note
+        return decision
+    }
+
+    private func ruling(
+        item: PackageID,
+        availableVersion: AvailableVersion?,
         risk: RiskAssessment,
         signals: Set<RiskSignal>,
         intent: PolicyIntent
@@ -111,6 +141,15 @@ public struct PolicyEngine: Sendable {
                 source: .providerPin,
                 reason: "\(item.name) is pinned in \(item.provider.displayName). MacUp does not unpin it for you."
             )
+        }
+
+        if policy != .ignore, policy != .pin, let skipped = Self.skippedVersion(
+            item: item,
+            policy: policy,
+            availableVersion: availableVersion,
+            configuration: configuration
+        ) {
+            return skipped
         }
 
         switch policy {
@@ -218,6 +257,40 @@ public struct PolicyEngine: Sendable {
             return "Updating \(item.name) is a high-risk change (\(risk.reasons.first?.lowercased() ?? "reason unknown")), so it asks first."
         }
         return nil
+    }
+
+    /// The refusal for a version the user skipped, or `nil` when the version
+    /// on offer is a different one.
+    ///
+    /// The same answer whether someone is at the Mac or not: a skipped
+    /// version is neither offered for confirmation nor run on a schedule.
+    static func skippedVersion(
+        item: PackageID,
+        policy: UpdatePolicy,
+        availableVersion: AvailableVersion?,
+        configuration: MacUpConfiguration
+    ) -> PolicyDecision? {
+        guard let settings = configuration.items[item.rawValue], let skipped = settings.skipVersion else { return nil }
+        let version = TerminalText.sanitize(skipped)
+        guard let availableVersion else {
+            // Fail closed: this might be the skipped version (CLAUDE.md §2.23).
+            return PolicyDecision(
+                item: item,
+                action: .deny,
+                policy: policy,
+                source: .skippedVersion,
+                reason: "You skipped \(item.name) \(version), and MacUp could not tell which version is on offer, "
+                    + "so it left \(item.name) alone."
+            )
+        }
+        guard settings.skips(availableVersion) else { return nil }
+        return PolicyDecision(
+            item: item,
+            action: .deny,
+            policy: policy,
+            source: .skippedVersion,
+            reason: "You skipped \(item.name) \(version). MacUp will offer the next version."
+        )
     }
 
     private static func reason(_ predicate: String, source: PolicyDecision.Source, item: PackageID) -> String {

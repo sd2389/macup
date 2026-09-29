@@ -9,9 +9,10 @@ cleans, prunes, removes, or uninstalls, and it never upgrades an item it did
 not name.
 
 These commands write **MacUp's own configuration file** and no packages:
-`macup policy set`, `macup policy clear`, `macup exclude`, `macup provider
-enable`, `macup provider disable`, `macup schedule enable`, `macup schedule
-disable`, `macup security require`, and `macup security face enroll|forget`.
+`macup policy set`, `macup policy clear`, `macup policy skip|unskip|note`,
+`macup exclude`, `macup provider enable`, `macup provider disable`, `macup
+schedule enable`, `macup schedule disable`, `macup security require`, and
+`macup security face enroll|forget`.
 
 **Everything else only reads**, including plain `macup`, `macup check`,
 `macup plan`, `macup doctor`, `macup history`, `macup policy list`,
@@ -73,6 +74,9 @@ macup --generate-completion-script zsh > ~/.zsh/completions/_macup
 | `macup policy` / `macup policy list [--json]` | Every policy rule, the global default, and where each lives in the file. Read-only. |
 | `macup policy set <target> <auto\|ask\|ignore\|pin\|inherit> [--json]` | Sets the rule for a package ID, a provider name, or `default`. |
 | `macup policy clear <target>… [--json]` | Removes an item's rule, or sets a provider back to `inherit`. |
+| `macup policy skip <package-id> [--version <v>] [--json]` | Leaves one version out of plans until a different one is offered. Without `--version`, a read-only check of the item's provider finds the version on offer; nothing on offer is exit 64, a provider that could not be checked exit 2. See docs/CONFIGURATION.md. |
+| `macup policy unskip <package-id>… [--json]` | Stops skipping, so that version follows the item's rule again. |
+| `macup policy note <package-id> "<text>"` / `--clear` `[--json]` | Keeps your own one-line note on an item (at most 200 characters), shown in `policy list`, `check`, `plan`, and the app, and never acted on. |
 | `macup exclude <package-id>… [--json]` | Shorthand for `macup policy set … ignore`; the same rule in the same place. |
 | `macup providers` / `macup provider list [--json]` | Shows which providers were found and exactly which installation MacUp uses. Runs detection only. |
 | `macup provider enable <id> [--json]` | Lets MacUp check a provider again and propose its updates. |
@@ -117,6 +121,8 @@ macup policy set brew:postgresql ignore
 macup policy set homebrew auto         # a whole provider
 macup policy set default ask           # the fallback for everything else
 macup policy clear brew:postgresql
+macup policy skip brew:mysql           # not this version; the next one is offered as usual
+macup policy note brew:php "waiting for PHP 8.4 support"
 macup exclude npm:@anthropic-ai/claude-code
 macup provider disable mise
 macup provider enable mise
@@ -133,7 +139,8 @@ change:
 1. **Policy.** The item's own rule wins over its provider's rule, which wins
    over the default. `ignore` and `pin` never run. A provider that is off
    never runs. A formula Homebrew itself has pinned never runs, and MacUp
-   does not unpin it for you.
+   does not unpin it for you. A version you skipped never runs, even named
+   and confirmed; a different version follows the rule as usual.
 2. **Risk.** An item set to `auto` still waits for you when the change is a
    macOS update, a major runtime change, unknown risk, or would need an
    administrator password, a restart, or a rewrite of your configuration or
@@ -410,8 +417,10 @@ example and fails if the encoding changes.
 
 `decision`: `item`, `action` (`allow`, `confirm`, `deny`), `policy` (the
 effective one, never `inherit`), `source` (`item`, `provider`, `global`,
-`providerDisabled`, `providerPin`, `risk`, `configuration`, `unattended`),
-`reason`, `escalated` (risk turned an automatic update into a confirmation).
+`providerDisabled`, `providerPin`, `skippedVersion`, `risk`, `configuration`,
+`unattended`), `reason`, `escalated` (risk turned an automatic update into a
+confirmation), and `note` (your note on the item, verbatim; absent when there
+is none).
 
 `plan` (an `ExecutionPlan`): `id`, `createdAt`, `item`, `currentVersion`,
 `proposedVersion`, `risk`, `rationale`, `steps[]`, `expectsNetwork`,
@@ -466,13 +475,14 @@ Each entry: `schemaVersion`, `id`, `timestamp`, `origin` (`cli`, `gui`,
   `confirmMajorUpdates`, `providers[]` (`provider`, `enabled`, `policy` as
   written, `effectivePolicy`, `explicit` — false when the row is MacUp's
   built-in default rather than something in your file, `path`, `source`),
-  `items[]` (`item`, `policy`, `effectivePolicy`, `path`, `source`),
-  `unreadableItemKeys[]`, `automaticModificationsAllowed`,
-  `configurationFile`.
-- `macup policy set|clear --json`, `macup exclude --json`, and `macup
-  provider enable|disable --json` → `"kind": "policyChange"`:
+  `items[]` (`item`, `policy`, `effectivePolicy`, `path`, `source`, and
+  `skipVersion` and `note` when set), `unreadableItemKeys[]`,
+  `automaticModificationsAllowed`, `configurationFile`.
+- `macup policy set|clear|skip|unskip|note --json`, `macup exclude --json`,
+  and `macup provider enable|disable --json` → `"kind": "policyChange"`:
   `configurationFile` and `changes[]` (`subject` (`{"kind": "item"|"provider"
-  |"global", "id": …}`), `setting` (`policy` or `enabled`), `previousValue`,
+  |"global", "id": …}`), `setting` (`policy`, `enabled`, `skipVersion`, or
+  `note`), `previousValue`,
   `newValue` (null when the rule was removed), `changed` (false when the
   configuration already said this and nothing was written), `path`,
   `summary`, `warnings[]`).
