@@ -53,6 +53,9 @@ final class CLIHarness: @unchecked Sendable {
     let stateDirectory: TemporaryDirectory
     let launchAgentsDirectory: TemporaryDirectory
     let binDirectory: TemporaryDirectory
+    /// The directory a command runs in, so a default output location is a
+    /// throwaway one rather than wherever the test runner was started.
+    let workingDirectory: TemporaryDirectory
     let schedulerRunner = FakeCommandRunner()
     let authorizer = FakeBiometricAuthorizer()
     var schedulerFileSystem: any FileSystem = LocalFileSystem()
@@ -102,6 +105,7 @@ final class CLIHarness: @unchecked Sendable {
         stateDirectory = try TemporaryDirectory(prefix: "macup-cli-state")
         launchAgentsDirectory = try TemporaryDirectory(prefix: "macup-cli-agents")
         binDirectory = try TemporaryDirectory(prefix: "macup-cli-bin")
+        workingDirectory = try TemporaryDirectory(prefix: "macup-cli-cwd")
         executablePath = try binDirectory.makeScript("macup", "exit 0").path
         environment = [
             "HOME": "/Users/example",
@@ -233,7 +237,8 @@ final class CLIHarness: @unchecked Sendable {
             schedulerRunner: schedulerRunner,
             schedulerFileSystem: schedulerFileSystem,
             authorizer: authorizer,
-            readLine: { scripted.next() }
+            readLine: { scripted.next() },
+            currentDirectory: workingDirectory.path
         )
         return try await runCLI(arguments, context: context, stdout: stdout, stderr: stderr)
     }

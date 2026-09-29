@@ -89,7 +89,7 @@ final class AppModel {
     /// The outside world an engine runs against, with the login shell's
     /// environment when MacUp managed to read it. Built in one place so the
     /// check, the planner, the executor, and Doctor all see the same Mac.
-    private func checkEnvironment(_ processEnvironment: [String: String]) -> CheckEnvironment {
+    func checkEnvironment(_ processEnvironment: [String: String]) -> CheckEnvironment {
         CheckEnvironment(
             runner: environment.runner,
             fileSystem: environment.fileSystem,
@@ -533,6 +533,10 @@ final class AppModel {
     private(set) var isDiagnosing = false
     private(set) var doctorProblem: String?
 
+    /// The Export Diagnostics sheet while it is open, and `nil` otherwise.
+    /// Opened and closed in AppModel+Diagnostics.swift.
+    var diagnosticsExport: DiagnosticsExport?
+
     /// Runs MacUp's deterministic diagnostics. Every check reads; none fixes.
     func runDoctor() async {
         guard !isDiagnosing else { return }
@@ -886,7 +890,7 @@ final class AppModel {
     /// app started from Finder does not inherit it, and without it MacUp would
     /// miss tools installed outside the standard locations. A failed read is
     /// retried on the next check rather than cached.
-    private func loadEnvironment() async -> [String: String] {
+    func loadEnvironment() async -> [String: String] {
         if let shellEnvironment { return shellEnvironment }
         let shell = environment.loginShell.shell()
         self.shell = shell

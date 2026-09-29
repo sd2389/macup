@@ -302,6 +302,43 @@ value. A test plants `GITHUB_TOKEN`, `AWS_SECRET_ACCESS_KEY`, and
 `NODE_OPTIONS` in the environment and asserts that no finding contains their
 values.
 
+## Exported diagnostics
+
+Export Diagnostics (`macup diagnostics`, and Settings → Diagnostics in the
+app) is the one place MacUp's local inventory is packaged to leave the Mac,
+so it is held to the privacy rules (CLAUDE.md §2.15, §16, §18) by mechanism
+rather than by care:
+
+- **It is an explicit action with a preview.** `preview` and the app's sheet
+  show the exact bytes before anything is written; both come from one
+  rendering of one look at the Mac, so what was shown is what is saved.
+  MacUp never sends the file anywhere.
+- **Fields are chosen, not inherited.** `DiagnosticsDocument` lists every
+  field it writes. A property added to a model later does not reach the file
+  until someone adds it there, and every string passes through one scrubber:
+  `Redactor`, the home folder as `~`, the account name on its own as `<user>`,
+  control and bidirectional characters escaped.
+- **No environment variables.** Nothing from the process or login-shell
+  environment is copied in; only Doctor's findings, which can name folders on
+  `PATH`. Tests plant tokens and a custom variable and assert neither their
+  values nor the custom name appear.
+- **Package names are placeholders by default**, because what someone has
+  installed can identify their employer, their projects, or an outdated
+  version worth attacking. Placeholders are numbered by first mention, so a
+  number reveals nothing about names the file never shows; free text is
+  masked too, including cask display names, npm scopes, and third-party taps.
+  The one exception is MacUp's own vocabulary — the runtimes and package
+  managers its source recognizes by name — because Doctor's findings are
+  written in those terms and they identify nobody. Versions are kept; they
+  are what most bug reports are about. Item notes are never included.
+- **The file is new or it is nothing.** It is created with `O_CREAT |
+  O_EXCL | O_NOFOLLOW` relative to an opened folder, owner-only (`0600`,
+  `fchmod`ed past the umask), and removed if writing fails part-way. An
+  existing file is never replaced and a symbolic link at the destination —
+  even a dangling one — is refused. The folders above it are the user's
+  choice. The CLI's default is the current directory rather than the Desktop,
+  which iCloud Drive may sync.
+
 ## Privilege
 
 The main process runs as the user.

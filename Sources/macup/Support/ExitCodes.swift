@@ -20,6 +20,10 @@ enum MacUpExitCode: Int32, CaseIterable {
     case attentionRequired = 5
     /// Invalid command-line usage.
     case usage = 64
+    /// `macup diagnostics export` could not create its file: something is
+    /// already there, it is a symbolic link, or the folder is missing or not
+    /// writable. Nothing was written.
+    case cannotCreateOutput = 73
     /// The device owner did not approve the change, or MacUp could not ask.
     /// Nothing was changed.
     case notApproved = 77

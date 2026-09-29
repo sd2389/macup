@@ -65,8 +65,29 @@ enum Snapshots {
             NSApp.appearance = NSAppearance(named: .aqua)
             try? await Task.sleep(for: .milliseconds(700))
             write(settings, to: directory, named: "settings-light.png")
+            await captureDiagnosticsExport(model: model, settings: settings, into: directory)
         }
         NSApp.terminate(nil)
+    }
+
+    /// The Export Diagnostics sheet of the Settings window, in both
+    /// appearances. Opening it gathers, which is a read-only check and Doctor;
+    /// nothing here presses Save, and nothing here ever will.
+    @MainActor
+    private static func captureDiagnosticsExport(
+        model: AppModel,
+        settings: NSWindow,
+        into directory: PrivateDirectory
+    ) async {
+        model.beginDiagnosticsExport()
+        await model.diagnosticsExport?.waitUntilGathered()
+        for (appearance, suffix) in [(NSAppearance.Name.aqua, "light"), (.darkAqua, "dark")] {
+            NSApp.appearance = NSAppearance(named: appearance)
+            try? await Task.sleep(for: .milliseconds(900))
+            if let sheet = settings.attachedSheet { write(sheet, to: directory, named: "diagnostics-\(suffix).png") }
+        }
+        model.endDiagnosticsExport()
+        try? await Task.sleep(for: .milliseconds(500))
     }
 
     /// The two sheets the Updates screen can open, which are windows of their

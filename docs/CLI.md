@@ -14,9 +14,12 @@ These commands write **MacUp's own configuration file** and no packages:
 schedule enable`, `macup schedule disable`, `macup security require`, and
 `macup security face enroll|forget`.
 
+`macup diagnostics export` writes **one new file**, for a bug report, and
+nothing else.
+
 **Everything else only reads**, including plain `macup`, `macup check`,
-`macup plan`, `macup explain`, `macup doctor`, `macup history`, `macup policy list`,
-`macup provider list`, and `macup config`.
+`macup plan`, `macup explain`, `macup doctor`, `macup diagnostics preview`,
+`macup history`, `macup policy list`, `macup provider list`, and `macup config`.
 
 Nothing runs on a schedule but a check. The launchd agent MacUp installs is
 only ever allowed to run `macup check --save-state`, and a static check in
@@ -72,6 +75,8 @@ macup --generate-completion-script zsh > ~/.zsh/completions/_macup
 | `macup explain <package-id> [--refresh] [--json]` | Everything MacUp knows about one item: installed and available versions, what changes and the release link, risk and every reason, notes, who manages it, the policy that decides it and the rule behind that, the exact command it would run — or exactly why it would run nothing — and its recent history. Launches nothing. The app's Copy Details copies the same text. |
 | **`macup update [<package-id>…]`** | **The only command that changes packages.** Flags below. |
 | `macup doctor [--json] [--verbose]` | Runs MacUp's deterministic diagnostics and explains each finding. Fixes nothing. |
+| `macup diagnostics` / `macup diagnostics preview [--include-packages]` | Prints exactly what `export` would write, and writes nothing. See [Diagnostics for a bug report](#diagnostics-for-a-bug-report). |
+| `macup diagnostics export [--output <path>] [--include-packages] [--json]` | Writes that document to a new file, readable only by you. |
 | `macup history [<package-id>…] [--search <text>] [--limit N] [--json] [--verbose]` | What MacUp has changed and what it decided not to change, newest first, each opening with one line that says what happened. Name package IDs to see only those items; `--search` keeps the entries whose item, provider, or outcome contains every word. See below. |
 | `macup policy` / `macup policy list [--json]` | Every policy rule, the global default, and where each lives in the file. Read-only. |
 | `macup policy set <target> <auto\|ask\|ignore\|pin\|inherit> [--json]` | Sets the rule for a package ID, a provider name, or `default`. |
@@ -216,6 +221,48 @@ command itself is left to finish, because stopping a package manager part-way
 can leave the item with no usable version. A second Ctrl+C quits MacUp at
 once; the running command may carry on by itself.
 
+## Diagnostics for a bug report
+
+```bash
+macup diagnostics preview                  # exactly what would be written; writes nothing
+macup diagnostics export                   # ./macup-diagnostics-2026-09-29-111500.json
+macup diagnostics export --output ~/Desktop
+macup diagnostics export --include-packages
+```
+
+Both run a read-only check and Doctor, and read the configuration and the
+last 50 history entries. `preview` prints the document to standard output byte
+for byte as `export` would write it; the app's Settings → Diagnostics →
+Export Diagnostics… shows the same text before its save panel.
+
+What goes in: MacUp's version; macOS version, build, and architecture; each
+provider found, its version and executable; what the check found (counts,
+update versions and risk, the commands it ran, errors); Doctor's findings;
+whether the configuration is valid and its problems, schedule, and approval
+settings; the update policies; and recent history.
+
+What stays out, and the file's `leftOut` list says so:
+
+- **Package names**, unless you pass `--include-packages`. Each is replaced
+  with a placeholder such as `brew:package-1`, the same one everywhere in the
+  file, numbered in the order the file first mentions it. Names in error
+  messages are replaced too, including cask display names, npm scopes, and
+  third-party taps. The runtimes and package managers MacUp itself recognizes
+  by name (`node`, `python@3.12`, `npm`, `mise`, …) are kept, because Doctor's
+  findings are written in terms of them. Versions are kept.
+- The list of installed items (only counts), and the text of item notes (only
+  whether one exists).
+- Environment variables, and every token, password, and authorization header,
+  which become `<redacted>`.
+- Your user name: the home folder is `~`, and the name on its own `<user>`.
+
+By default `export` writes to the current directory: it is where you are and
+what you can see, whereas a default such as the Desktop can be synced to
+iCloud Drive without your noticing. `--output` names the file, or a folder to
+put it in. MacUp creates the file exclusively and owner-only (`0600`): if
+anything is already at that path, including a symbolic link, it writes
+nothing and exits 73. Nothing is sent anywhere.
+
 ## Approval before a change
 
 MacUp can require the device owner's approval before it changes anything:
@@ -355,6 +402,7 @@ finish, the output says so and the check exits with status 2.
 | 4 | `update` ran and at least one item failed. Everything it did attempt is in `macup history`. |
 | 5 | `doctor` found at least one warning or error. Notes alone are exit code 0. |
 | 64 | Invalid command-line usage: an argument that is not a package ID, an unknown provider, an unknown policy, `--limit` below 1, or (for `plan` and `update`) a package ID with no update available. `update` changes nothing in that case. For `explain`, an item MacUp knows nothing about: its provider does not list it, is turned off, or is not installed. |
+| 73 | `diagnostics export` could not create its file: something is already at that path, it is a symbolic link, or the folder is missing or not writable. Nothing was written. What the check and Doctor found never changes `diagnostics`' exit status. |
 | 77 | The device owner did not approve the change, or MacUp could not ask. Nothing was changed. |
 | 130 | Interrupted with Ctrl+C. |
 | 1 | Unexpected internal error; `schedule enable`/`disable` failing to install, remove, or record the schedule; and `history` failing to read its file. |
@@ -548,6 +596,27 @@ there was something), `command` (redacted display form), `outcome`,
 `verification`, `errorSummary`, `skipReason`, `durationSeconds`. Fields are
 only ever added and every added one is optional, so lines written by an
 earlier MacUp still decode; they simply lack the newer fields.
+
+### `macup diagnostics preview` (`"kind": "diagnostics"`, schema version 1)
+
+The same document is what `export` writes. `packageNames` (`placeholders` or
+`included`), `createdAt`, `system` (`productVersion`, `buildVersion`,
+`architecture`), `providers[]` (as in `check`, without `items` or `findings`),
+`check` (`mode`, `startedAt`, `finishedAt`, `cancelled`, `complete`,
+`summary`, `updates[]` — `item`, `kind`, `installedVersion`,
+`availableVersion`, `versionChange`, `risk`, `signals[]`, `ownership` — and
+`commands[]`), `doctor` (`startedAt`, `finishedAt`, `cancelled`, `summary`,
+`findings[]`), `configuration` (`path`, `source`, `valid`,
+`automaticModificationsAllowed`, `migratedFromSchemaVersion`, `issues[]`,
+`schedule`, `security`), `policies` (`defaultPolicy`, `confirmMajorUpdates`,
+`providers[]`, `items[]` — `item`, `policy`, `effectivePolicy`,
+`skipVersion`, `hasNote` — and `unreadableItemRules`), `history`
+(`entries[]`, at most 50, newest first, `unreadableLines`,
+`olderEntriesNotRead`, `problem`), and `leftOut[]`. Durations are rounded to
+the millisecond.
+
+`macup diagnostics export --json` → `"kind": "diagnosticsExport"`: `path`
+(absolute), `bytes`, `packageNames`.
 
 ### Other documents
 
