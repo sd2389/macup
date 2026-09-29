@@ -20,6 +20,26 @@ public enum TerminalText {
         return result
     }
 
+    /// `json` with every scalar that could act on a terminal written as a
+    /// `\uXXXX` escape.
+    ///
+    /// JSONEncoder escapes only C0 controls. DEL, C1 controls, bidirectional
+    /// overrides, and line/paragraph separators can still act on a terminal
+    /// the output is printed to. JSONEncoder emits such scalars only inside
+    /// string literals, so this is lossless for JSON readers; C0 (including
+    /// the newlines of pretty-printing) is left alone.
+    public static func escapingUnsafeScalars(inJSON json: String) -> String {
+        var result = String.UnicodeScalarView()
+        for scalar in json.unicodeScalars {
+            if scalar.value >= 0x20 && (isUnsafe(scalar) || scalar.value == 0x2028 || scalar.value == 0x2029) {
+                result.append(contentsOf: String(format: "\\u%04x", scalar.value).unicodeScalars)
+            } else {
+                result.append(scalar)
+            }
+        }
+        return String(result)
+    }
+
     /// Whether printing `scalar` could control the terminal or disguise text.
     public static func isUnsafe(_ scalar: Unicode.Scalar) -> Bool {
         switch scalar.value {

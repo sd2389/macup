@@ -138,6 +138,19 @@ public struct DoctorEngine: Sendable {
         paths: MacUpPaths,
         schedule: ScheduleStatus? = nil
     ) async -> DoctorReport {
+        await diagnose(configuration: configuration, environment: environment, paths: paths, schedule: schedule).report
+    }
+
+    /// ``run(configuration:environment:paths:schedule:)``, also handing back
+    /// the read-only check the findings were drawn from, so a caller that
+    /// reports both — an exported diagnostics file — checks the machine once
+    /// rather than twice.
+    public func diagnose(
+        configuration: LoadedConfiguration,
+        environment: CheckEnvironment,
+        paths: MacUpPaths,
+        schedule: ScheduleStatus? = nil
+    ) async -> (report: DoctorReport, check: CheckReport) {
         let startedAt = environment.now()
         let report = await CheckEngine(providers: providers).run(
             configuration: configuration,
@@ -161,7 +174,7 @@ public struct DoctorEngine: Sendable {
         // is said twice.
         findings += report.providers.flatMap(\.findings)
         var seen: Set<DiagnosticFinding> = []
-        return DoctorReport(
+        let doctor = DoctorReport(
             startedAt: startedAt,
             finishedAt: environment.now(),
             findings: findings
@@ -172,5 +185,6 @@ public struct DoctorEngine: Sendable {
             checksRun: checks.count,
             cancelled: report.cancelled
         )
+        return (doctor, report)
     }
 }
