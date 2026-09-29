@@ -46,6 +46,10 @@ struct CLIContext: Sendable {
     /// Returns `nil` when there is nobody to read from, which every caller
     /// treats as "no" rather than as consent.
     var readLine: @Sendable () -> String?
+    /// Where a relative path on the command line starts from, and where
+    /// `macup diagnostics export` writes by default. Injectable so a test
+    /// never writes into whatever directory the test runner is in.
+    var currentDirectory = FileManager.default.currentDirectoryPath
 
     /// Asks the device owner to approve a change, when the configuration says
     /// to. Returns the outcome; the caller refuses the change unless it allows

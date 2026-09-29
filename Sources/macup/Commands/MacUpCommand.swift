@@ -14,7 +14,8 @@ struct MacUpCommand: AsyncParsableCommand {
             what happened. A few commands change MacUp's own configuration file and no \
             packages: `macup policy set|clear|skip|unskip|note` (and `macup exclude`), \
             `macup provider enable|disable`, `macup schedule enable|disable`, and `macup \
-            security require`. Everything else — including plain `macup` — only reads.
+            security require`. `macup diagnostics export` writes one new file, for a bug \
+            report. Everything else — including plain `macup` — only reads.
 
             Examples:
               macup                   See what is outdated
@@ -25,6 +26,7 @@ struct MacUpCommand: AsyncParsableCommand {
               macup policy list       What MacUp may do with each item
               macup exclude brew:postgresql   Never update this one
               macup doctor            What is odd about this Mac
+              macup diagnostics       A redacted file for a bug report
               macup history           What MacUp has changed
               macup security          Ask for Touch ID before MacUp changes anything
             """,
@@ -37,6 +39,7 @@ struct MacUpCommand: AsyncParsableCommand {
             ExcludeCommand.self,
             ProviderCommand.self,
             DoctorCommand.self,
+            DiagnosticsCommand.self,
             HistoryCommand.self,
             ConfigCommand.self,
             ScheduleCommand.self,
