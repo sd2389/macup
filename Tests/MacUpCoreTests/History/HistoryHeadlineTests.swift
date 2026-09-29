@@ -53,15 +53,15 @@ struct HistoryHeadlineTests {
 
     static let cases: [Case] = [
         // The command succeeded.
-        Case(entry(.succeeded, .verified, after: "26.7.0_2"), .confirmed, "Upgraded and confirmed"),
-        Case(entry(.succeeded, .targetNotReached, after: "9.7.1"), .targetNotReached, "Ran without an error, but mysql was not upgraded"),
+        Case(entry(.succeeded, .verified, after: "26.7.0_2"), .confirmed, "Updated and confirmed"),
+        Case(entry(.succeeded, .targetNotReached, after: "9.7.1"), .targetNotReached, "Ran without an error, but mysql was not updated"),
         Case(entry(.succeeded, .targetNotReached, after: "26.6.0"), .targetNotReached, "Ran without an error, but mysql is not at the new version"),
-        Case(entry(.succeeded, .failed), .unconfirmed, "Upgraded, but MacUp could not confirm the new version"),
-        Case(entry(.succeeded, .notPerformed), .unconfirmed, "Upgraded, but MacUp could not confirm the new version"),
-        Case(entry(.succeeded), .unconfirmed, "Upgraded, but MacUp could not confirm the new version"),
+        Case(entry(.succeeded, .failed), .unconfirmed, "Updated, but MacUp could not confirm the new version"),
+        Case(entry(.succeeded, .notPerformed), .unconfirmed, "Updated, but MacUp could not confirm the new version"),
+        Case(entry(.succeeded), .unconfirmed, "Updated, but MacUp could not confirm the new version"),
         // It failed.
         Case(entry(.failed, .verified, after: "26.7.0_2"), .failed, "Failed, but mysql is at the new version"),
-        Case(entry(.failed, .targetNotReached, after: "9.7.1"), .failed, "Failed — mysql was not upgraded"),
+        Case(entry(.failed, .targetNotReached, after: "9.7.1"), .failed, "Failed — mysql was not updated"),
         Case(entry(.failed, .targetNotReached, after: "26.6.0"), .failed, "Failed — mysql is not at the new version"),
         Case(entry(.failed, .targetNotReached, before: nil, after: "9.7.1"), .failed, "Failed — mysql is not at the new version"),
         Case(entry(.failed, .failed), .failed, "Failed — MacUp could not read the version back"),
@@ -69,18 +69,18 @@ struct HistoryHeadlineTests {
         Case(entry(.failed), .failed, "Failed — MacUp changed nothing further"),
         // It ran past its time limit.
         Case(entry(.timedOut, .verified, after: "26.7.0_2"), .timedOut, "Timed out, but mysql is at the new version"),
-        Case(entry(.timedOut, .targetNotReached, after: "9.7.1"), .timedOut, "Timed out — mysql was not upgraded"),
+        Case(entry(.timedOut, .targetNotReached, after: "9.7.1"), .timedOut, "Timed out — mysql was not updated"),
         Case(entry(.timedOut, .targetNotReached, after: "26.6.0"), .timedOut, "Timed out — mysql is not at the new version"),
         Case(entry(.timedOut, .failed), .timedOut, "Timed out — MacUp could not read the version back"),
-        Case(entry(.timedOut, .notPerformed), .timedOut, "Timed out before the upgrade finished"),
-        Case(entry(.timedOut), .timedOut, "Timed out before the upgrade finished"),
+        Case(entry(.timedOut, .notPerformed), .timedOut, "Timed out before the update finished"),
+        Case(entry(.timedOut), .timedOut, "Timed out before the update finished"),
         // It was stopped.
         Case(entry(.cancelled, .verified, after: "26.7.0_2"), .stopped, "Stopped, but mysql is at the new version"),
-        Case(entry(.cancelled, .targetNotReached, after: "9.7.1"), .stopped, "Stopped — mysql was not upgraded"),
+        Case(entry(.cancelled, .targetNotReached, after: "9.7.1"), .stopped, "Stopped — mysql was not updated"),
         Case(entry(.cancelled, .targetNotReached, after: "26.6.0"), .stopped, "Stopped — mysql is not at the new version"),
         Case(entry(.cancelled, .failed), .stopped, "Stopped — MacUp could not read the version back"),
-        Case(entry(.cancelled, .notPerformed), .stopped, "Stopped before the upgrade finished"),
-        Case(entry(.cancelled), .stopped, "Stopped before the upgrade finished"),
+        Case(entry(.cancelled, .notPerformed), .stopped, "Stopped before the update finished"),
+        Case(entry(.cancelled), .stopped, "Stopped before the update finished"),
         Case(entry(.cancelled, command: nil), .stopped, "Stopped before anything ran"),
         // MacUp left it alone. Nothing was read back for a skip, but the
         // headline would not change if something were.
@@ -101,7 +101,7 @@ struct HistoryHeadlineTests {
     @Test("A version that differs only in spelling still counts as the one it started from")
     func spellingOfTheVersionDoesNotMatter() {
         let entry = Self.entry(.failed, .targetNotReached, before: "v9.7.1", after: "9.7.1")
-        #expect(entry.headline.text == "Failed — mysql was not upgraded")
+        #expect(entry.headline.text == "Failed — mysql was not updated")
     }
 
     @Test("Only a confirmed update gets the checkmark, and a deliberate stop is never shown as an error")
@@ -167,16 +167,16 @@ struct HistoryHeadlineTests {
             .map { try decoder.decode(HistoryEntry.self, from: Data($0.utf8)) }
 
         #expect(entries.map(\.headline.text) == [
-            "Upgraded and confirmed",
+            "Updated and confirmed",
             "Left alone",
             "Failed — MacUp changed nothing further",
-            "Timed out before the upgrade finished",
-            "Stopped before the upgrade finished",
+            "Timed out before the update finished",
+            "Stopped before the update finished",
         ])
         #expect(entries.allSatisfy { $0.stateAfter == nil })
         for entry in entries where entry.outcome != .succeeded {
             #expect(!entry.versionSummary.contains("now"), "\(entry.item) recorded nothing afterwards")
-            #expect(!entry.headline.text.contains("was not upgraded"), "\(entry.item) would be a guess")
+            #expect(!entry.headline.text.contains("was not updated"), "\(entry.item) would be a guess")
         }
 
         // The stopped mysql upgrade that prompted all of this.

@@ -55,11 +55,11 @@ public struct HistoryHeadline: Sendable, Hashable {
         case .succeeded:
             switch entry.verification {
             case .verified:
-                self.init(.confirmed, "Upgraded and confirmed")
+                self.init(.confirmed, "Updated and confirmed")
             case .targetNotReached:
                 self.init(.targetNotReached, "Ran without an error, but " + Self.missedTarget(entry))
             case .failed, .notPerformed, nil:
-                self.init(.unconfirmed, "Upgraded, but MacUp could not confirm the new version")
+                self.init(.unconfirmed, "Updated, but MacUp could not confirm the new version")
             }
         case .failed, .timedOut, .cancelled:
             let kind: Kind = switch entry.outcome {
@@ -118,7 +118,7 @@ public struct HistoryHeadline: Sendable, Hashable {
     private static func missedTarget(_ entry: HistoryEntry) -> String {
         if let before = entry.versionBefore, let after = entry.versionAfter,
            before == after || VersionComparator.compare(before, after) == .orderedSame {
-            return "\(entry.item.name) was not upgraded"
+            return "\(entry.item.name) was not updated"
         }
         return "\(entry.item.name) is not at the new version"
     }
@@ -127,8 +127,8 @@ public struct HistoryHeadline: Sendable, Hashable {
     /// nothing back: what happened to the attempt, and nothing about the item.
     private static func nothingReadBack(_ kind: Kind, ranCommand: Bool) -> String {
         switch kind {
-        case .timedOut: "Timed out before the upgrade finished"
-        case .stopped: ranCommand ? "Stopped before the upgrade finished" : "Stopped before anything ran"
+        case .timedOut: "Timed out before the update finished"
+        case .stopped: ranCommand ? "Stopped before the update finished" : "Stopped before anything ran"
         default: "Failed — MacUp changed nothing further"
         }
     }

@@ -58,7 +58,7 @@ struct HistoryCommandTests {
         let npm = try #require(run.standardOutput.range(of: "npm:@scope/name"))
         #expect(npm.lowerBound < git.lowerBound)
         #expect(run.standardOutput.contains("1.0.0 → 1.1.0"))
-        #expect(run.standardOutput.contains("Upgraded and confirmed"))
+        #expect(run.standardOutput.contains("Updated and confirmed"))
         #expect(run.standardOutput.contains("started from the command line"))
         #expect(run.standardOutput.contains("started from the MacUp app"))
         #expect(run.standardOutput.contains("via Homebrew"))
@@ -176,7 +176,7 @@ struct HistoryCommandTests {
         let run = try await harness.run(["history"])
         #expect(run.standardOutput.contains("brew:git"))
         #expect(run.standardOutput.contains("2.43.0 → 2.44.0 · now 2.44.0"))
-        #expect(run.standardOutput.contains("Upgraded and confirmed"))
+        #expect(run.standardOutput.contains("Updated and confirmed"))
     }
 
     // MARK: What an unsuccessful attempt left
@@ -195,7 +195,7 @@ struct HistoryCommandTests {
         #expect(update.standardOutput.contains("MacUp read each failed item back afterwards"))
 
         let run = try await harness.run(["history", "brew:git"])
-        #expect(run.standardOutput.contains("Failed — git was not upgraded"))
+        #expect(run.standardOutput.contains("Failed — git was not updated"))
         #expect(run.standardOutput.contains("2.43.0 → 2.44.0 · now 2.43.0"))
         #expect(run.standardOutput.contains("Details: "), "the provider's error is detail under the headline")
 
@@ -218,15 +218,15 @@ struct HistoryCommandTests {
         #expect(run.exitCode == nil)
         let output = run.standardOutput
         #expect(output.contains("brew:mysql"))
-        #expect(output.contains("Stopped before the upgrade finished"))
+        #expect(output.contains("Stopped before the update finished"))
         #expect(output.contains("9.7.1 → 26.7.0_2"))
         #expect(!output.contains("now "), "nothing was read back, so nothing is said about afterwards")
-        #expect(!output.contains("was not upgraded"))
+        #expect(!output.contains("was not updated"))
         #expect(output.contains("via Homebrew · started from the MacUp app · ran for 1 minute, 35 seconds"))
         #expect(output.contains("Details: The command was cancelled."))
         #expect(!output.contains("One history entry could not be read"))
         // The headline comes before the error text, and appears once.
-        let headline = try #require(output.range(of: "Stopped before the upgrade finished"))
+        let headline = try #require(output.range(of: "Stopped before the update finished"))
         let details = try #require(output.range(of: "The command was cancelled."))
         #expect(headline.lowerBound < details.lowerBound)
         #expect(output.components(separatedBy: "Stopped").count == 2)

@@ -130,6 +130,35 @@ public struct HistoryStore: Sendable {
         )
     }
 
+    /// The newest entries for one item, for `macup explain` and the app's
+    /// Copy Details.
+    ///
+    /// Decoding from the end means it stops as soon as it has `limit` of
+    /// them. Lines it could not decode on the way are counted, because any
+    /// of them may have been about this item.
+    public func read(item: PackageID, limit: Int) throws -> HistoryReading {
+        guard let (data, olderEntriesNotRead) = try contents() else {
+            return HistoryReading(entries: [])
+        }
+        let decoder = Self.decoder()
+        var entries: [HistoryEntry] = []
+        var unreadable = 0
+        for line in data.split(separator: 0x0A, omittingEmptySubsequences: true).reversed() {
+            if entries.count >= limit { break }
+            do {
+                let entry = try decoder.decode(HistoryEntry.self, from: Data(line))
+                if entry.item == item { entries.append(entry) }
+            } catch {
+                unreadable += 1
+            }
+        }
+        return HistoryReading(
+            entries: entries,
+            unreadableLines: unreadable,
+            olderEntriesNotRead: olderEntriesNotRead
+        )
+    }
+
     // MARK: Encoding
 
     /// One entry with every display string redacted.

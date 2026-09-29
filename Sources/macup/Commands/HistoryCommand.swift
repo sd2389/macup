@@ -192,10 +192,11 @@ struct HistoryRenderer {
         }
     }
 
+    // Worded in MacUpCore, so `macup explain` and the app's Copy Details
+    // describe an attempt exactly as this list does.
+
     static func timestamp(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd HH:mm"
-        return formatter.string(from: date)
+        HistoryEntry.timestampText(date)
     }
 }
 

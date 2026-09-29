@@ -91,6 +91,12 @@ final class AppModel {
         )
     }
 
+    /// That environment with the login shell's variables, for the model's
+    /// extensions in other files.
+    func engineEnvironment() async -> CheckEnvironment {
+        checkEnvironment(await loadEnvironment())
+    }
+
     // MARK: - Policy
 
     /// Every rule the configuration sets, as written, for the Settings screen.

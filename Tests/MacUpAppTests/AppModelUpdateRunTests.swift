@@ -123,7 +123,7 @@ struct AppModelUpdateRunTests {
         let entry = try #require(try harness.recordedHistory().first)
         #expect(entry.outcome == .failed)
         #expect(entry.versionAfter == "1.0.0")
-        #expect(entry.headline.text == "Failed — git was not upgraded")
+        #expect(entry.headline.text == "Failed — git was not updated")
     }
 
     @Test("An item waiting for confirmation is left alone until it is confirmed")

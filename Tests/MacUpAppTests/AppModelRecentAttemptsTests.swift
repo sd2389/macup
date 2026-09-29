@@ -49,7 +49,7 @@ struct AppModelRecentAttemptsTests {
         #expect(attempts.problem == nil)
         #expect(attempts.entries.map(\.item) == [Self.git, Self.git, Self.git])
         #expect(attempts.entries.map(\.timestamp) == [3.0, 2, 1].map { Date(timeIntervalSince1970: 1_700_000_000 + $0) })
-        #expect(attempts.entries.first?.headline.text == "Upgraded and confirmed")
+        #expect(attempts.entries.first?.headline.text == "Updated and confirmed")
         #expect(harness.launchedExecutables.isEmpty, "reading history runs nothing")
     }
 
@@ -152,7 +152,7 @@ struct AppModelRecentAttemptsTests {
         let attempt = try #require(harness.model.recentAttempts(for: Self.git).entries.first)
         #expect(attempt.outcome == .failed)
         #expect(attempt.versionAfter == "1.0.0")
-        #expect(attempt.headline.text == "Failed — git was not upgraded")
+        #expect(attempt.headline.text == "Failed — git was not updated")
         #expect(attempt.versionSummary == "1.0.0 → 1.0.1 · now 1.0.0")
         #expect(attempt.circumstances.prefix(2) == ["via Homebrew", "started from the MacUp app"])
     }
@@ -173,7 +173,7 @@ struct AppModelRecentAttemptsTests {
         harness.model.showHistory(for: Self.mysql)
         let entry = try #require(harness.model.visibleHistory.first)
         #expect(harness.model.history?.unreadableLines == 0)
-        #expect(entry.headline.text == "Stopped before the upgrade finished")
+        #expect(entry.headline.text == "Stopped before the update finished")
         #expect(entry.headline.symbolName == "stop.circle")
         #expect(entry.versionSummary == "9.7.1 → 26.7.0_2")
         #expect(entry.stateAfter == nil)

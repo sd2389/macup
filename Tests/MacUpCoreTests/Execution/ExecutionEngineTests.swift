@@ -582,7 +582,7 @@ struct ExecutionEngineTests {
         #expect(entry.verification == .targetNotReached)
         #expect(entry.versionAfter == "2.50.0")
         #expect(entry.stateAfter == "No version of git is linked, so its commands are not on your PATH.")
-        #expect(entry.headline.text == "Failed — git was not upgraded")
+        #expect(entry.headline.text == "Failed — git was not updated")
         // The upgrade ran once and nothing else changing was attempted.
         #expect(harness.runner.recordedRequests.filter { $0.effect == .modifying }.count == 1)
     }
@@ -645,7 +645,7 @@ struct ExecutionEngineTests {
         #expect(entry.versionAfter == "2.50.0")
         #expect(entry.stateAfter == "No version of git is linked, so its commands are not on your PATH.")
         #expect(entry.errorSummary == "The command was cancelled.")
-        #expect(entry.headline.text == "Stopped — git was not upgraded")
+        #expect(entry.headline.text == "Stopped — git was not updated")
     }
 
     @Test("A command that ran past its time limit is read back too")
@@ -668,7 +668,7 @@ struct ExecutionEngineTests {
         let entry = try #require(try harness.history.load().first)
         #expect(entry.versionAfter == "2.50.0")
         #expect(entry.verification == .targetNotReached)
-        #expect(entry.headline.text == "Timed out — git was not upgraded")
+        #expect(entry.headline.text == "Timed out — git was not updated")
     }
 
     @Test("An attempt stopped before its first command reads nothing back, because nothing ran")
