@@ -34,12 +34,31 @@ fi
 /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $version" "$app/Contents/Info.plist"
 cp build/MacUp.icns "$app/Contents/Resources/MacUp.icns"
 
-# Ad-hoc, because there is no Developer ID here to sign with. The identifier is
-# pinned to the bundle identifier so the signature cannot drift from it, but an
-# ad-hoc signature still carries no team identifier, so macOS has no developer
-# to attribute the app to and will not grant it camera access — and the
-# signature's hash changes on every build, so it could not remember a decision
-# even if it made one. The app says so where someone meets it; see
-# Apps/MacUpApp/MacUpApp/App/CameraReadiness.swift.
-codesign --force --sign - --identifier dev.macup.MacUp "$app"
+# Signed with a real identity when this Mac has one: an Apple Development
+# certificate (free with an Apple ID, created in Xcode > Settings > Accounts >
+# Manage Certificates) or a Developer ID. That signature names a team, so
+# macOS can attribute the app to a developer, ask for camera access, and
+# remember the answer across rebuilds. MACUP_SIGNING_IDENTITY picks one
+# explicitly (a SHA-1 hash or a name from `security find-identity`).
+#
+# Otherwise ad-hoc. The identifier is pinned to the bundle identifier so the
+# signature cannot drift from it, but an ad-hoc signature carries no team
+# identifier, so macOS has no developer to attribute the app to and will not
+# grant it camera access — and its hash changes on every build, so it could not
+# remember a decision even if it made one. The app says so where someone meets
+# it; see Apps/MacUpApp/MacUpApp/App/CameraReadiness.swift.
+identity="${MACUP_SIGNING_IDENTITY:-}"
+if [[ -z "$identity" ]]; then
+    identity="$(security find-identity -v -p codesigning 2>/dev/null \
+        | awk '/"(Apple Development|Developer ID Application): / { print $2; exit }')"
+fi
+if [[ -n "$identity" ]]; then
+    # The helper first: a bundle's signature covers the code inside it.
+    codesign --force --sign "$identity" --identifier dev.macup.cli "$app/Contents/Helpers/macup"
+    codesign --force --sign "$identity" --identifier dev.macup.MacUp "$app"
+    echo "Signed with identity $identity." >&2
+else
+    codesign --force --sign - --identifier dev.macup.MacUp "$app"
+    echo "Signed ad-hoc: no Apple Development or Developer ID certificate on this Mac, so face match stays off." >&2
+fi
 echo "$app"

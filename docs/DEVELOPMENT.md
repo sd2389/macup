@@ -48,9 +48,8 @@ open -n build/MacUp.app --args --snapshot-dir "$(mktemp -d)"
 This is a property of how the bundle is signed, not a bug, so it is written
 down rather than rediscovered.
 
-`scripts/build-app.sh` signs the bundle **ad-hoc** (`codesign --sign -`),
-because this repository has no Developer ID certificate to sign with and
-cannot create one. An ad-hoc signature carries no team identifier, so macOS
+Without a certificate, `scripts/build-app.sh` signs the bundle **ad-hoc**
+(`codesign --sign -`), and a build tool cannot create a certificate for you. An ad-hoc signature carries no team identifier, so macOS
 has no developer to attribute the app to — and macOS will not grant camera
 access to a bundle it cannot attribute. It never presents the prompt,
 `AVCaptureDevice.authorizationStatus` stays `notDetermined`, and the capture
@@ -74,9 +73,18 @@ Because it is settled rather than intermittent, both surfaces say so:
   same `CameraReadiness` value, so a diagnostic run and the screen can never
   tell different stories.
 
-This starts working with the signing and notarization described in
-`docs/RELEASE.md`, and not before. Everything else in the app — including the
-approval prompt through `LocalAuthentication` — works in a local build.
+The way out for a local build is a signing identity that names a team.
+`scripts/build-app.sh` now uses one automatically when this Mac has one: an
+**Apple Development** certificate, free with an Apple ID (Xcode > Settings >
+Accounts > your Apple ID > Manage Certificates > + > Apple Development), or a
+Developer ID Application certificate. `MACUP_SIGNING_IDENTITY` picks one
+explicitly. The script says which way it signed. A team-named signature is
+what `CameraReadiness` looks for, and the one macOS needs before it will ask;
+it has not yet been verified end to end on this Mac, which has no certificate.
+Without one the build stays ad-hoc and everything above still holds.
+Distribution is still the signing and notarization in `docs/RELEASE.md`.
+Everything else in the app — including the approval prompt through
+`LocalAuthentication` — works in a local build.
 
 ## Test
 
