@@ -13,6 +13,47 @@ claim that 0.4.0 has been released.
 ## [0.4.0] — unreleased
 
 ### Added
+- **History that says what happened**: one plain headline per attempt
+  ("Stopped before the update finished", "Updated and confirmed"), labelled
+  facts ("via Homebrew · started from the MacUp app · ran for 1 minute, 35
+  seconds"), and before → target → after versions. After an attempt that
+  did not succeed, MacUp reads the item back (reading only) and records what
+  it found. `macup history <package-id>` and `--search`; a search field and
+  per-item view in the app, and Recent Attempts beside each update.
+- **Skip This Version** and item notes: `macup policy skip|unskip|note`, and
+  the same in the app's rule menu, detail pane, and dashboard. A skipped
+  version stays out of plans until a different one is offered; when MacUp
+  cannot tell which version is on offer, it leaves the item alone.
+- **`macup explain <package-id>`**: everything MacUp knows about one item —
+  versions, what changes, risk and every reason, notes, the rule that
+  decided, the exact command or why there is none, and its history. The app's
+  Copy Details copies the same text, and Copy Command copies the command.
+  The menu bar lists pending updates, each opening its item.
+- **Search, filter, and sort** on the Updates screen (by provider, risk,
+  policy in effect, and Needs Attention), always saying how many updates a
+  filter hides; `--risk`, `--policy`, `--attention`, and `--sort` on
+  `macup check` and `macup plan`. ⌘1–⌘6 switch sections and ⌘F searches.
+- **What an update affects**: formulae running as `brew services` say so,
+  and a database moving to a new major version is high risk and always asks
+  first, with a note to back up, because its first start may convert its
+  data. `macup dependents <package-id>` and Show What Depends on It answer
+  `brew uses --installed`, on request only.
+- **Doctor checks for Homebrew's own state**: an install that did not finish,
+  a formula with no linked version, and a prefix that makes Homebrew compile
+  from source, each with safe manual repair steps in the right order.
+- **Export Diagnostics**: `macup diagnostics preview|export` and Settings >
+  Diagnostics write one redacted JSON file for a bug report — package names
+  replaced by placeholders unless asked for, secrets, home paths, and the user
+  name removed, no environment variables, never overwriting, readable only by
+  you.
+- **Opt-in AI help from TypeSafe**, off by default. With it off MacUp makes no
+  network request of its own. With a key (kept in the Keychain) and after
+  seeing exactly what is sent: "Ask MacUp" (`macup ask`) turns a plain
+  request into a rule change you confirm, and an on-demand estimate
+  (`macup insight`) can add a labelled caution that makes an item ask first.
+  AI never lowers risk, never allows what policy denies, and never changes
+  configuration without confirmation. `macup ai status|enable|disable|key
+  set|key clear|test|disclosure|forget`, and a card on the Features screen.
 - **App layout**: the sidebar is now Dashboard, Providers, Updates,
   Features, Doctor, History. The dashboard lists pending updates first and
   the items your rules ignore or hold below them, each with the way to clear
@@ -50,6 +91,11 @@ claim that 0.4.0 has been released.
   one wins, and where the global packages actually live.
 
 ### Fixed
+- **Face enrolment never had a camera to capture from**: its session was
+  built with the bare `init()`, which adds no camera input. It can now only
+  be built from a camera device. `scripts/build-app.sh` signs with an Apple
+  Development or Developer ID certificate when one is installed, which macOS
+  needs before it asks for camera access.
 - **Stop no longer breaks what it stops.** Pressing Stop in the app (or
   Escape, which was bound to it), or Ctrl+C in the CLI, sent the running
   package manager SIGTERM and then SIGKILL three seconds later. During a
