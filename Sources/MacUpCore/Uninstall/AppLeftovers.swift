@@ -8,6 +8,8 @@ struct Leftover: Sendable, Hashable {
     var selectedByDefault: Bool
     var reason: String
     var warning: String?
+    /// Removed only if it is an empty folder when MacUp comes to it.
+    var onlyIfEmpty = false
 }
 
 /// The files an app leaves in the home folder's Library, found by fixed
@@ -28,6 +30,11 @@ struct Leftover: Sendable, Hashable {
 /// A name that belongs to a longer bundle identifier of another installed
 /// app — `com.google.Chrome.canary` when uninstalling `com.google.Chrome` —
 /// is left to that app.
+///
+/// A bundle identifier is whatever the app's `Info.plist` claims, so how far
+/// it is trusted depends on its shape (``IdentifierScope``): one with fewer
+/// than three parts is not used at all, and one in Apple's namespace finds
+/// files but ticks none of them.
 struct AppLeftoverScanner: Sendable {
     var homeDirectory: String
     var otherBundleIdentifiers: Set<String>
@@ -43,16 +50,40 @@ struct AppLeftoverScanner: Sendable {
 
     var library: String { homeDirectory + "/Library" }
 
+    static let appleWarning = "Named like part of macOS. Check that it is this app's before removing it."
+
+    /// How much a bundle identifier says about which files are the app's.
+    enum IdentifierScope: Sendable, Hashable {
+        /// Names that are it, or start with it and a dot, are the app's.
+        case specific
+        /// In Apple's namespace (`com.apple.…`). Any app can claim one, and
+        /// macOS keeps its own settings under such names, so what it matches
+        /// is found but never ticked.
+        case apple
+        /// Fewer than three parts, such as `com` or `com.google`: names
+        /// starting with it belong to other apps too, so it finds nothing.
+        case tooBroad
+    }
+
+    static func scope(of identifier: String) -> IdentifierScope {
+        let parts = identifier.split(separator: ".", omittingEmptySubsequences: false)
+        guard parts.count >= 3, parts.allSatisfy({ !$0.isEmpty }) else { return .tooBroad }
+        return parts[0].lowercased() == "com" && parts[1].lowercased() == "apple" ? .apple : .specific
+    }
+
     func scan(bundleIdentifier: String?, bundlePath: String, names: [String], teamIdentifier: String?) -> [Leftover] {
         var found: [Leftover] = []
-        if let identifier = bundleIdentifier {
+        let scope = bundleIdentifier.map(Self.scope)
+        if let identifier = bundleIdentifier, let scope, scope != .tooBroad {
+            let ticked = scope == .specific
             for folder in Self.ownFolders {
                 for name in matching(identifier, in: library + "/" + folder) {
                     found.append(Leftover(
                         path: library + "/" + folder + "/" + name,
                         category: .belongsToApp,
-                        selectedByDefault: true,
-                        reason: "Named after \(identifier), the app's bundle identifier."
+                        selectedByDefault: ticked,
+                        reason: "Named after \(identifier), the app's bundle identifier.",
+                        warning: ticked ? nil : Self.appleWarning
                     ))
                 }
             }
@@ -79,7 +110,12 @@ struct AppLeftoverScanner: Sendable {
                 }
             }
         }
-        found += launchAgents(bundleIdentifier: bundleIdentifier, bundlePath: bundlePath, alreadyFound: Set(found.map(\.path)))
+        found += launchAgents(
+            bundleIdentifier: scope == .tooBroad ? nil : bundleIdentifier,
+            ticked: scope != .apple,
+            bundlePath: bundlePath,
+            alreadyFound: Set(found.map(\.path))
+        )
         for name in names where name != "." && name != ".." {
             for folder in Self.nameFolders {
                 let path = library + "/" + folder + "/" + name
@@ -110,8 +146,9 @@ struct AppLeftoverScanner: Sendable {
     }
 
     /// Launch agents in the home folder that start this app: by label, or by
-    /// a program inside the bundle.
-    private func launchAgents(bundleIdentifier: String?, bundlePath: String, alreadyFound: Set<String>) -> [Leftover] {
+    /// a program inside the bundle. `ticked` is false for a label in Apple's
+    /// namespace; a program inside the bundle is the app's either way.
+    private func launchAgents(bundleIdentifier: String?, ticked: Bool, bundlePath: String, alreadyFound: Set<String>) -> [Leftover] {
         let directory = library + "/LaunchAgents"
         let bundle = FileTree.canonicalPath(bundlePath) ?? bundlePath
         var found: [Leftover] = []
@@ -123,8 +160,9 @@ struct AppLeftoverScanner: Sendable {
                 found.append(Leftover(
                     path: path,
                     category: .belongsToApp,
-                    selectedByDefault: true,
-                    reason: "A launch agent labelled \(label), after the app's bundle identifier. It stops loading at your next login."
+                    selectedByDefault: ticked,
+                    reason: "A launch agent labelled \(label), after the app's bundle identifier. It stops loading at your next login.",
+                    warning: ticked ? nil : Self.appleWarning
                 ))
             } else if agent.startsProgram(inside: bundle) {
                 found.append(Leftover(

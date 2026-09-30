@@ -90,7 +90,9 @@ public struct SystemFileRemovalBackend: FileRemovalBackend {
 ///   skipped;
 /// - where it really lives, with every link above it resolved, is inside the
 ///   ``RemovalBoundary``;
-/// - it is not a separate volume mounted there, and macOS has not locked it.
+/// - it is not a separate volume mounted there, and macOS has not locked it;
+/// - a folder a cask removes only when empty is empty;
+/// - a folder being deleted permanently has no other disk mounted inside it.
 ///
 /// A link is removed as a link and never followed. Anything that fails a
 /// check is skipped and reported with the reason; nothing is adjusted into a
@@ -141,6 +143,22 @@ public struct GuardedFileRemover: FileRemoving {
         }
         if current.isLocked {
             return outcome(.skipped, "MacUp did not remove it because macOS has locked it.")
+        }
+        if removal.onlyIfEmpty {
+            guard current.kind == .directory, let names = FileTree.names(in: path), names.allSatisfy({ $0 == ".DS_Store" }) else {
+                return outcome(.skipped, "MacUp did not remove it because it is not empty, and it is removed only when it is.")
+            }
+        }
+        // Deleting a folder deletes everything below it, so a disk mounted
+        // anywhere inside must not be reached. Moving it to the Trash moves
+        // the folder alone and reaches into nothing.
+        if mode == .delete, current.kind == .directory {
+            guard let inside = FileTree.size(of: path), !inside.partial else {
+                return outcome(.skipped, "MacUp did not delete it because it could not check everything inside it. Moving it to the Trash instead is safe.")
+            }
+            if inside.otherVolumes > 0 {
+                return outcome(.skipped, "MacUp did not delete it because another disk is mounted inside it.")
+            }
         }
 
         // A link is moved or deleted as a link. What it pointed at is noted

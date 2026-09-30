@@ -102,6 +102,68 @@ struct ZapPathExpander: Sendable {
         return results
     }
 
+    /// Whether every wildcard in `pattern` is tied to one app, so that what
+    /// it matches is that app's rather than whatever a shared folder holds.
+    ///
+    /// Leading folders many apps share are passed over first: the home
+    /// folder's standard folders, `~/Library` and each folder directly in it,
+    /// `Preferences/ByHost`, `Logs/DiagnosticReports`,
+    /// `Application Support/CrashReporter`, and Apple's own `com.apple.…`
+    /// folders. The next name must then be literal —
+    /// `~/Library/Caches/Firefox/*` — or a wildcard whose literal start names
+    /// the app: one of `owners` (the cask token, the app's name or bundle
+    /// identifier), or a reverse-DNS name of at least three parts, as in
+    /// `com.microsoft.VSCode*`. `~/Library/Preferences/*` and
+    /// `~/Library/Caches/*.plist` are not tied to anything.
+    ///
+    /// Only patterns in the home folder are judged here; the removal
+    /// boundary refuses everything outside it anyway.
+    func isAnchored(_ pattern: String, owners: [String]) -> Bool {
+        // "Redis Insight" and redis-insight also name RedisInsight.
+        let owners = owners.flatMap { owner in
+            [owner.lowercased(), owner.lowercased().filter { !" -_".contains($0) }]
+        }.filter { $0.count >= 3 }
+        for alternative in Self.braces(pattern) {
+            let relative: Substring
+            if alternative.hasPrefix("~/") {
+                relative = alternative.dropFirst(2)
+            } else if alternative.hasPrefix(homeDirectory + "/") {
+                relative = alternative.dropFirst(homeDirectory.count + 1)
+            } else {
+                continue
+            }
+            var shared = ""
+            for component in relative.split(separator: "/").map(String.init) {
+                guard Self.isPattern(component) else {
+                    let path = shared.isEmpty ? component : shared + "/" + component
+                    if Self.isShared(path) {
+                        shared = path
+                        continue
+                    }
+                    break
+                }
+                let literal = String(component.prefix { !"*?[".contains($0) }).lowercased()
+                let reverseDNS = literal.split(separator: ".").count >= 3
+                guard reverseDNS || owners.contains(where: literal.hasPrefix) else { return false }
+                break
+            }
+        }
+        return true
+    }
+
+    /// Folders under the home folder that hold many apps' files, by their
+    /// path relative to it.
+    static func isShared(_ relative: String) -> Bool {
+        let components = relative.split(separator: "/")
+        if components.first == "Library", components.count <= 2 { return true }
+        if ["Library/Preferences/ByHost", "Library/Logs/DiagnosticReports", "Library/Application Support/CrashReporter"]
+            .contains(relative) {
+            return true
+        }
+        if components.count > 1, components.last?.lowercased().hasPrefix("com.apple.") == true { return true }
+        return RemovalBoundary.standardHomeFolders.contains(relative)
+    }
+
     static func isPattern(_ component: String) -> Bool {
         component.contains("*") || component.contains("?") || component.contains("[")
     }

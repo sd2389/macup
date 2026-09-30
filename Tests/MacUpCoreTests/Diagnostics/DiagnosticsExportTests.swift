@@ -268,6 +268,34 @@ struct DiagnosticsDocumentTests {
         #expect(document.configuration.issues.first?.path.hasPrefix("items.package-") == true)
     }
 
+    @Test("The name and bundle identifier of an app MacUp uninstalled are masked in free text too")
+    func uninstalledAppNamesAreMasked() throws {
+        var entry = HistoryEntry(
+            timestamp: Sample.now,
+            origin: .gui,
+            item: nil,
+            versionBefore: "1.2",
+            versionTarget: nil,
+            versionAfter: nil,
+            command: nil,
+            outcome: .failed,
+            verification: nil,
+            errorSummary: "Quit Moonlighter first; com.acme.moonlighter is still open.",
+            skipReason: "Moonlighter is open."
+        )
+        entry.uninstall = UninstallRecord(target: "app:com.acme.moonlighter", name: "Moonlighter", kind: .app, mode: .trash)
+        var snapshot = Sample.snapshot()
+        snapshot.history = HistoryReading(entries: [entry])
+
+        let masked = String(decoding: try DiagnosticsDocument(snapshot, includePackageNames: false).encoded(), as: UTF8.self)
+        #expect(!masked.contains("Moonlighter"))
+        #expect(!masked.contains("com.acme.moonlighter"))
+        #expect(masked.contains("\"item\" : \"app\""))
+
+        let named = String(decoding: try DiagnosticsDocument(snapshot, includePackageNames: true).encoded(), as: UTF8.self)
+        #expect(named.contains("Moonlighter is open."))
+    }
+
     @Test("Runtimes and package managers MacUp knows by name keep their names")
     func vocabularyIsKept() throws {
         let document = try Sample.document()

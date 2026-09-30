@@ -212,7 +212,7 @@ public struct DiagnosticsDocument: Sendable, Hashable, Codable {
             "The last \(historyLimit) entries in MacUp's history.",
         ]
         if packageNames == .included {
-            lines.append("Package names, because you chose to include them.")
+            lines.append("Package names and the names of apps MacUp uninstalled, because you chose to include them.")
         }
         return lines
     }
@@ -222,7 +222,8 @@ public struct DiagnosticsDocument: Sendable, Hashable, Codable {
         var lines: [String] = []
         if packageNames == .placeholders {
             lines.append(
-                "Package names. Each is replaced with a placeholder such as brew:package-1, the same one everywhere in the file. "
+                "Package names, and the names of apps MacUp uninstalled. Each is replaced with a placeholder such as brew:package-1, "
+                    + "the same one everywhere in the file. "
                     + "Runtimes and package managers MacUp itself knows by name, such as node, python, and npm, are kept."
             )
         }
@@ -275,6 +276,15 @@ public struct DiagnosticsDocument: Sendable, Hashable, Codable {
         }
         for entry in snapshot.history?.entries ?? [] {
             if let item = entry.item { add(item) }
+            // An app has no package ID, but its skip reasons and errors can
+            // still name it, by its name or its bundle identifier.
+            if let uninstall = entry.uninstall, entry.item == nil, uninstall.kind != .macUp {
+                if uninstall.target.hasPrefix("app:") {
+                    names.append((String(uninstall.target.dropFirst(4)), [uninstall.name]))
+                } else {
+                    names.append((uninstall.name, []))
+                }
+            }
         }
         for key in snapshot.configuration.configuration.items.keys.sorted() {
             if let id = try? PackageID(parsing: key) {

@@ -142,6 +142,20 @@ claim that 0.4.0 has been released.
   `AWS_SECRET_ACCESS_KEY`, and `NODE_OPTIONS` and asserts that none of their
   values appear.
 - Doctor explains. It has no fix action, not even an opt-in one.
+- The uninstaller no longer takes an app's bundle identifier at its word. One
+  with fewer than three parts (`com`, `com.google`) finds no files, and one in
+  Apple's namespace finds files but ticks none of them, so an app claiming
+  `com.apple` cannot sweep macOS's own settings.
+- A cask's `zap` wildcard must be tied to the app. A pattern such as
+  `~/Library/Preferences/*` is listed as left in place instead of expanded,
+  and entries named in Apple's namespace are never ticked.
+- A folder a cask removes only when empty is removed only if it is empty when
+  MacUp reaches it; one holding other files is never offered, not even by
+  Select Everything.
+- A folder with another disk mounted inside it is never removed, and a folder
+  deleted permanently is checked again for one first.
+- Export Diagnostics also masks the names and bundle identifiers of apps
+  MacUp uninstalled, which skip reasons and errors can mention.
 
 ## [0.3.0] — unreleased
 

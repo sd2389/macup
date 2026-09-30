@@ -330,7 +330,9 @@ rather than by care:
   The one exception is MacUp's own vocabulary — the runtimes and package
   managers its source recognizes by name — because Doctor's findings are
   written in those terms and they identify nobody. Versions are kept; they
-  are what most bug reports are about. Item notes are never included.
+  are what most bug reports are about. Item notes are never included. The
+  names and bundle identifiers of apps MacUp uninstalled are masked the same
+  way, because a skip reason or an error can name them.
 - **The file is new or it is nothing.** It is created with `O_CREAT |
   O_EXCL | O_NOFOLLOW` relative to an opened folder, owner-only (`0600`,
   `fchmod`ed past the umask), and removed if writing fails part-way. An
@@ -359,12 +361,38 @@ every rule an update carries and a few of its own (ADR-022):
   allowed folders or at the top of one (the home folder, `~/Library`, a
   top-level Library folder, the Trash, `/System`, `/usr`, `/bin`, `/sbin`).
   `scripts/check-trust-invariants.sh` keeps removal calls in that one place.
+- **An app's claims are not taken at their word.** A bundle identifier is
+  whatever the app's `Info.plist` says. One with fewer than three parts
+  (`com`, `com.google`) is not used to find files at all, because names that
+  start with it belong to other apps too; one in Apple's namespace
+  (`com.apple.…`) finds files but ticks none of them, because macOS keeps its
+  own settings under such names. The plan says which applied.
+- **A cask's `zap` list is bounded.** Patterns are expanded in code, never by
+  a shell, never with `**`, and never through a link. A wildcard must be tied
+  to the app: after the folders many apps share (`~/Library/Preferences`, its
+  `ByHost` folder, `Logs/DiagnosticReports`, the home folder's standard
+  folders, Apple's `com.apple.…` folders), the next name must be literal or
+  start with the cask's token, the app's name or bundle identifier, or a
+  three-part reverse-DNS name. `~/Library/Preferences/*` is listed as left in
+  place instead of expanded. A folder the cask removes only when empty
+  (`rmdir`) is removed only if it is empty — apart from Finder's `.DS_Store` —
+  when MacUp reaches it, and one holding files the cask does not list is
+  never offered, not even by "include everything".
+- **Never into another disk.** A folder with another disk mounted inside it is
+  listed as left in place, and a folder deleted permanently is walked again
+  first; if MacUp cannot check all of it, or finds a mount, it is skipped.
 - **No administrator.** What needs one is listed with manual steps.
 - **Stops for the obvious reasons.** An open app, a formula others need, or an
   unreadable configuration stops the uninstall; scheduled runs cannot
   uninstall at all.
 - **Tests never touch real files.** Every uninstall test runs over a pretend
   Mac in a temporary folder with a fake Trash.
+
+Known limit: the last check and the removal are two steps by path, not one
+step through an open folder handle. A program running as the same user could
+swap a folder for a link in between. MacUp accepts this because such a
+program can already remove anything the user can, so it gains nothing by
+steering MacUp; MacUp never runs as another user or as root.
 
 ## Privilege
 

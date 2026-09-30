@@ -166,6 +166,9 @@ public struct UninstallPlanner: Sendable {
         let leftovers = AppLeftoverScanner(homeDirectory: uninstall.homeDirectory, otherBundleIdentifiers: others)
             .scan(bundleIdentifier: app.bundleIdentifier, bundlePath: app.path, names: app.names, teamIdentifier: team)
         Self.add(leftovers, to: &plan, boundary: boundary, owner: app.name)
+        if let identifier = app.bundleIdentifier, let warning = Self.identifierWarning(identifier, app: app.name) {
+            plan.warnings.append(warning)
+        }
         let system = SystemLeftoverScanner(
             systemLibrary: uninstall.systemLibrary,
             receiptsDirectory: uninstall.receiptsDirectory,
@@ -177,6 +180,21 @@ public struct UninstallPlanner: Sendable {
             var manual = manual
             manual.sizeBytes = FileTree.size(of: manual.path)?.bytes
             plan.cannotRemove.append(manual)
+        }
+    }
+
+    /// What the plan says when the app's bundle identifier cannot be trusted
+    /// to name its files (``AppLeftoverScanner/IdentifierScope``).
+    static func identifierWarning(_ identifier: String, app: String) -> String? {
+        switch AppLeftoverScanner.scope(of: identifier) {
+        case .specific:
+            nil
+        case .apple:
+            "\(app) says its bundle identifier is \(identifier), which is in Apple's namespace. MacUp lists the files named "
+                + "after it but ticks none of them, because macOS keeps its own settings under names like these."
+        case .tooBroad:
+            "\(app) says its bundle identifier is \(identifier), which is too short to tell its files from other apps'. "
+                + "MacUp looks only for folders named like the app."
         }
     }
 
@@ -197,6 +215,15 @@ public struct UninstallPlanner: Sendable {
                 continue
             }
             let size = FileTree.size(of: leftover.path)
+            if let size, size.otherVolumes > 0 {
+                plan.cannotRemove.append(ManualRemoval(
+                    path: leftover.path,
+                    reason: "Another disk is mounted inside it, and removing it could reach into that disk, so MacUp leaves it.",
+                    steps: ["Eject the disk mounted inside it, then try again."],
+                    sizeBytes: size.bytes
+                ))
+                continue
+            }
             if let size, size.locked > 0 {
                 plan.cannotRemove.append(ManualRemoval(
                     path: leftover.path,
@@ -206,16 +233,19 @@ public struct UninstallPlanner: Sendable {
                 ))
                 continue
             }
+            // A folder removed only once empty frees nothing of its own:
+            // what is inside it is counted where it is listed, if anywhere.
             plan.removals.append(PlannedRemoval(
                 path: leftover.path,
                 category: leftover.category,
                 kind: status.kind,
-                sizeBytes: size?.bytes,
-                sizeIsPartial: (size?.partial ?? true) || (size?.unreadable ?? 0) > 0,
+                sizeBytes: leftover.onlyIfEmpty ? 0 : size?.bytes,
+                sizeIsPartial: leftover.onlyIfEmpty ? false : (size?.partial ?? true) || (size?.unreadable ?? 0) > 0,
                 selectedByDefault: leftover.selectedByDefault,
                 reason: leftover.reason,
                 warning: leftover.warning,
-                identity: status.identity
+                identity: status.identity,
+                onlyIfEmpty: leftover.onlyIfEmpty
             ))
         }
     }
@@ -308,7 +338,10 @@ public struct UninstallPlanner: Sendable {
     }
 
     /// The paths a cask's `zap` lists, expanded here, each ticked or not by
-    /// where it is: caches and preferences are, data is not.
+    /// where it is: caches and preferences are, data is not. A pattern whose
+    /// wildcard is not tied to the app is not expanded at all
+    /// (``ZapPathExpander/isAnchored(_:owners:)``), and a folder the cask
+    /// removes only when empty is removed only then.
     private func addZap(
         _ cask: HomebrewCask,
         app: InstalledApp?,
@@ -317,46 +350,98 @@ public struct UninstallPlanner: Sendable {
         boundary: RemovalBoundary
     ) {
         let expander = ZapPathExpander(homeDirectory: uninstall.homeDirectory)
+        let owners = [cask.token, cask.name] + (app.map { $0.names + [$0.bundleIdentifier].compactMap { $0 } } ?? [])
         var leftovers: [Leftover] = []
+        var emptyOnly: [String] = []
         for directive in cask.zap {
-            switch expander.expand(directive.pattern) {
-            case .refused(let reason):
+            let manually = ["If you want it gone, look for \(CommandInvocation.quoted(directive.pattern)) yourself."]
+            guard expander.isAnchored(directive.pattern, owners: owners) else {
                 plan.cannotRemove.append(ManualRemoval(
                     path: directive.pattern,
-                    reason: reason,
-                    steps: ["If you want it gone, look for \(CommandInvocation.quoted(directive.pattern)) yourself."]
+                    reason: "The pattern could match other apps' files as well as \(cask.token)'s, so MacUp does not expand it.",
+                    steps: manually
                 ))
+                continue
+            }
+            switch expander.expand(directive.pattern) {
+            case .refused(let reason):
+                plan.cannotRemove.append(ManualRemoval(path: directive.pattern, reason: reason, steps: manually))
             case .paths(let paths):
                 for path in paths where app.map({ !FileTree.isWithin(path, $0.path) }) ?? true {
-                    leftovers.append(Self.zapLeftover(path, directive: directive, token: cask.token, homeDirectory: uninstall.homeDirectory))
+                    if directive.action == .rmdir {
+                        emptyOnly.append(path)
+                    } else {
+                        leftovers.append(Self.zapLeftover(path, token: cask.token, homeDirectory: uninstall.homeDirectory))
+                    }
                 }
             }
         }
         Self.add(leftovers, to: &plan, boundary: boundary, owner: cask.token)
+        // Deepest first, one at a time, so a folder that is emptied by
+        // removing the folder inside it is judged after that one is planned.
+        for folder in Set(emptyOnly).sorted(by: { $0.count != $1.count ? $0.count > $1.count : $0 < $1 }) {
+            if let leftover = Self.emptyFolderLeftover(folder, token: cask.token, plan: &plan) {
+                Self.add([leftover], to: &plan, boundary: boundary, owner: cask.token)
+            }
+        }
     }
 
-    static func zapLeftover(_ path: String, directive: ZapDirective, token: String, homeDirectory: String) -> Leftover {
+    static func zapLeftover(_ path: String, token: String, homeDirectory: String) -> Leftover {
         let library = homeDirectory + "/Library/"
         let dataFolders = ["Application Support", "Containers", "Group Containers"].map { library + $0 + "/" }
         let isData = dataFolders.contains(where: path.hasPrefix) || !path.hasPrefix(library)
-        if directive.action == .rmdir {
-            let empty = (FileTree.names(in: path) ?? ["?"]).filter { $0 != ".DS_Store" }.isEmpty
+        // macOS keeps its own settings under com.apple names; a cask listing
+        // one is taken at its word only when someone ticks it.
+        let isApple = (path as NSString).lastPathComponent.lowercased().hasPrefix("com.apple.")
+        return Leftover(
+            path: path,
+            category: .declaredByPackageManager,
+            selectedByDefault: !isData && !isApple,
+            reason: "The \(token) cask lists this for a complete removal.",
+            warning: isData ? AppLeftoverScanner.dataWarning : isApple ? AppLeftoverScanner.appleWarning : nil
+        )
+    }
+
+    /// A folder the cask removes only when it is empty, as Homebrew's own
+    /// `rmdir` does. It is offered when it is empty now, or would be once
+    /// what the plan already removes from it is gone, and it is removed only
+    /// if it is empty by then (``PlannedRemoval/onlyIfEmpty``). A folder that
+    /// holds anything else is listed as left in place, never removed whole.
+    static func emptyFolderLeftover(_ path: String, token: String, plan: inout UninstallPlan) -> Leftover? {
+        guard let names = FileTree.names(in: path) else {
+            plan.cannotRemove.append(ManualRemoval(
+                path: path,
+                reason: "The \(token) cask lists it as a folder to remove once it is empty, but it is not a folder, so MacUp leaves it.",
+                steps: []
+            ))
+            return nil
+        }
+        let inside = names.filter { $0 != ".DS_Store" }.map { path + "/" + $0 }
+        guard !inside.isEmpty else {
             return Leftover(
                 path: path,
                 category: .declaredByPackageManager,
-                selectedByDefault: empty,
-                reason: empty
-                    ? "The \(token) cask removes this folder when it is empty, and it is."
-                    : "The \(token) cask removes this folder only when it is empty, and it is not.",
-                warning: empty ? nil : AppLeftoverScanner.dataWarning
+                selectedByDefault: true,
+                reason: "The \(token) cask removes this folder when it is empty, and it is.",
+                onlyIfEmpty: true
             )
+        }
+        let planned = inside.compactMap { item in plan.removals.first { $0.path == item } }
+        guard planned.count == inside.count else {
+            plan.cannotRemove.append(ManualRemoval(
+                path: path,
+                reason: "The \(token) cask removes this folder only when it is empty, and it holds files the cask does not list, so MacUp leaves it.",
+                steps: ["If you are sure what is in it belongs to \(token), remove it yourself in Finder."]
+            ))
+            return nil
         }
         return Leftover(
             path: path,
             category: .declaredByPackageManager,
-            selectedByDefault: !isData,
-            reason: "The \(token) cask lists this for a complete removal.",
-            warning: isData ? AppLeftoverScanner.dataWarning : nil
+            selectedByDefault: planned.allSatisfy(\.selectedByDefault),
+            reason: "The \(token) cask removes this folder once it is empty. It is empty once what is listed inside it is gone, "
+                + "and MacUp removes it only then.",
+            onlyIfEmpty: true
         )
     }
 

@@ -19,6 +19,8 @@ struct SystemLeftoverScanner: Sendable {
     func scan(bundleIdentifier: String?, bundlePath: String) -> [ManualRemoval] {
         var found: [ManualRemoval] = []
         let bundle = FileTree.canonicalPath(bundlePath) ?? bundlePath
+        // A bundle identifier too short to name one app's files names none.
+        let bundleIdentifier = bundleIdentifier.flatMap { AppLeftoverScanner.scope(of: $0) == .tooBroad ? nil : $0 }
         if let identifier = bundleIdentifier {
             for folder in ["Application Support", "Caches", "Preferences", "PrivilegedHelperTools"] {
                 let directory = systemLibrary + "/" + folder

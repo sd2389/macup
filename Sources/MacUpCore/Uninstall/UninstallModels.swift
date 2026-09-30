@@ -159,6 +159,10 @@ public struct PlannedRemoval: Sendable, Hashable, Codable, Identifiable {
     /// What removing it would cost, for data.
     public var warning: String?
     public var identity: FileIdentity?
+    /// A folder that is removed only if it is empty — apart from a Finder
+    /// `.DS_Store` — when MacUp comes to it, as a cask's `rmdir` asks. Its
+    /// contents are never removed with it.
+    public var onlyIfEmpty: Bool
 
     public init(
         path: String,
@@ -171,7 +175,8 @@ public struct PlannedRemoval: Sendable, Hashable, Codable, Identifiable {
         role: Role = .item,
         reason: String,
         warning: String? = nil,
-        identity: FileIdentity? = nil
+        identity: FileIdentity? = nil,
+        onlyIfEmpty: Bool = false
     ) {
         self.path = path
         self.category = category
@@ -184,6 +189,7 @@ public struct PlannedRemoval: Sendable, Hashable, Codable, Identifiable {
         self.reason = reason
         self.warning = warning
         self.identity = identity
+        self.onlyIfEmpty = onlyIfEmpty
     }
 
     public var id: String { path }

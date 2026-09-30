@@ -143,6 +143,9 @@ enum FileTree {
         /// and files macOS has locked. Any at all means MacUp will not remove
         /// the item, because it would be left half-removed.
         var locked = 0
+        /// Folders inside it where another disk is mounted. The walk does not
+        /// enter them, and MacUp removes nothing that holds one.
+        var otherVolumes = 0
     }
 
     /// Walks `path` without following links or leaving its volume, and adds
@@ -181,6 +184,7 @@ enum FileTree {
                 reading.partial = true
                 break
             }
+            if Int64(stat.st_dev) != top.identity.device { reading.otherVolumes += 1 }
             if stat.st_flags & lockedFlags != 0 { reading.locked += 1 }
             if info == FTS_D, access(entry.pointee.fts_path, W_OK) != 0 { reading.locked += 1 }
             if stat.st_nlink > 1 && (stat.st_mode & S_IFMT) != S_IFDIR {
