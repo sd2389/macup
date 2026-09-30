@@ -177,7 +177,9 @@ struct ProcessCommandRunnerTests {
             "trap 'kill $! 2>/dev/null; /bin/sleep 1; touch \"\(marker)\"; exit 130' INT\n/bin/sleep 30 &\nwait"
         )
         let error = await #expect(throws: MacUpError.self) {
-            try await runner.run(request(script.path, timeout: .milliseconds(300), effect: .modifying))
+            // Long enough for the shell to have set its trap even on a busy
+            // machine; the cleanup still takes longer than the grace period.
+            try await runner.run(request(script.path, timeout: .milliseconds(1500), effect: .modifying))
         }
         #expect(error?.kind == .timeout)
         #expect(error?.message.contains("interrupted it the way Ctrl+C would") == true)

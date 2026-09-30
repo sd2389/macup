@@ -35,9 +35,14 @@ fi
 # Only these files may name a modifying provider verb: the one reviewable
 # list of allowed commands, and the one planning file per provider. Every
 # other file — the CLI, the app, discovery, scheduling — must not.
-planning_files='^Sources/MacUpCore/Execution/ModifyingCommandRules\.swift:|^Sources/MacUpCore/Providers/(Homebrew/Homebrew|Npm/Npm|Mise/Mise)UpdatePlan\.swift:'
+# The uninstall plan files are the same kind of file as the update plan files:
+# each provider's one reviewed place for the commands an uninstall runs.
+planning_files='^Sources/MacUpCore/Execution/ModifyingCommandRules\.swift:|^Sources/MacUpCore/Providers/(Homebrew/Homebrew|Npm/Npm|Mise/Mise)(Update|Uninstall)Plan\.swift:'
+# Two uses of the word that are not commands: the uninstall report's document
+# kind, and the words History search matches for an uninstall entry.
+not_commands='^Sources/MacUpCore/Uninstall/UninstallEngine\.swift:[0-9]+:.*kind|^Sources/MacUpCore/History/HistoryFilter\.swift:[0-9]+:.*fields \+='
 verbs=$(grep -rnE '"(upgrade|install|reinstall|uninstall|remove|rm|cleanup|autoremove|prune|self-update|use|--install|--download|--bump|--all)"' Sources Apps \
-    | grep -vE "$planning_files" || true)
+    | grep -vE "$planning_files" | grep -vE "$not_commands" || true)
 if [[ -n "$verbs" ]]; then
     echo "$verbs" >&2
     fail "modifying provider command found outside the reviewed planning files"
@@ -48,7 +53,14 @@ if grep -rn -- '"--bump"' Sources Apps; then
     fail "mise --bump must never appear: it rewrites the user's requested version"
 fi
 
-daemons=$(grep -rnE 'LaunchDaemons|"system/|"bootstrap", *"system' Sources Apps || true)
+# The uninstaller may name the system's launch daemon folder in one file, only
+# to read it and tell the user what to remove by hand; that file must never be
+# able to run anything.
+daemons=$(grep -rnE 'LaunchDaemons|"system/|"bootstrap", *"system' Sources Apps \
+    | grep -v '^Sources/MacUpCore/Uninstall/SystemLeftovers\.swift:' || true)
+if grep -nE 'CommandRunning|CommandRequest|runner|launchctl", *\[' Sources/MacUpCore/Uninstall/SystemLeftovers.swift; then
+    fail "SystemLeftovers.swift may only read /Library and describe manual steps; it must not run commands"
+fi
 if [[ -n "$daemons" ]]; then
     echo "$daemons" >&2
     fail "scheduling must stay a per-user LaunchAgent; MacUp installs no system daemon"
