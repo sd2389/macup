@@ -34,7 +34,14 @@ if [[ "$("$cli" --version)" != "$version" ]]; then
     echo "error: the CLI reports $("$cli" --version), not $version" >&2
     exit 1
 fi
-lipo "$cli" -verify_arch arm64 x86_64
+for binary in "$cli" build/MacUp.app/Contents/MacOS/MacUp build/MacUp.app/Contents/Helpers/macup; do
+    archs=" $(lipo -archs "$binary") "
+    if [[ "$archs" != *" arm64 "* || "$archs" != *" x86_64 "* ]]; then
+        echo "error: $binary is not universal (it has:$archs)" >&2
+        exit 1
+    fi
+done
+codesign --verify --deep --strict build/MacUp.app
 
 cp "$cli" LICENSE "$out/cli/"
 tar -C "$out/cli" -czf "$out/macup-$version-macos-universal.tar.gz" macup LICENSE
