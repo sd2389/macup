@@ -162,7 +162,7 @@ struct HistoryCommandTests {
             from: try JSONSerialization.data(withJSONObject: try #require(object["entries"]))
         )
         #expect(entries.count == 1)
-        #expect(entries[0].item.rawValue == "brew:git")
+        #expect(entries[0].subjectID == "brew:git")
         #expect(entries[0].schemaVersion == HistoryEntry.schemaVersion)
     }
 
@@ -332,7 +332,7 @@ struct HistoryCommandTests {
             [HistoryEntry].self,
             from: try JSONSerialization.data(withJSONObject: try #require(object["entries"]))
         )
-        #expect(entries.map(\.item.rawValue) == ["brew:mysql"])
+        #expect(entries.map(\.subjectID) == ["brew:mysql"])
         #expect(entries.first?.versionAfter == "9.7.1")
         #expect(entries.first?.stateAfter == "No version of mysql is linked, so its commands are not on your PATH.")
 

@@ -155,16 +155,10 @@ struct SelfUninstallPlanner: Sendable {
         }
         // The app goes last of all, after the state folder, so whatever else
         // fails, the app that can say so is still there.
-        plan.removals.sort { Self.order($0.role) < Self.order($1.role) }
+        plan.removals = [PlannedRemoval.Role.item, .macUpState, .bundle].flatMap { role in
+            plan.removals.filter { $0.role == role }
+        }
         plan.verification = [VerificationStep(summary: "Check that each item you ticked is gone and no scheduled check is left.")]
         return plan
-    }
-
-    static func order(_ role: PlannedRemoval.Role) -> Int {
-        switch role {
-        case .item: 0
-        case .macUpState: 1
-        case .bundle: 2
-        }
     }
 }

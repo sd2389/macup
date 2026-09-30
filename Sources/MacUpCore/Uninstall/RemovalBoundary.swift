@@ -114,13 +114,15 @@ public struct RemovalBoundary: Sendable, Hashable {
         if let folder = protectedChildrenOf.first(where: { $0 == path || $0 == parent }) {
             return "it is a top-level folder of \(PathDisplay.abbreviatingHome(folder, homeDirectory: homeDirectory)), which MacUp never removes"
         }
+        // MacUp's own command, by its exact path: `make install
+        // PREFIX=/usr/local` puts it inside Intel Homebrew's prefix.
+        if exactFiles.contains(path) { return nil }
         if let prefix = usableHomebrewPrefix, FileTree.isWithin(path, prefix) {
             let areas = [prefix + "/var", prefix + "/etc"]
             return areas.contains(where: { FileTree.isInside(path, $0) })
                 ? nil
                 : "it is part of Homebrew's own installation, which Homebrew removes itself"
         }
-        if exactFiles.contains(path) { return nil }
         if let prefix = systemPrefixes.first(where: { FileTree.isWithin(path, $0) }) {
             return "it is inside \(prefix), which MacUp never changes"
         }

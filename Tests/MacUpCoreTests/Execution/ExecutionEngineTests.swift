@@ -380,7 +380,7 @@ struct ExecutionEngineTests {
         #expect(update.plan.rollback.availability == .unavailable)
 
         let entry = try #require(try harness.history.load().first)
-        #expect(entry.item.rawValue == "brew:git")
+        #expect(entry.item?.rawValue == "brew:git")
         #expect(entry.origin == .cli)
         #expect(entry.outcome == .succeeded)
         #expect(entry.versionBefore == "2.50.0")
@@ -437,7 +437,7 @@ struct ExecutionEngineTests {
             ["upgrade", "--formula", "git"],
             ["install", "-g", "typescript"],
         ])
-        #expect(try harness.history.load().map(\.item.rawValue) == ["npm:typescript", "brew:git"])
+        #expect(try harness.history.load().map(\.subjectID) == ["npm:typescript", "brew:git"])
     }
 
     @Test("The same item is never updated twice in one run")
@@ -640,7 +640,7 @@ struct ExecutionEngineTests {
         #expect(report.skipped.map(\.item.rawValue) == ["npm:typescript"])
         #expect(!harness.runner.recordedRequests.contains { $0.executable.path.hasSuffix("/npm") })
 
-        let entry = try #require(try harness.history.load().first { $0.item.rawValue == "brew:git" })
+        let entry = try #require(try harness.history.load().first { $0.subjectID == "brew:git" })
         #expect(entry.outcome == .cancelled)
         #expect(entry.versionAfter == "2.50.0")
         #expect(entry.stateAfter == "No version of git is linked, so its commands are not on your PATH.")
@@ -855,7 +855,7 @@ struct ExecutionEngineTests {
         #expect(report.cancelled)
         #expect(report.skipped.map(\.item.rawValue) == ["npm:typescript"])
         #expect(!harness.runner.recordedRequests.contains { $0.executable.path.hasSuffix("/npm") })
-        let entry = try #require(try harness.history.load().first { $0.item.rawValue == "brew:git" })
+        let entry = try #require(try harness.history.load().first { $0.subjectID == "brew:git" })
         #expect(entry.outcome == .succeeded)
         #expect(entry.verification == .verified)
     }

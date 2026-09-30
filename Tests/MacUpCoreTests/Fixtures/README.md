@@ -15,3 +15,10 @@ them, so a change to `HistoryEntry` is tested against what is already on
 people's disks. `before-read-back.jsonl` predates the after-state MacUp now
 reads back after an unsuccessful attempt; its last line is a real entry from
 an upgrade that was stopped part-way, anonymized.
+
+`homebrew/info-installed-uninstall.json` is real `brew info --json=v2
+--installed` output (Homebrew 7.0.7), anonymized and cut down to what the
+uninstaller reads: three formulae, the `codex` and `redis-insight` casks with
+their app targets and `zap` lists exactly as Homebrew printed them, and one
+hand-written cask, `example-pkg`, shaped like a cask that installs through an
+installer package.

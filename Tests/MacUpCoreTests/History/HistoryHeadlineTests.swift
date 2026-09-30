@@ -106,7 +106,8 @@ struct HistoryHeadlineTests {
 
     @Test("Only a confirmed update gets the checkmark, and a deliberate stop is never shown as an error")
     func symbolsRepeatTheWords() {
-        for kind in HistoryHeadline.Kind.allCases {
+        // An uninstall has headlines of its own (UninstallHistoryTests).
+        for kind in HistoryHeadline.Kind.allCases where kind != .uninstalled {
             let headline = Self.cases.first { $0.kind == kind }!.entry.headline
             #expect((headline.symbolName == "checkmark.circle") == (kind == .confirmed))
             #expect((headline.tone == .good) == (kind == .confirmed))
@@ -181,7 +182,7 @@ struct HistoryHeadlineTests {
 
         // The stopped mysql upgrade that prompted all of this.
         let mysql = try #require(entries.last)
-        #expect(mysql.item.rawValue == "brew:mysql")
+        #expect(mysql.subjectID == "brew:mysql")
         #expect(mysql.headline.kind == .stopped)
         #expect(mysql.headline.symbolName == "stop.circle")
         #expect(mysql.versionSummary == "9.7.1 → 26.7.0_2")

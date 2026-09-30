@@ -1,0 +1,245 @@
+{
+  "casks": [
+    {
+      "artifacts": [
+        {
+          "binary": [
+            "bin/codex"
+          ],
+          "target": "/Users/example/.homebrew/bin/codex"
+        },
+        {
+          "generate_completions_from_executable": [
+            "bin/codex",
+            "completion",
+            {
+              "base_name": null,
+              "shell_parameter_format": null,
+              "shells": [
+                "bash",
+                "zsh",
+                "fish"
+              ]
+            }
+          ]
+        },
+        {
+          "zap": [
+            {
+              "rmdir": "~/.codex"
+            }
+          ]
+        }
+      ],
+      "auto_updates": null,
+      "deprecated": false,
+      "desc": "OpenAI's coding agent that runs in your terminal",
+      "disabled": false,
+      "full_token": "codex",
+      "homepage": "https://github.com/openai/codex",
+      "installed": "0.157.0",
+      "installed_time": 1790387725,
+      "name": [
+        "Codex"
+      ],
+      "outdated": false,
+      "pinned": false,
+      "pinned_version": null,
+      "tap": "homebrew/cask",
+      "token": "codex",
+      "version": "0.157.0"
+    },
+    {
+      "artifacts": [
+        {
+          "app": [
+            "Redis Insight.app"
+          ],
+          "target": "/Applications/Redis Insight.app"
+        },
+        {
+          "zap": [
+            {
+              "trash": [
+                "~/.redisinsight-app",
+                "~/Library/Application Support/com.apple.sharedfilelist/com.apple.LSSharedFileList.ApplicationRecentDocuments/org.redislabs.redisinsight-v3.sfl*",
+                "~/Library/Application Support/RedisInsight",
+                "~/Library/Caches/org.RedisLabs.RedisInsight-V3",
+                "~/Library/Caches/org.RedisLabs.RedisInsight-V3.ShipIt",
+                "~/Library/HTTPStorages/org.RedisLabs.RedisInsight-V3",
+                "~/Library/Logs/RedisInsight",
+                "~/Library/Preferences/org.RedisLabs.RedisInsight-V3.plist",
+                "~/Library/Saved Application State/org.RedisLabs.RedisInsight-V3.savedState"
+              ]
+            }
+          ]
+        }
+      ],
+      "auto_updates": true,
+      "deprecated": false,
+      "desc": "GUI for streamlined Redis application development",
+      "disabled": false,
+      "full_token": "redis-insight",
+      "homepage": "https://redis.io/insight/",
+      "installed": "3.6.0",
+      "installed_time": 1784249043,
+      "name": [
+        "Redis Insight"
+      ],
+      "outdated": false,
+      "pinned": false,
+      "pinned_version": null,
+      "tap": "homebrew/cask",
+      "token": "redis-insight",
+      "version": "3.8.0"
+    },
+    {
+      "artifacts": [
+        {
+          "uninstall": [
+            {
+              "pkgutil": "com.example.pkg",
+              "quit": "com.example.Pkg"
+            }
+          ]
+        },
+        {
+          "pkg": [
+            "ExamplePkg.pkg"
+          ]
+        },
+        {
+          "zap": [
+            {
+              "trash": [
+                "~/Library/Preferences/com.example.Pkg.plist"
+              ]
+            }
+          ]
+        }
+      ],
+      "auto_updates": null,
+      "deprecated": false,
+      "desc": "A cask that installs with a macOS installer package",
+      "disabled": false,
+      "full_token": "example-pkg",
+      "homepage": "https://example.com",
+      "installed": "2.0",
+      "installed_time": 1790000000,
+      "name": [
+        "Example Pkg"
+      ],
+      "outdated": false,
+      "pinned": false,
+      "pinned_version": null,
+      "tap": "homebrew/cask",
+      "token": "example-pkg",
+      "version": "2.0"
+    }
+  ],
+  "formulae": [
+    {
+      "deprecated": false,
+      "desc": "Powerful, lightweight programming language",
+      "disabled": false,
+      "full_name": "lua",
+      "homepage": "https://www.lua.org/",
+      "installed": [
+        {
+          "installed_on_request": false,
+          "version": "5.5.1"
+        }
+      ],
+      "keg_only": false,
+      "linked_keg": "5.5.1",
+      "name": "lua",
+      "pinned": false,
+      "service": null,
+      "tap": "homebrew/core",
+      "versions": {
+        "bottle": true,
+        "head": null,
+        "stable": "5.5.1"
+      }
+    },
+    {
+      "deprecated": false,
+      "desc": "Open source relational database management system",
+      "disabled": false,
+      "full_name": "mysql",
+      "homepage": "https://github.com/mysql/mysql-server",
+      "installed": [
+        {
+          "installed_on_request": true,
+          "version": "9.7.1"
+        },
+        {
+          "installed_on_request": false,
+          "version": "26.7.0_2"
+        }
+      ],
+      "keg_only": false,
+      "linked_keg": null,
+      "name": "mysql",
+      "pinned": false,
+      "service": {
+        "keep_alive": {
+          "always": true
+        },
+        "run": [
+          "/Users/example/.homebrew/opt/mysql/bin/mysqld_safe",
+          "--datadir=/Users/example/.homebrew/var/mysql"
+        ],
+        "run_type": "immediate",
+        "working_dir": "/Users/example/.homebrew/var/mysql"
+      },
+      "tap": "homebrew/core",
+      "versions": {
+        "bottle": true,
+        "head": null,
+        "stable": "26.7.0"
+      }
+    },
+    {
+      "deprecated": false,
+      "desc": "Object-relational database system",
+      "disabled": false,
+      "full_name": "postgresql@16",
+      "homepage": "https://www.postgresql.org/",
+      "installed": [
+        {
+          "installed_on_request": true,
+          "version": "16.15"
+        }
+      ],
+      "keg_only": true,
+      "linked_keg": null,
+      "name": "postgresql@16",
+      "pinned": false,
+      "service": {
+        "environment_variables": {
+          "LC_ALL": "en_US.UTF-8"
+        },
+        "error_log_path": "/Users/example/.homebrew/var/log/postgresql@16.log",
+        "keep_alive": {
+          "always": true
+        },
+        "log_path": "/Users/example/.homebrew/var/log/postgresql@16.log",
+        "run": [
+          "/Users/example/.homebrew/opt/postgresql@16/bin/postgres",
+          "-D",
+          "/Users/example/.homebrew/var/postgresql@16"
+        ],
+        "run_type": "immediate",
+        "stop_timeout": 120,
+        "working_dir": "/Users/example/.homebrew"
+      },
+      "tap": "homebrew/core",
+      "versions": {
+        "bottle": true,
+        "head": null,
+        "stable": "16.15"
+      }
+    }
+  ]
+}

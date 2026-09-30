@@ -87,8 +87,8 @@ struct HistoryStoreTests {
             try store.append(try entry(name, at: Self.moment.addingTimeInterval(Double(offset))))
         }
 
-        #expect(try store.load().map(\.item.rawValue) == ["npm:typescript", "brew:openssl", "brew:git"])
-        #expect(try store.load(limit: 2).map(\.item.rawValue) == ["npm:typescript", "brew:openssl"])
+        #expect(try store.load().map(\.subjectID) == ["npm:typescript", "brew:openssl", "brew:git"])
+        #expect(try store.load(limit: 2).map(\.subjectID) == ["npm:typescript", "brew:openssl"])
         #expect(try store.load(limit: 0).isEmpty)
     }
 
@@ -203,7 +203,7 @@ struct HistoryStoreTests {
         try text.write(to: store.fileURL, atomically: true, encoding: .utf8)
 
         let reading = try store.read()
-        #expect(reading.entries.map(\.item.rawValue) == ["brew:openssl", "brew:git"])
+        #expect(reading.entries.map(\.subjectID) == ["brew:openssl", "brew:git"])
         #expect(reading.unreadableLines == 2)
         let finding = try #require(reading.findings.first)
         #expect(finding.id == "history.unreadableEntries")
@@ -223,7 +223,7 @@ struct HistoryStoreTests {
 
         let entries = try store.load()
         #expect(entries.count == 4)
-        #expect(entries.map(\.item.name) == ["item8", "item7", "item6", "item5"])
+        #expect(entries.map(\.subjectName) == ["item8", "item7", "item6", "item5"])
         // Trimming replaces the file rather than appending to it, so the
         // permissions have to survive.
         var file = stat()
@@ -280,7 +280,7 @@ struct HistoryStoreTests {
         #expect(reading.entries.allSatisfy { $0.stateAfter == nil })
 
         let mysql = try #require(reading.entries.first)
-        #expect(mysql.item.rawValue == "brew:mysql")
+        #expect(mysql.subjectID == "brew:mysql")
         #expect(mysql.outcome == .cancelled)
         #expect(mysql.versionBefore == "9.7.1")
         #expect(mysql.versionTarget == "26.7.0_2")
@@ -312,7 +312,7 @@ struct HistoryStoreTests {
         let entries = try store.load(limit: 2, filter: HistoryFilter(items: [git]))
         #expect(entries.map(\.item) == [git, git])
         #expect(entries.map(\.timestamp) == [Self.moment.addingTimeInterval(2), Self.moment.addingTimeInterval(1)])
-        #expect(try store.load(limit: 2).allSatisfy { $0.item.rawValue == "brew:wget" }, "unfiltered, the newest win")
+        #expect(try store.load(limit: 2).allSatisfy { $0.subjectID == "brew:wget" }, "unfiltered, the newest win")
         #expect(try store.load(filter: HistoryFilter(search: "left alone")).count == 37)
     }
 
