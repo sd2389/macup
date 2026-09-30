@@ -100,3 +100,30 @@ The spec lists Settings in primary navigation; macOS convention (and the
 spec's "standard macOS conventions first") puts it in the Settings window
 (⌘,), reachable from the app menu and the menu bar. The sidebar holds
 Dashboard, Updates, Doctor, and History.
+
+## ADR-022 — A reviewed uninstaller, by the owner's decision
+The spec put uninstall and cleanup out of scope for v0.1. On 2026-09-29 the
+owner asked for an uninstaller that removes an app ("like ChatGPT, Claude or
+a game"), a package ("anything like python or npm"), or MacUp itself, with no
+residue. It ships with the trust rules intact:
+
+- Nothing is removed without a plan the person reviewed and confirmed, in
+  either surface. The plan names the package manager's exact commands
+  (`brew uninstall --formula --force`, `brew uninstall --cask`, `brew
+  services stop`, `npm uninstall -g`, `mise uninstall`) and every file with
+  its size. Never `--zap`, `--ignore-dependencies`, `autoremove`, `cleanup`,
+  or a configuration rewrite.
+- How files go is chosen for each uninstall, Move to Trash or Delete
+  Permanently, and starts at the Trash; there is no remembered answer. A
+  permanent deletion asks once more, saying it cannot be undone.
+- What clearly belongs to the item is ticked; data (app data, formula data
+  such as `var/mysql`) and anything matched only by name are not.
+- Only paths in the confirmed plan are removed, each checked again just
+  before removal (a symbolic link is removed as a link, never followed, and
+  nothing outside the allowed folders is touched). What needs an
+  administrator is listed with manual steps; MacUp never uses one.
+- An app that is open, a formula other formulae need, and a configuration
+  MacUp cannot read all stop an uninstall. Interactive only: nothing
+  scheduled or unattended can uninstall.
+- Every uninstall is recorded in History.
+

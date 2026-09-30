@@ -37,9 +37,11 @@ struct ConfigPathCommandTests {
     @Test("--help says plainly which commands change things and which only read")
     func helpIsHonestAboutWhatChanges() {
         let help = MacUpCommand.helpMessage()
-        #expect(help.contains("One command changes packages: `macup update`"))
-        #expect(help.contains("Everything else — including plain `macup` — only reads."))
-        for subcommand in ["plan", "update", "policy", "exclude", "doctor", "history"] {
+        let prose = unwrapped(MacUpCommand.self)
+        #expect(prose.contains("Two commands change what is installed: `macup update`, and `macup uninstall`"))
+        #expect(prose.contains("Each shows its plan first, asks before it changes anything, and records what happened."))
+        #expect(prose.contains("Everything else — including plain `macup` — only reads."))
+        for subcommand in ["plan", "update", "uninstall", "self-uninstall", "policy", "exclude", "doctor", "history"] {
             #expect(help.contains(subcommand))
         }
         #expect(unwrapped(CheckCommand.self).contains("without changing anything"))

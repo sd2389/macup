@@ -268,7 +268,8 @@ final class AppModelHarness {
         doctorChecks: [any DiagnosticCheck] = [],
         capability: BiometricCapability = .touchID,
         camera: FakeFaceCamera = FakeFaceCamera(),
-        loginShell: FakeLoginShell = FakeLoginShell()
+        loginShell: FakeLoginShell = FakeLoginShell(),
+        uninstall: UninstallEnvironment? = nil
     ) throws {
         home = try TemporaryDirectory(prefix: "macup-app-tests")
         authorizer = FakeBiometricAuthorizer(capability: capability)
@@ -311,7 +312,8 @@ final class AppModelHarness {
             // under the throwaway home, and nothing is found on the real one.
             processEnvironment: [:],
             system: SystemInfo(productVersion: "15.0", buildVersion: "24A335", architecture: "arm64"),
-            bundledExecutablePath: bundledExecutablePath
+            bundledExecutablePath: bundledExecutablePath,
+            uninstall: uninstall
         ))
     }
 

@@ -12,7 +12,7 @@ import Observation
 final class AppModel {
     /// Declared in sidebar order, which ⌘1…⌘6 follow.
     enum Section: Hashable, CaseIterable {
-        case dashboard, providers, updates, features, doctor, history
+        case dashboard, providers, updates, uninstall, features, doctor, history
     }
 
     var section: Section? = .dashboard
@@ -50,13 +50,15 @@ final class AppModel {
     let environment: AppEnvironment
     /// What depends on each item someone asked about (AppModel+Dependents.swift).
     let dependents = DependentsModel()
+    /// The Uninstall screen and its review sheet (AppModel+Uninstall.swift).
+    let uninstaller = UninstallState()
 
     init(environment: AppEnvironment = .live()) {
         self.environment = environment
     }
 
     private var home: String { environment.homeDirectory }
-    private var authorizer: any BiometricAuthorizing { environment.authorizer }
+    var authorizer: any BiometricAuthorizing { environment.authorizer }
 
     var updateCount: Int { report?.summary.updatesAvailable ?? 0 }
 
@@ -604,7 +606,7 @@ final class AppModel {
     /// camera can actually be used. `nil` otherwise, so the camera is never
     /// opened for someone who did not turn it on, and approval is not delayed
     /// by a shortcut that cannot answer.
-    private func faceUnlock(_ configuration: MacUpConfiguration, paths: MacUpPaths) -> FaceUnlockService? {
+    func faceUnlock(_ configuration: MacUpConfiguration, paths: MacUpPaths) -> FaceUnlockService? {
         guard configuration.security.faceUnlock, cameraReadiness.canUse else { return nil }
         return FaceUnlockService(
             store: faceStore(paths),
@@ -855,7 +857,7 @@ final class AppModel {
         return nil
     }
 
-    private func scheduler(paths: MacUpPaths, executable: String) -> Scheduler {
+    func scheduler(paths: MacUpPaths, executable: String) -> Scheduler {
         Scheduler(
             paths: paths,
             executable: executable,

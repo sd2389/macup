@@ -135,6 +135,19 @@ struct SettingsView: View {
                 Text("Automatic checks, approval, and face match are on the Features screen.")
                     .foregroundStyle(.secondary)
             }
+
+            Section {
+                Button("Uninstall MacUp…") {
+                    show(.uninstall)
+                    Task { await model.reviewSelfUninstall() }
+                }
+                .help("See everything MacUp put on this Mac before anything is removed.")
+            } header: {
+                Text("Uninstall MacUp")
+            } footer: {
+                Text("Removes the app, the macup command, MacUp's settings and history, its scheduled check, and its Keychain items, with nothing left behind. Nothing it manages for you is touched.")
+                    .leadingFooter()
+            }
         }
         .formStyle(.grouped)
         // Sized, not fixed: a fixed height clips the form at larger text

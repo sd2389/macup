@@ -71,6 +71,7 @@ extension AppModel.Section {
         case .dashboard: "Dashboard"
         case .providers: "Providers"
         case .updates: "Updates"
+        case .uninstall: "Uninstall"
         case .features: "Features"
         case .doctor: "Doctor"
         case .history: "History"

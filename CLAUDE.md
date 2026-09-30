@@ -111,7 +111,7 @@ Do not expand scope without completing and testing v0.1:
 - app-store update installation
 - pip/uv/cargo/gem providers
 - auto-fixing shell dotfiles
-- uninstall/cleanup functionality
+- uninstall/cleanup functionality (owner decision 2026-09-29: a reviewed, user-initiated uninstaller now ships — see docs/DECISIONS.md ADR-022; automatic cleanup stays out of scope)
 - system “optimizer” features
 - antivirus
 - background root daemon

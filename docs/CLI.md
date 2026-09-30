@@ -8,6 +8,12 @@ one item at a time, verifies each result, and records what happened. It never
 cleans, prunes, removes, or uninstalls, and it never upgrades an item it did
 not name.
 
+Exactly one command removes anything: **`macup uninstall`** (and **`macup
+self-uninstall`** for MacUp itself), and only what you named. It shows every
+file and command first, asks each time whether to move the files to the Trash
+or delete them permanently, asks you to confirm, and records what happened.
+Your data is left in place unless you add it. See [Uninstalling](#uninstalling).
+
 These commands write **MacUp's own configuration file** and no packages:
 `macup policy set`, `macup policy clear`, `macup policy skip|unskip|note`,
 `macup exclude`, `macup provider enable`, `macup provider disable`, `macup
@@ -671,3 +677,41 @@ the millisecond.
   `executablePath`, `executableExists`, `nextRun`, `logPath`, `warnings[]`,
   and `lastCheck` (`path`, `finishedAt`, `updatesAvailable`,
   `providersWithErrors`, `unreadable`) when a saved report exists.
+
+## Uninstalling
+
+| Command | What it does |
+| --- | --- |
+| `macup uninstall --list [--json]` | What can be uninstalled: apps (name, version, where it came from, and whether MacUp can remove it) and packages by provider, plus installs only you can remove. Reads only. |
+| `macup uninstall <target> --dry-run [--json]` | The plan: what the package manager will run, every file with its size and whether it is included, and what MacUp cannot remove with the steps to do it yourself. Removes nothing. |
+| `macup uninstall <target> [--mode trash\|delete] [--include <path>]… [--include-data] [--all] [--yes] [--json]` | Uninstalls. |
+| `macup self-uninstall [--dry-run] [--mode trash\|delete] [--yes] [--json]` | Removes MacUp itself: the app, every installed `macup`, its settings, history and state, its scheduled check, its Keychain items, and its files in `~/Library`. |
+
+A target is a package ID (`brew:mysql`, `brew-cask:firefox`, `npm:typescript`,
+`mise:node@22`), `app:<bundle-id>`, an app name, or an app's path.
+
+What is included by default:
+
+- **Ticked:** the app or package itself, and what clearly belongs to it —
+  caches, preferences, saved state, logs, web storage, launch agents, and
+  Homebrew's download caches for it.
+- **Left in place unless you add it:** your data — an app's Application
+  Support folder and container, a formula's `var` and `etc` folders (for
+  example `~/.homebrew/var/mysql`) — and anything matched only by name.
+  `--include-data` adds the data folders; `--include <path>` adds one listed
+  path; `--all` adds everything MacUp can remove, for no residue.
+- **Listed, never removed by MacUp:** anything that needs an administrator,
+  such as `/Library/LaunchDaemons` jobs or installer receipts, with the exact
+  steps. MacUp never asks for a password.
+
+At a terminal MacUp asks "Move to Trash or delete permanently?" every time
+(anything but `d` or `delete` is the Trash) and then asks you to confirm.
+Without a terminal, or with `--json`, `--mode` and `--yes` are required.
+MacUp refuses an app that is open, a formula other formulae depend on, and any
+uninstall while its configuration cannot be read.
+
+Exit status: 0 uninstalled; 1 MacUp would not uninstall it (the reason is
+printed); 4 it started but not everything was removed; 64 a usage problem,
+such as a target MacUp cannot find or `--include` naming a path the plan does
+not list; 77 approval refused; 130 stopped.
+

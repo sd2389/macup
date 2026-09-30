@@ -339,6 +339,33 @@ rather than by care:
   choice. The CLI's default is the current directory rather than the Desktop,
   which iCloud Drive may sync.
 
+## Uninstalling
+
+An uninstall is the one thing MacUp does that removes files, so it carries
+every rule an update carries and a few of its own (ADR-022):
+
+- **Reviewed and confirmed.** Nothing is removed without a plan the person saw
+  and confirmed; the package manager's commands are exact argument arrays
+  from the uninstall rules in `ModifyingCommandRules`, and never `--zap`,
+  `--ignore-dependencies`, `autoremove`, or `cleanup`.
+- **Trash first, chosen each time.** Move to Trash or Delete Permanently is
+  asked for every uninstall and starts at the Trash; a permanent deletion is
+  confirmed again with its count and size.
+- **Data is opt-in.** App data, formula data, and name-only matches are never
+  ticked for the person.
+- **Only planned paths, checked again.** The guarded remover removes only what
+  the confirmed plan lists, re-checks each path immediately before removing
+  it, removes a symbolic link as a link, and refuses anything outside the
+  allowed folders or at the top of one (the home folder, `~/Library`, a
+  top-level Library folder, the Trash, `/System`, `/usr`, `/bin`, `/sbin`).
+  `scripts/check-trust-invariants.sh` keeps removal calls in that one place.
+- **No administrator.** What needs one is listed with manual steps.
+- **Stops for the obvious reasons.** An open app, a formula others need, or an
+  unreadable configuration stops the uninstall; scheduled runs cannot
+  uninstall at all.
+- **Tests never touch real files.** Every uninstall test runs over a pretend
+  Mac in a temporary folder with a fake Trash.
+
 ## Privilege
 
 The main process runs as the user.

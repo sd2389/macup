@@ -131,10 +131,10 @@ struct AppModelUpdateListTests {
         #expect(harness.model.filterableProviders == [.homebrew, .npm, .mise])
     }
 
-    @Test("⌘1…⌘6 follow the sidebar's order, and ⌘F opens the Updates search")
+    @Test("⌘1…⌘7 follow the sidebar's order, and ⌘F opens the Updates search")
     func keyboard() async throws {
-        #expect(AppModel.Section.allCases == [.dashboard, .providers, .updates, .features, .doctor, .history])
-        #expect(AppModel.Section.allCases.map(\.title) == ["Dashboard", "Providers", "Updates", "Features", "Doctor", "History"])
+        #expect(AppModel.Section.allCases == [.dashboard, .providers, .updates, .uninstall, .features, .doctor, .history])
+        #expect(AppModel.Section.allCases.map(\.title) == ["Dashboard", "Providers", "Updates", "Uninstall", "Features", "Doctor", "History"])
 
         let harness = try await checked()
         let model = harness.model

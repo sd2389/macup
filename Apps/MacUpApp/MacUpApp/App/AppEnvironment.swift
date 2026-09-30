@@ -126,6 +126,10 @@ struct AppEnvironment {
     /// needed rather than remembered, so a bundle rebuilt underneath the
     /// running app is not reported wrongly.
     var bundledExecutablePath: String?
+    /// The Mac the Uninstall screen looks at and removes from. `nil` means
+    /// this one; a test gives a pretend Mac in a temporary folder with a fake
+    /// Trash, so no test ever removes a real file.
+    var uninstall: UninstallEnvironment? = nil
 
     static func live() -> AppEnvironment {
         let runner = ProcessCommandRunner()

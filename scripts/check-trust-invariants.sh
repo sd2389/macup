@@ -38,9 +38,10 @@ fi
 # The uninstall plan files are the same kind of file as the update plan files:
 # each provider's one reviewed place for the commands an uninstall runs.
 planning_files='^Sources/MacUpCore/Execution/ModifyingCommandRules\.swift:|^Sources/MacUpCore/Providers/(Homebrew/Homebrew|Npm/Npm|Mise/Mise)(Update|Uninstall)Plan\.swift:'
-# Two uses of the word that are not commands: the uninstall report's document
-# kind, and the words History search matches for an uninstall entry.
-not_commands='^Sources/MacUpCore/Uninstall/UninstallEngine\.swift:[0-9]+:.*kind|^Sources/MacUpCore/History/HistoryFilter\.swift:[0-9]+:.*fields \+='
+# Uses of the word that are not commands: the uninstall report's document
+# kind, the words History search matches for an uninstall entry, and the name
+# of MacUp's own `macup uninstall` command.
+not_commands='^Sources/MacUpCore/Uninstall/UninstallEngine\.swift:[0-9]+:.*kind|^Sources/MacUpCore/History/HistoryFilter\.swift:[0-9]+:.*fields \+=|^Sources/macup/Commands/UninstallCommand\.swift:[0-9]+: *commandName: "uninstall",$'
 verbs=$(grep -rnE '"(upgrade|install|reinstall|uninstall|remove|rm|cleanup|autoremove|prune|self-update|use|--install|--download|--bump|--all)"' Sources Apps \
     | grep -vE "$planning_files" | grep -vE "$not_commands" || true)
 if [[ -n "$verbs" ]]; then

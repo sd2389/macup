@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-/// The keyboard's way around MacUp: ⌘1 to ⌘6 open the sidebar's sections in
+/// The keyboard's way around MacUp: ⌘1 to ⌘7 open the sidebar's sections in
 /// the order the sidebar lists them, from the View menu, and ⌘F searches the
 /// Updates list. Each brings the main window forward, so they also work when
 /// only the menu bar extra is showing.

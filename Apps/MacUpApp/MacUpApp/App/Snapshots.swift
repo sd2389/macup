@@ -58,6 +58,7 @@ enum Snapshots {
             await captureFilteredUpdates(model: model, main: main, into: directory, suffix: suffix)
             await captureDependents(model: model, main: main, into: directory, suffix: suffix)
             await captureSheets(model: model, main: main, into: directory, suffix: suffix)
+            await captureUninstall(model: model, main: main, into: directory, suffix: suffix)
         }
         openSettings()
         try? await Task.sleep(for: .milliseconds(1200))
@@ -141,6 +142,29 @@ enum Snapshots {
         try? await Task.sleep(for: .milliseconds(900))
         if let sheet = main?.attachedSheet { write(sheet, to: directory, named: "command-\(suffix).png") }
         model.dismissCommand()
+        try? await Task.sleep(for: .milliseconds(500))
+    }
+
+    /// The Uninstall screen and one review sheet, from a real scan and plan.
+    /// Both only read. Nothing here presses Uninstall, and nothing here ever
+    /// will: a snapshot run must be as safe to start as `macup check`.
+    @MainActor
+    private static func captureUninstall(
+        model: AppModel,
+        main: NSWindow?,
+        into directory: PrivateDirectory,
+        suffix: String
+    ) async {
+        model.section = .uninstall
+        await model.scanUninstallable()
+        try? await Task.sleep(for: .milliseconds(900))
+        if let main { write(main, to: directory, named: "uninstall-\(suffix).png") }
+        let apps = model.uninstaller.catalog?.apps.filter(\.removability.isRemovable) ?? []
+        guard let app = apps.first(where: { $0.name == "ChatGPT" }) ?? apps.first else { return }
+        await model.reviewUninstall(.app(app))
+        try? await Task.sleep(for: .milliseconds(900))
+        if let sheet = main?.attachedSheet { write(sheet, to: directory, named: "uninstall-review-\(suffix).png") }
+        model.endUninstallReview()
         try? await Task.sleep(for: .milliseconds(500))
     }
 

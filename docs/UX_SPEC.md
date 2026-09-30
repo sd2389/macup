@@ -15,9 +15,9 @@ Do not use:
 
 ### Navigation
 
-Sidebar order: Dashboard, Providers, Updates, Features, Doctor, History, with
-Settings at the foot.
-⌘1 to ⌘6 open them in that order, from the View menu. ⌘F searches the Updates
+Sidebar order: Dashboard, Providers, Updates, Uninstall, Features, Doctor,
+History, with Settings at the foot.
+⌘1 to ⌘7 open them in that order, from the View menu. ⌘F searches the Updates
 list.
 
 ### Dashboard
@@ -90,6 +90,34 @@ npm → Node 24.19.0 → mise
 
 [Update] [Policy ▾] [Details]
 ```
+
+### Uninstall
+
+Apps (icon, name, version, where it came from) and packages by provider,
+with search, and installs only the user can remove with their steps. Each row
+has Uninstall…, which opens the review sheet:
+
+```text
+Uninstall ChatGPT
+Nothing is removed until you confirm. What belongs to it is ticked; your data is not.
+
+[ Move to Trash | Delete Permanently ]          ← first, and Trash every time
+Everything goes to the Trash, so you can put it back until you empty it.
+
+[Select Everything] [Only What Belongs to It]
+The app               [■] /Applications/ChatGPT.app      1.45 GB · always removed
+Belongs to the app    [■] ~/Library/Caches/com.openai…   5.2 MB
+App data              [ ] ~/Library/Application Support/…   (your chats, saved games, settings)
+MacUp cannot remove   ~/Library/Group Containers/…  1. In Finder, move it to the Trash…
+
+6 items, 1.47 GB · 1 left in place                      [Cancel] [Uninstall…]
+```
+
+Uninstall… asks once more; for Delete Permanently the question says it cannot
+be undone and gives the count and size. Then progress (with Stop After This
+File) and the result: what was moved or deleted, what was left in place, and
+what was checked afterwards. Settings has Uninstall MacUp…, which opens the
+same sheet for MacUp itself and ends with Quit MacUp.
 
 ### Details
 

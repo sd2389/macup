@@ -13,6 +13,18 @@ claim that 0.4.0 has been released.
 ## [0.4.0] — unreleased
 
 ### Added
+- **Uninstall apps and packages with nothing left behind**: a new Uninstall
+  screen (after Updates) and `macup uninstall`, for apps like ChatGPT or a
+  game, Homebrew formulae and casks, npm global packages, and mise runtimes
+  such as Python or Node — through the package manager's own uninstall, then
+  the files it left in `~/Library`. Each uninstall starts with a review: a
+  Move to Trash / Delete Permanently switch at the top (Trash every time),
+  what the package manager will run, every file with its size, what clearly
+  belongs to it ticked and your data (chats, saved games, databases) not,
+  Select Everything for no residue, and what only you can remove with the
+  steps. An open app, a formula others need, and anything needing an
+  administrator are never touched. `macup self-uninstall` and Settings >
+  Uninstall MacUp remove MacUp itself. Every uninstall is in History.
 - **History that says what happened**: one plain headline per attempt
   ("Stopped before the update finished", "Updated and confirmed"), labelled
   facts ("via Homebrew · started from the MacUp app · ran for 1 minute, 35
