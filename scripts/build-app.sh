@@ -66,6 +66,9 @@ if [[ -n "$identity" ]]; then
     codesign --force --sign "$identity" --identifier dev.macup.MacUp "$app"
     echo "Signed with identity $identity." >&2
 else
+    # The helper first here too: the linker signs an Apple silicon binary on
+    # its own, but not the Intel half of a universal one.
+    codesign --force --sign - --identifier dev.macup.cli "$app/Contents/Helpers/macup"
     codesign --force --sign - --identifier dev.macup.MacUp "$app"
     echo "Signed ad-hoc: no Apple Development or Developer ID certificate on this Mac, so face match stays off." >&2
 fi
