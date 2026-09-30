@@ -45,7 +45,7 @@ codesign --verify --deep --strict build/MacUp.app
 
 cp "$cli" LICENSE "$out/cli/"
 tar -C "$out/cli" -czf "$out/macup-$version-macos-universal.tar.gz" macup LICENSE
-ditto -c -k --sequesterRsrc --keepParent build/MacUp.app "$out/MacUp-$version-macos-universal.zip"
+ditto -c -k --norsrc --noextattr --noacl --keepParent build/MacUp.app "$out/MacUp-$version-macos-universal.zip"
 rm -rf "$out/cli"
 
 (cd "$out" && shasum -a 256 ./*.tar.gz ./*.zip | sed 's| \./| |' > SHA256SUMS)
