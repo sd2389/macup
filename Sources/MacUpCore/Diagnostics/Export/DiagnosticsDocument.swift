@@ -274,7 +274,7 @@ public struct DiagnosticsDocument: Sendable, Hashable, Codable {
             }
         }
         for entry in snapshot.history?.entries ?? [] {
-            add(entry.item)
+            if let item = entry.item { add(item) }
         }
         for key in snapshot.configuration.configuration.items.keys.sorted() {
             if let id = try? PackageID(parsing: key) {
@@ -354,7 +354,9 @@ public struct DiagnosticsDocument: Sendable, Hashable, Codable {
             HistoryItem(
                 timestamp: entry.timestamp,
                 origin: entry.origin,
-                item: scrub.item(entry.item),
+                // An app or MacUp itself has no package ID; which app it
+                // was is as identifying as a package name, so it is not said.
+                item: entry.item.map(scrub.item) ?? (entry.uninstall?.kind == .macUp ? "macup" : "app"),
                 versionBefore: scrub.text(entry.versionBefore),
                 versionTarget: scrub.text(entry.versionTarget),
                 versionAfter: scrub.text(entry.versionAfter),

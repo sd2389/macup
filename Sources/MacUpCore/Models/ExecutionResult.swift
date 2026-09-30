@@ -116,7 +116,10 @@ public struct HistoryEntry: Sendable, Hashable, Codable, Identifiable {
     public var id: UUID
     public var timestamp: Date
     public var origin: ExecutionOrigin
-    public var item: PackageID
+    /// The package the entry is about. `nil` only for an uninstall of an app
+    /// no package manager owns, or of MacUp itself, which ``uninstall``
+    /// names instead.
+    public var item: PackageID?
     public var versionBefore: String?
     public var versionTarget: String?
     /// The version MacUp read back afterwards. Recorded after a success, and
@@ -135,12 +138,14 @@ public struct HistoryEntry: Sendable, Hashable, Codable, Identifiable {
     public var errorSummary: String?
     public var skipReason: String?
     public var durationSeconds: Double?
+    /// What an uninstall removed, kept, and skipped. `nil` for an update.
+    public var uninstall: UninstallRecord?
 
     public init(
         id: UUID = UUID(),
         timestamp: Date,
         origin: ExecutionOrigin,
-        item: PackageID,
+        item: PackageID?,
         versionBefore: String?,
         versionTarget: String?,
         versionAfter: String?,
@@ -169,5 +174,13 @@ public struct HistoryEntry: Sendable, Hashable, Codable, Identifiable {
         self.durationSeconds = durationSeconds
     }
 
-    public var provider: ProviderID { item.provider }
+    /// The provider of the package, when there is one.
+    public var provider: ProviderID? { item?.provider }
+
+    /// What the entry is about, as the command line names it: `brew:mysql`,
+    /// `app:com.openai.chat`, `mise:node@22.1.0`, or `macup`.
+    public var subjectID: String { uninstall?.target ?? item?.rawValue ?? "unknown" }
+
+    /// What the entry is about, as a person names it.
+    public var subjectName: String { uninstall?.name ?? item?.name ?? subjectID }
 }

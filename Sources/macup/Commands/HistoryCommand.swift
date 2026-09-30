@@ -114,7 +114,7 @@ struct HistoryRenderer {
 
     private func block(_ entry: HistoryEntry) -> [String] {
         let headline = entry.headline
-        var lines = [style.dim(Self.timestamp(entry.timestamp)) + "  " + style.bold(style.safe(entry.item.rawValue))]
+        var lines = [style.dim(Self.timestamp(entry.timestamp)) + "  " + style.bold(style.safe(entry.subjectID))]
         lines.append("  " + style.tone(headline.tone, style.safe(headline.text)))
         lines.append("  " + style.safe(entry.versionSummary))
         if let state = entry.stateAfter {

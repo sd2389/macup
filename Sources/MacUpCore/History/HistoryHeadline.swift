@@ -31,6 +31,8 @@ public struct HistoryHeadline: Sendable, Hashable {
         case stopped
         /// MacUp decided not to run it, for the reason recorded with it.
         case leftAlone
+        /// An uninstall finished, and MacUp confirmed everything ticked is gone.
+        case uninstalled
     }
 
     /// How the headline reads at a glance. The words always carry the
@@ -48,7 +50,12 @@ public struct HistoryHeadline: Sendable, Hashable {
     public var text: String
 
     public init(_ entry: HistoryEntry) {
-        let name = entry.item.name
+        if let record = entry.uninstall {
+            let (kind, text) = Self.uninstall(entry, record)
+            self.init(kind, text)
+            return
+        }
+        let name = entry.subjectName
         switch entry.outcome {
         case .skipped:
             self.init(.leftAlone, "Left alone")
@@ -92,7 +99,7 @@ public struct HistoryHeadline: Sendable, Hashable {
 
     public var tone: Tone {
         switch kind {
-        case .confirmed: .good
+        case .confirmed, .uninstalled: .good
         case .unconfirmed, .targetNotReached: .caution
         case .failed, .timedOut: .problem
         case .stopped, .leftAlone: .neutral
@@ -110,6 +117,7 @@ public struct HistoryHeadline: Sendable, Hashable {
         case .timedOut: "clock.badge.exclamationmark"
         case .stopped: "stop.circle"
         case .leftAlone: "minus.circle"
+        case .uninstalled: "trash.circle"
         }
     }
 
@@ -118,9 +126,9 @@ public struct HistoryHeadline: Sendable, Hashable {
     private static func missedTarget(_ entry: HistoryEntry) -> String {
         if let before = entry.versionBefore, let after = entry.versionAfter,
            before == after || VersionComparator.compare(before, after) == .orderedSame {
-            return "\(entry.item.name) was not updated"
+            return "\(entry.subjectName) was not updated"
         }
-        return "\(entry.item.name) is not at the new version"
+        return "\(entry.subjectName) is not at the new version"
     }
 
     /// What can be said about an attempt that did not succeed when MacUp read
@@ -143,6 +151,7 @@ extension HistoryEntry {
     /// afterwards. Versions come from provider output, so the text is made
     /// display-safe where it is shown.
     public var versionSummary: String {
+        if uninstall != nil { return "\(versionBefore ?? "unknown version") → removed" }
         let versions = "\(versionBefore ?? "unknown") → \(versionTarget ?? "unknown")"
         guard let versionAfter else { return versions }
         return versions + " · now \(versionAfter)"
@@ -153,12 +162,14 @@ extension HistoryEntry {
     /// because "Homebrew · MacUp app · 94.9 s" on its own reads like a list of
     /// things that were updated.
     public var circumstances: [String] {
+        // An app or MacUp itself is removed by MacUp, not by a provider.
+        let by = provider.map { "via \($0.displayName)" } ?? "by MacUp"
         guard outcome != .skipped else {
             // Nothing ran for a skip, so nothing was started and nothing took
             // any time; the run it was part of still came from somewhere.
-            return ["via \(provider.displayName)", origin.phrase]
+            return [by, origin.phrase]
         }
-        var facts = ["via \(provider.displayName)", "started " + origin.phrase]
+        var facts = [by, "started " + origin.phrase]
         if let durationSeconds {
             facts.append("ran for " + Self.describe(duration: durationSeconds))
         }

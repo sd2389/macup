@@ -139,7 +139,7 @@ struct UpdateCommandTests {
 
         _ = try await harness.run(["update", "brew:git", "--yes"])
         let entries = try harness.historyStore.load()
-        let attempt = try #require(entries.first { $0.item.rawValue == "brew:git" })
+        let attempt = try #require(entries.first { $0.subjectID == "brew:git" })
         #expect(attempt.outcome == .succeeded)
         #expect(attempt.verification == .verified)
         #expect(attempt.versionBefore == "2.43.0")
@@ -278,7 +278,7 @@ struct UpdateCommandTests {
         #expect(run.standardOutput.contains("0 of 1 item updated · 1 failed"))
 
         let entries = try harness.historyStore.load()
-        #expect(entries.contains { $0.item.rawValue == "brew:git" && $0.outcome == .failed })
+        #expect(entries.contains { $0.subjectID == "brew:git" && $0.outcome == .failed })
     }
 
     @Test("An update MacUp cannot confirm is not reported as done")

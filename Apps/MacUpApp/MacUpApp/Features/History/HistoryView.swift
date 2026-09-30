@@ -127,8 +127,8 @@ private struct HistoryRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(entry.item.name.displaySafe).fontWeight(.semibold)
-                Text(entry.item.rawValue.displaySafe)
+                Text(entry.subjectName.displaySafe).fontWeight(.semibold)
+                Text(entry.subjectID.displaySafe)
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -192,7 +192,7 @@ private struct HistoryRow: View {
     private var summary: String {
         var versions = "From \(entry.versionBefore ?? "an unknown version") to \(entry.versionTarget ?? "an unknown version")"
         if let after = entry.versionAfter { versions += ", now \(after)" }
-        var parts = ["\(entry.item.name), \(entry.item.rawValue), \(timestamp)", entry.headline.text, versions]
+        var parts = ["\(entry.subjectName), \(entry.subjectID), \(timestamp)", entry.headline.text, versions]
         if let state = entry.stateAfter { parts.append(state) }
         if let reason = entry.skipReason { parts.append(reason) }
         parts.append(entry.circumstances.joined(separator: ", "))

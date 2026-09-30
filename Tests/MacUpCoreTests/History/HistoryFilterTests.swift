@@ -33,7 +33,7 @@ struct HistoryFilterTests {
     ]
 
     private func names(_ filter: HistoryFilter) -> [String] {
-        Self.entries.filter(filter.includes).map(\.item.name)
+        Self.entries.filter(filter.includes).map(\.subjectName)
     }
 
     @Test("An empty filter lets everything through")

@@ -16,8 +16,10 @@ import Foundation
 /// instead of a convention, and it fails closed on anything unexpected.
 public struct ExecutionGuard: CommandRunning {
     public var base: any CommandRunning
-    /// The plan being executed. Nothing outside it runs.
-    public var plan: ExecutionPlan
+    /// The steps of the plan being executed. Nothing outside them runs.
+    public var steps: [ExecutionStep]
+    /// The plan's read-only verification commands.
+    public var verification: [VerificationStep]
     /// Shapes a modifying command may take at all. An empty list means MacUp
     /// may run nothing modifying, which is the right answer for a provider
     /// whose commands have not been reviewed yet.
@@ -37,8 +39,27 @@ public struct ExecutionGuard: CommandRunning {
         modifyingRules: [ModifyingCommandRule] = ModifyingCommandRules.all,
         readOnlyRules: [CommandRule] = []
     ) {
+        self.init(
+            base: base,
+            steps: plan.steps,
+            verification: plan.verification,
+            modifyingRules: modifyingRules,
+            readOnlyRules: readOnlyRules
+        )
+    }
+
+    /// The same guard for a plan that is not an update: an uninstall's steps
+    /// and verification, checked against the rules that plan may use.
+    public init(
+        base: any CommandRunning,
+        steps: [ExecutionStep],
+        verification: [VerificationStep],
+        modifyingRules: [ModifyingCommandRule],
+        readOnlyRules: [CommandRule] = []
+    ) {
         self.base = base
-        self.plan = plan
+        self.steps = steps
+        self.verification = verification
         self.modifyingRules = modifyingRules
         self.readOnlyRules = readOnlyRules
     }
@@ -79,13 +100,13 @@ public struct ExecutionGuard: CommandRunning {
     /// round. Either would make the plan the user read a poor description of
     /// what happened.
     private func declaresStep(_ request: CommandRequest) -> Bool {
-        plan.steps.contains { $0.invocation == request.invocation && $0.effect == request.effect }
+        steps.contains { $0.invocation == request.invocation && $0.effect == request.effect }
     }
 
     /// Verification commands are read-only by definition, so they are only
     /// ever matched for a read-only request.
     private func declaresVerification(_ request: CommandRequest) -> Bool {
-        plan.verification.contains { $0.invocation == request.invocation }
+        verification.contains { $0.invocation == request.invocation }
     }
 
     private func matchesReadOnlyRule(_ request: CommandRequest) -> Bool {
