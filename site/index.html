@@ -30,7 +30,7 @@
   <div class="wrap">
     <div class="reveal">
       <h1>Understand your Mac development environment.</h1>
-      <p>Homebrew, npm globals, mise, and macOS. MacUp tells you what is outdated, who owns it, and what it would run.</p>
+      <p>Homebrew, npm globals, mise, and macOS. MacUp tells you what is outdated, who owns it, and exactly what it would run, then updates only what you approve.</p>
       <div class="hero__actions">
         <a class="button button--primary" href="#install">Install</a>
         <a class="button button--quiet" href="https://github.com/sd2389/macup">Read the source</a>
@@ -50,8 +50,8 @@
 <section class="promise">
   <div class="wrap">
     <div>
-      <strong>It reports</strong>
-      <p>This version installs, upgrades, and removes nothing. Running a check cannot change a package.</p>
+      <strong>It asks first</strong>
+      <p>A check only reads. An update or an uninstall starts as a plan you review, and nothing changes until you confirm it.</p>
     </div>
     <div>
       <strong>It shows the command</strong>
@@ -149,7 +149,7 @@ macOS 27.0 <span class="quiet">·</span> /usr/sbin/softwareupdate
     <ul>
       <li><strong>Build a command out of text.</strong> Every process is an executable path and an argument array. Nothing is handed to a shell.</li>
       <li><strong>Run as root.</strong> No privileged daemon, no helper tool, no hidden authorization.</li>
-      <li><strong>Clean up after itself.</strong> No automatic cleanup, prune, or uninstall. Reclaiming disk space is your decision.</li>
+      <li><strong>Delete behind your back.</strong> No automatic cleanup or prune. Uninstalling happens only when you ask, and goes to the Trash unless you choose otherwise.</li>
       <li><strong>Guess.</strong> When MacUp cannot tell who owns an item or what command would be correct, it skips it and says why.</li>
       <li><strong>Phone home.</strong> No account, no analytics endpoint, no remote kill switch, no remote execution.</li>
       <li><strong>Claim a rollback it does not have.</strong> Recovery is reported per provider, honestly, including when the answer is unknown.</li>
@@ -160,12 +160,13 @@ macOS 27.0 <span class="quiet">·</span> /usr/sbin/softwareupdate
 <section class="install" id="install">
   <div class="wrap">
     <h2>Install it</h2>
-    <p>Needs macOS 14 or later and the Xcode Command Line Tools. The formula builds from source.</p>
+    <p>Needs macOS 14 or later, on Apple silicon or Intel. Download the app from GitHub Releases, or install the command-line tool with Homebrew, which builds it from source with the Xcode Command Line Tools.</p>
     <div class="copyline">
       <span>$</span><code>brew install sd2389/macup/macup</code>
     </div>
     <div class="hero__actions">
-      <a class="button button--primary" href="https://github.com/sd2389/macup">Read the source</a>
+      <a class="button button--primary" href="https://github.com/sd2389/macup/releases/latest">Download the app</a>
+      <a class="button button--quiet" href="https://github.com/sd2389/macup">Read the source</a>
       <a class="button button--quiet" href="https://github.com/sd2389/macup/blob/main/docs/CLI.md">CLI reference</a>
     </div>
   </div>

@@ -1,295 +1,315 @@
+<div align="center">
+
+<img src="site/logo.svg" width="96" height="96" alt="MacUp logo">
+
 # MacUp
 
-MacUp is a local-first, open-source macOS developer-environment manager.
+**One place to understand, update, and maintain your Mac development environment.**
 
-Its job is to help a user **understand, review, update, and maintain** the package managers, runtimes, CLI tools, and developer applications on their Mac without blindly changing the machine.
+Homebrew, npm, mise, and macOS updates in one native app and one command-line tool,
+with the exact command shown before anything runs.
 
-> One place to understand, update, and maintain your Mac development environment.
+[![CI](https://github.com/sd2389/macup/actions/workflows/ci.yml/badge.svg)](https://github.com/sd2389/macup/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/sd2389/macup?include_prereleases&sort=semver&label=release)](https://github.com/sd2389/macup/releases)
+[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
+[![macOS 14+](https://img.shields.io/badge/macOS-14%2B-black?logo=apple)](#install)
+[![Swift 6](https://img.shields.io/badge/Swift-6-F05138?logo=swift&logoColor=white)](Package.swift)
 
-MacUp is **conservative with changes and aggressive with information**. It is not a new package manager: it orchestrates Homebrew, npm, mise, and macOS software update, adds policy, planning, and diagnostics on top, and never silently changes something the user did not authorize.
+[Install](#install) · [Features](#features) · [Command line](#command-line) · [Why trust it](#built-to-be-trusted) · [Docs](#documentation)
 
-## Status
+<br>
 
-Early development. v0.1.0 is the only tagged release; everything below marked
-done is in `main` and covered by tests. The build reports 0.4.0, which is the
-version of the code rather than of a release.
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="site/screenshots/dashboard-dark.png">
+  <img src="site/screenshots/dashboard-light.png" width="860" alt="The MacUp dashboard: five updates awaiting review, four needing confirmation, one ignored by the user's rules">
+</picture>
 
-MacUp can now plan and perform **per-item** updates for Homebrew, npm, and
-mise — one named package at a time, from a plan you read first, with the
-policy re-checked immediately before the command runs and the result recorded
-in history.
+</div>
 
-| Phase | Scope | State |
-| --- | --- | --- |
-| 0 | Package, command runner, config paths, CI | done |
-| 1 | Read-only engine: Homebrew, npm, mise, macOS; `macup check` | done |
-| 2 | Policies, planning, dry run, exact command review | done |
-| 3 | Per-item updates, verification, history, cancellation | done |
-| 4 | Doctor: eleven deterministic diagnostics | done |
-| 5a | Desktop app: dashboard, updates, doctor, history, settings, menu bar | done |
-| 6a | Scheduled read-only checks | done |
-| 5b | Xcode project, asset catalog, SwiftUI previews | waiting on Xcode |
-| 6b | Scheduled *updating* (explicit-auto only) and notifications | not started |
-| 7 | Release hardening: signing, notarization, packaging, beta | not started |
+## Why MacUp
 
-### What MacUp still will not do
+A developer's Mac is kept up to date by half a dozen tools that don't know about
+each other. `brew upgrade` upgrades everything at once. A global npm package is
+tied to whichever Node is active. A runtime bump can quietly rewrite a project's
+config. MacUp doesn't replace any of these tools. It sits on top of the ones you
+already have and gives you one careful place to manage them:
 
-Being exact about this is the point of the project, so it gets its own list.
+- **See everything in one check.** Homebrew formulae and casks, global npm
+  packages, mise runtimes, and macOS software updates. For each item it shows
+  who manages it, what changes, and how risky the change is.
+- **Change only what you approve.** Every update starts as a plan showing the
+  exact executable and arguments. Nothing runs until you confirm it, and your
+  rules are read again right before each command.
+- **Uninstall without leftovers.** Remove apps and packages along with the
+  files they leave in `~/Library`. Items go to the Trash by default, and your
+  data stays unticked unless you tick it.
+- **Stay local.** No account, no cloud, no telemetry, and no background daemon.
+  MacUp never runs as root and never asks for your password.
 
-- **Apply a macOS update.** MacUp reports them. Installing one needs an
-  administrator and usually a restart; MacUp holds no password and restarts
-  nothing.
-- **Roll back.** No provider action has a tested rollback strategy, so every
-  plan reports rollback as unavailable rather than promising one.
-- **Update on a schedule.** A scheduled check is read-only. Scheduled
-  updating does not exist yet.
-- **Notify you.** Not yet; it needs the app bundle.
-- **Run `brew cleanup`, `mise prune`, or anything else that deletes.** After
-  an upgrade the version you were on is still installed.
-- **Unpin something you pinned** in Homebrew.
-- **Upgrade everything with one command.** Every command names one item,
-  because an upgrade that names nothing walks past every exclusion.
-- **Use `sudo`, or ask you for a password.** Where a change genuinely needs
-  one, the plan says so and the provider does the asking.
+## Features
 
-## Command-line tool
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <h3>Review every update</h3>
+      Updates are grouped by provider, with current → available versions, a risk
+      level with its reasons, and the rule that decides each one. You can search,
+      filter, sort, skip a version, or add a note.
+    </td>
+    <td width="50%" valign="top">
+      <h3>Approve before anything runs</h3>
+      A review sheet lists what will change, what needs your confirmation, and
+      what will be left alone and why. The exact commands are one click away.
+    </td>
+  </tr>
+  <tr>
+    <td>
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="site/screenshots/updates-dark.png">
+        <img src="site/screenshots/updates-light.png" alt="The Updates screen with per-item risk, policy, and version changes">
+      </picture>
+    </td>
+    <td>
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="site/screenshots/review-dark.png">
+        <img src="site/screenshots/review-light.png" alt="The review sheet: items needing confirmation, and items MacUp will not change with the reason">
+      </picture>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <h3>Uninstall cleanly</h3>
+      Apps, Homebrew formulae and casks, npm packages, and mise runtimes, plus
+      their caches, preferences, and launch agents. You choose between the Trash
+      and permanent deletion every time, and nothing you leave unticked is touched.
+    </td>
+    <td width="50%" valign="top">
+      <h3>Doctor explains your setup</h3>
+      Deterministic checks for the things that make a Mac behave oddly:
+      duplicate Homebrew installs, <code>PATH</code> differences between the app
+      and your shell, npm tied to a mise-managed Node, and unfinished installs.
+      Each finding comes with safe steps you can follow yourself.
+    </td>
+  </tr>
+  <tr>
+    <td>
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="site/screenshots/uninstall-review-dark.png">
+        <img src="site/screenshots/uninstall-review-light.png" alt="Uninstalling an app: Move to Trash or Delete Permanently, with every leftover listed and sized">
+      </picture>
+    </td>
+    <td>
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="site/screenshots/doctor-dark.png">
+        <img src="site/screenshots/doctor-light.png" alt="Doctor findings with the reason for each one and repair steps in the right order">
+      </picture>
+    </td>
+  </tr>
+</table>
 
-Install with Homebrew (needs macOS 14+ and the Xcode Command Line Tools:
-`xcode-select --install`; the formula builds MacUp from source):
+**Also included:**
+
+- **History of every attempt.** Each entry has a one-line headline, the
+  versions before, targeted, and after, the command that ran, and why anything
+  was skipped.
+- **Policies** per item, per provider, and globally: Auto Update, Ask First,
+  Ignore, and Pin.
+- **Scheduled checks** through a launchd user agent. They only read, and you
+  can remove them with one switch.
+- **Menu bar** list of pending updates.
+- **Touch ID confirmation** before MacUp changes anything, if you want it.
+- **Export Diagnostics:** a redacted file for bug reports, with package names
+  replaced by placeholders.
+- **Both surfaces, one engine.** Every feature works the same in the app and in
+  `macup`, because both are built on the same `MacUpCore`.
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="site/screenshots/history-dark.png">
+    <img src="site/screenshots/history-light.png" width="760" alt="History: an uninstall moved three items to the Trash and kept the data folder; an update was stopped before it finished">
+  </picture>
+</p>
+
+## Install
+
+MacUp needs **macOS 14 Sonoma or later** and runs on Apple silicon and Intel Macs.
+
+### The app
+
+1. Download `MacUp-<version>-macos-universal.zip` from the
+   [latest release](https://github.com/sd2389/macup/releases), unzip it, and
+   move **MacUp** to Applications.
+2. Open it. This build isn't notarized yet, because the project doesn't have
+   an Apple Developer ID, so macOS blocks it the first time. Open
+   **System Settings → Privacy & Security**, find the message about MacUp, and
+   click **Open Anyway**. You only need to do this once.
+
+To confirm the download is intact, check it against `SHA256SUMS` from the same
+release:
+
+```bash
+shasum -a 256 -c SHA256SUMS --ignore-missing
+```
+
+The app includes the command-line tool at `MacUp.app/Contents/Helpers/macup`.
+
+### The command-line tool
+
+With Homebrew (this builds from source and needs the Xcode Command Line Tools):
 
 ```bash
 brew install sd2389/macup/macup
 ```
 
-Or build it from a clone, which puts `macup` in `~/.local/bin`:
+Or download `macup-<version>-macos-universal.tar.gz` from the release and put
+`macup` somewhere on your `PATH`.
+
+### From source
 
 ```bash
 git clone https://github.com/sd2389/macup.git
 cd macup
-make install
+make install   # puts the command-line tool in ~/.local/bin
+make app       # builds build/MacUp.app
 ```
 
-Then, to look:
+This needs Swift 6 (Xcode 16 or later, or its Command Line Tools). To remove
+MacUp later, run `macup self-uninstall`, use **Settings → Uninstall MacUp**, or
+run `make uninstall` or `brew uninstall macup`.
+
+## Command line
+
+`macup` on its own is a read-only check. Only `macup update` and
+`macup uninstall` change what's installed, and both show their plan and ask
+first.
 
 ```bash
-macup                    # see what's outdated. Reads only; changes nothing
-macup check --verbose    # who manages each item, why it's rated that way, every command run
-macup check --json       # machine-readable output for scripts
-macup doctor             # why this Mac behaves the way it does
-macup providers          # which installation of each tool MacUp uses
-macup config             # the settings MacUp is using
-macup schedule           # whether MacUp checks on its own
+macup                        # what's outdated (reads only, changes nothing)
+macup plan                   # every update MacUp would make, with the exact commands
+macup update --dry-run       # the same, and it launches nothing
+macup update brew:git        # update one named item
+macup explain brew:git       # everything MacUp knows about one item
+macup policy set brew:postgresql ignore   # never touch this one
+macup uninstall ChatGPT --dry-run         # what uninstalling an app would remove
+macup doctor                 # what's odd about this Mac
+macup history                # what MacUp did, and what it decided not to do
 ```
 
-And to change something:
-
-```bash
-macup plan               # every update MacUp would make, with the exact commands
-macup update --dry-run   # the same, and it runs nothing
-macup update brew:git    # update one named item
-macup history            # what MacUp attempted, and what happened
-```
-
-`macup` on its own is a read-only check. Only `macup update` changes
-anything, and it changes only what a plan named and policy allowed. See
-[docs/CLI.md](docs/CLI.md) for the full command surface, the flags, the exit
-codes, and the JSON schemas.
-
-Remove the command with `brew uninstall macup` or, for a clone install,
-`make uninstall`; `make install PREFIX=/usr/local` installs it elsewhere.
-
-## Deciding what MacUp may touch
-
-Every item has a policy, resolved per item, then per provider, then from your
-global default:
-
-| Policy | Meaning |
-| --- | --- |
-| `auto` | Update without asking — unless risk says otherwise (see below) |
-| `ask` | Ask First. The default |
-| `ignore` | Never update, and never offer to |
-| `pin` | Hold at the current version |
-| `inherit` | Use the provider's rule, or the global default |
-
-```bash
-macup policy list
-macup policy set brew:postgresql ignore
-macup policy set npm:@anthropic-ai/claude-code auto
-macup policy clear brew:postgresql
-macup policy skip brew:mysql        # not this version; the next one comes back by itself
-macup policy note brew:php "waiting for PHP 8.4 support"
-macup provider disable mise
-```
-
-`auto` means "update this without asking me", not "decide anything on my
-behalf". An `auto` item still waits for a person when the change is a macOS
-update, may ask for an administrator password, may require a restart, would
-rewrite a config file or lockfile, is a major runtime change, or has a risk
-MacUp could not judge. A scheduled run has nobody to ask, so it updates only
-items that resolve to `auto` and skips the rest as review items.
-
-Every decision comes with a sentence saying which rule produced it, so a plan
-that lists twenty skipped items says why each one was skipped.
-
-The app has the same controls, on the Updates and Settings screens — both
-surfaces go through the same `MacUpCore`, so they cannot disagree.
-
-## Site
-
-`site/` holds the project's landing page: one static page, no build step, using
-real screenshots captured from the app. Preview it with
-`python3 -m http.server 4173 --directory site`.
-
-## Desktop app
-
-The same engine in a native window and the menu bar — Dashboard, Updates,
-Doctor, History, Features, and Settings:
-
-```bash
-make app && open build/MacUp.app
-```
-
-Every feature ships in both surfaces in the same change, and the app uses
-`MacUpCore` only: no provider or policy logic lives in the UI. The local
-bundle is ad-hoc signed because this repository has no Developer ID
-certificate, which is why MacUp's own camera face match cannot capture in a
-local build — [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) explains why, and the
-app's Features screen says so too.
-
-`macup check --refresh` first runs `brew update` (which updates Homebrew itself and its package lists, but no installed packages) and a fresh `softwareupdate --list` scan.
-
-## Asking before it changes anything
-
-```bash
-macup security require on   # Touch ID before MacUp changes anything
-macup security              # which sensor this Mac has
-```
-
-macOS does the asking with whatever the Mac has — Touch ID, Face ID, or Optic
-ID — falling back to your password or Apple Watch. MacUp never sees your
-fingerprint, your face, or your password. The same switch is on the app's
-**Features** screen.
-
-It is a confirmation, not a lock: MacUp runs as you, and so do `brew`, `npm`,
-and `mise`. What it buys is a deliberate step in front of every change MacUp
-itself makes.
-
-MacUp also has a camera face match of its own, off by default
-(`macup security face enroll`, or Features → Face match). No Mac has a Face
-ID sensor, and macOS exposes
-no face-recognition API, so this compares how alike two pictures look — **a
-photograph of you passes it**. It can only approve early; when it does not
-match, MacUp still asks macOS. Treat it as a shortcut, not as security.
-
-## Checking on a schedule
-
-```bash
-macup schedule enable --time 09:00   # or --frequency weekly --weekday monday
-macup schedule                       # when it next runs, what it last found
-macup schedule disable               # removes it completely
-```
-
-This installs a launchd **user agent** that runs `macup check --save-state`
-at that time — as you, not as root, with no background process between runs
-and no administrator authorization. The scheduled run is the same read-only
-check, so it still changes nothing; scheduled *updating* does not exist yet.
-Results land in `~/.local/state/macup/last-check.json`.
-
-The app has the same control on its **Features** screen: one row per feature,
-one switch each — automatic checks, approval, and face match. The Dashboard
-and the menu bar show when the next check is due. Settings stays what it is:
-where the configuration lives and what is in it.
-
-Example output (illustrative):
+Add `--json` for scripts. The output schemas are versioned, and there's no ANSI
+color when the output isn't a terminal. Example output (illustrative):
 
 ```text
 MacUp check · read-only · nothing was changed
 
 Homebrew 4.5.0 · /opt/homebrew/bin/brew
-  Prefix: /opt/homebrew
   142 installed · 2 updates
   brew:git    2.49.0 → 2.50.0    minor · moderate risk
   brew:mysql  9.3.0 → 9.4.0      minor · moderate risk
 
 npm 11.4.2 · ~/.local/share/mise/installs/node/24.3.0/bin/npm
-  Node v24.3.0 · ~/.local/share/mise/installs/node/24.3.0/bin/node · managed by mise
-  Global packages: ~/.local/share/mise/installs/node/24.3.0/lib/node_modules
+  Node v24.3.0 · managed by mise
   3 installed · 1 update
   npm:@anthropic-ai/claude-code  2.1.282 → 2.1.283  patch · low risk
 
 mise 2026.7.3 · ~/.local/bin/mise
-  Global config: ~/.config/mise/config.toml
   2 installed · up to date
 
 macOS 15.5 · /usr/sbin/softwareupdate
-  1 update
   macos:macOS Sequoia 15.6-24G84  15.5 → 15.6  minor · high risk · restart required
 
 4 updates available (Homebrew 2, npm 1, macOS 1).
 Nothing was changed.
 ```
 
-## Trust contract (highlights)
+[docs/CLI.md](docs/CLI.md) covers every command, flag, exit code, and JSON
+schema.
 
-- **MacUp runs only the commands it showed you.** While a plan runs, the
-  command runner is wrapped in a guard that compares every invocation against
-  that plan's own steps — executable, argument array, and effect. Anything
-  else is refused before it reaches the operating system.
-- **A change also has to be a shape MacUp has reviewed.** Four modifying
-  command shapes exist, in one file, and each was confirmed against the
-  tool's own `--help`. Being in a plan is not by itself permission to run
-  something nobody vetted.
-- **Every command names one item.** `brew upgrade` with no formula upgrades
-  everything, so the rules require an exact argument count — naming too few
-  is the dangerous case.
-- **Your policy is re-read immediately before the command runs**, from the
-  file, not from the copy the plan was built with. An exclusion you added
-  after reviewing the list is the one that wins.
-- **A configuration MacUp cannot read allows nothing**, because the rules
-  saying which items you excluded are exactly the ones it could not read.
-- **Read-only commands cannot act.** Their allowlist permits no positional
-  arguments at all, so a check has no way to name a package.
-- External programs run with an executable path and an argument array; never
-  through a shell. A hostile package name is one inert array element.
-- Homebrew runs with `HOMEBREW_NO_AUTO_UPDATE=1`, and an upgrade additionally
-  with `HOMEBREW_NO_INSTALL_CLEANUP=1` and
-  `HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK=1` — neither of which has a
-  command-line flag, which is why the owning provider supplies the
-  environment rather than the engine assembling one.
-- **Failures stop the run short of the risky changes.** After a failure MacUp
-  no longer knows the state of your machine as well as it did when the plan
-  was written, so it skips the remaining high-risk and unjudged items.
-- **History records every attempt and every skip, with the reason** — and
-  refuses to record secrets, or a dry run, or a guess about a line it cannot
-  read back.
-- Providers get an allowlisted environment; secrets are redacted from
-  anything displayed.
-- No account, no cloud, no telemetry.
+### Deciding what MacUp may touch
 
-Each of these is a property of the code rather than a promise about it.
-[docs/TRUST_AND_SECURITY.md](docs/TRUST_AND_SECURITY.md) says which type
-enforces which one. To report a vulnerability, please use private reporting as
-described in [SECURITY.md](SECURITY.md).
+MacUp looks for a rule on the item first, then on its provider, then uses your
+global default:
+
+| Policy | Meaning |
+| --- | --- |
+| `ask` | **Ask First.** The default: MacUp proposes the update, you confirm it |
+| `auto` | Update without asking, unless the risk says otherwise (below) |
+| `ignore` | Never update this, and never offer to |
+| `pin` | Hold at the current version |
+| `inherit` | Use the provider's rule, or the global default |
+
+`auto` means "update this without asking me", not "decide anything for me".
+An `auto` item still waits for you when:
+
+- it's a macOS update or a major runtime change
+- it might need an administrator or a restart
+- it would rewrite a config file
+- MacUp couldn't judge the risk
+
+Every decision comes with a sentence naming the rule that produced it.
+
+## Built to be trusted
+
+MacUp is **conservative with changes and aggressive with information**. When it
+can't be sure, it skips the item and tells you why. It never guesses. Each rule
+below is enforced in code and covered by tests, not just promised:
+
+- **It runs only the commands it showed you.** During an update, every command
+  is checked against the plan you reviewed. Anything else is refused before it
+  reaches the operating system.
+- **Every command names one item.** There's no blanket `brew upgrade`, so an
+  exclusion can't be walked past.
+- **Your rules are read again right before each command.** An exclusion added
+  after you opened the review still wins. If MacUp can't read its
+  configuration, it changes nothing.
+- **No shell.** Programs run with an executable path and an argument array, so
+  a hostile package name is just an inert argument.
+- **No root and no passwords.** MacUp never uses `sudo` and never captures an
+  administrator password. When a step needs one, MacUp tells you so and leaves
+  that step to you.
+- **Nothing deletes on its own.** There's no automatic `brew cleanup`, and no
+  pruning. Uninstalling only happens when you ask, from a reviewed plan.
+- **Private by design.** MacUp makes no network requests of its own, collects
+  no telemetry, and keeps your inventory on your Mac. A build check fails if
+  network code appears.
+- **Tests never touch your Mac.** More than 1,150 tests run against recorded
+  provider output and a pretend Mac in a temporary folder.
+
+The threat model and the code that enforces each rule are in
+[docs/TRUST_AND_SECURITY.md](docs/TRUST_AND_SECURITY.md). To report a
+vulnerability, use private reporting as described in [SECURITY.md](SECURITY.md).
+
+## What MacUp doesn't do (yet)
+
+- **Install macOS updates.** MacUp reports them. Installing one needs an
+  administrator and usually a restart.
+- **Roll back.** No provider action has a tested rollback, so every plan says
+  rollback is unavailable instead of promising one.
+- **Update on a schedule.** Scheduled checks only report. Scheduled updating of
+  items you marked `auto` is next on the [roadmap](docs/ROADMAP.md).
+- **Ship notarized builds.** That's waiting on an Apple Developer ID.
 
 ## Documentation
 
-- [CLAUDE.md](CLAUDE.md) — the authoritative implementation brief (read first)
-- [docs/TRUST_AND_SECURITY.md](docs/TRUST_AND_SECURITY.md) — what must be true before MacUp changes anything, and the threat model
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — the update pipeline, the two allowlists, and why the provider supplies the environment
-- [docs/CLI.md](docs/CLI.md) — commands, exit codes, JSON schema
-- [docs/CONFIGURATION.md](docs/CONFIGURATION.md) — config file, validation, storage, editing policy
-- [docs/COMMAND_EXECUTION.md](docs/COMMAND_EXECUTION.md) — command runner, environment, executable resolution, read-only guard
-- [docs/PROVIDER_NOTES.md](docs/PROVIDER_NOTES.md) — exactly what each provider runs, plans, and verifies
-- [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) — building and testing
-- [docs/TEST_PLAN.md](docs/TEST_PLAN.md) — what the suite covers, and what it deliberately does not
-- [docs/PRODUCT_SPEC.md](docs/PRODUCT_SPEC.md), [docs/UX_SPEC.md](docs/UX_SPEC.md), [docs/PROVIDER_SPEC.md](docs/PROVIDER_SPEC.md), [docs/ROADMAP.md](docs/ROADMAP.md), [docs/DECISIONS.md](docs/DECISIONS.md), [docs/RELEASE.md](docs/RELEASE.md)
-- [docs/IMPLEMENTATION_CHECKLIST.md](docs/IMPLEMENTATION_CHECKLIST.md) — phase checklists
+| Document | What it covers |
+| --- | --- |
+| [TRUST_AND_SECURITY.md](docs/TRUST_AND_SECURITY.md) | What must be true before MacUp changes anything, and the threat model |
+| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | The update pipeline, from candidate to verification and history |
+| [CLI.md](docs/CLI.md) | Every command, exit code, and JSON schema |
+| [CONFIGURATION.md](docs/CONFIGURATION.md) | The config file, validation, and policy editing |
+| [PROVIDER_NOTES.md](docs/PROVIDER_NOTES.md) | Exactly what each provider runs, plans, and verifies |
+| [DEVELOPMENT.md](docs/DEVELOPMENT.md) | Building and testing |
+| [ROADMAP.md](docs/ROADMAP.md) | What's done and what's next |
+| [DECISIONS.md](docs/DECISIONS.md) | Architecture decision records |
 
-`MACUP_MASTER_BUILD_SPEC.md` is the single-file specification these documents were extracted from.
+[CLAUDE.md](CLAUDE.md) is the project's authoritative build brief, and
+`site/` holds the landing page.
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) and the [Code of Conduct](CODE_OF_CONDUCT.md).
+Issues and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) and
+the [Code of Conduct](CODE_OF_CONDUCT.md). Provider parsers are tested against
+recorded output, so a bug report with the output of the command that confused
+MacUp (`macup diagnostics` makes a redacted one) is the most useful kind.
 
 ## License
 

@@ -5,7 +5,7 @@ import MacUpCore
 struct UpdateCommand: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "update",
-        abstract: "Apply the updates your policy allows. This is the only command that changes packages.",
+        abstract: "Apply the updates your policy allows. With `macup uninstall`, the only commands that change packages.",
         discussion: """
             MacUp shows the plan first, then runs it one item at a time, then reports \
             what happened and whether it could confirm each new version. Every attempt \

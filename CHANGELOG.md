@@ -4,13 +4,17 @@ All notable changes to MacUp are recorded here, grouped as described in
 `docs/RELEASE.md` (Added, Changed, Fixed, Security, Provider compatibility).
 MacUp follows Semantic Versioning once releases begin.
 
-Nothing after 0.1.0 has been tagged. The sections below carry the version
-`docs/ROADMAP.md` assigns them and will be dated when they are released.
-The build itself reports 0.4.0 — `macup --version`, the app, and every
-`--json` payload — because that is the version of the code in `main`, not a
-claim that 0.4.0 has been released.
+0.1.1, 0.2.0, and 0.3.0 were never tagged on their own: everything in them
+was first released in 0.4.0. Their sections keep the version
+`docs/ROADMAP.md` assigned them, so each change stays with the work it
+belonged to.
 
-## [0.4.0] — unreleased
+## [0.4.0] — 2026-09-30
+
+The first release that changes anything, and the first with downloads: a
+universal `macup` command-line tool and a universal MacUp app, with SHA-256
+checksums. The app is signed ad-hoc rather than with a Developer ID and is not
+notarized, so macOS asks you to approve it once (see the README).
 
 ### Added
 - **Uninstall apps and packages with nothing left behind**: a new Uninstall
@@ -157,7 +161,7 @@ claim that 0.4.0 has been released.
 - Export Diagnostics also masks the names and bundle identifiers of apps
   MacUp uninstalled, which skip reasons and errors can mention.
 
-## [0.3.0] — unreleased
+## [0.3.0] — released in 0.4.0
 
 Controlled updates: MacUp can change the machine, one named item at a time,
 from a plan the user read first.
@@ -272,7 +276,7 @@ from a plan the user read first.
   applying an OS update needs an administrator and usually a restart, and
   MacUp holds no password and restarts nothing.
 
-## [0.2.0] — unreleased
+## [0.2.0] — released in 0.4.0
 
 ### Added
 - **Policy**: Auto Update, Ask First, Ignore, Pin, and Inherit, resolved per
@@ -334,7 +338,7 @@ from a plan the user read first.
   exactly as the user wrote it.
 - No plan claims rollback, because none has a tested strategy.
 
-## [0.1.1] — unreleased
+## [0.1.1] — released in 0.4.0
 
 Scheduled read-only checks, and optional approval before a change. A
 scheduled *check* needs neither the policy engine nor the execution engine,

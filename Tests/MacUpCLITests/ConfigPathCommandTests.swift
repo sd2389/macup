@@ -46,7 +46,7 @@ struct ConfigPathCommandTests {
         }
         #expect(unwrapped(CheckCommand.self).contains("without changing anything"))
         #expect(unwrapped(PlanCommand.self).contains("change nothing"))
-        #expect(unwrapped(UpdateCommand.self).contains("only command that changes packages"))
+        #expect(unwrapped(UpdateCommand.self).contains("With `macup uninstall`, the only commands that change packages"))
         #expect(unwrapped(UpdateCommand.self).contains("Naming an item is a request, not a confirmation"))
         #expect(unwrapped(DoctorCommand.self).contains("read-only"))
         #expect(unwrapped(HistoryCommand.self).contains("read-only"))

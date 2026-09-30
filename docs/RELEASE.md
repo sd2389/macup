@@ -24,6 +24,25 @@ tag's tarball and `sha256` to that tarball's `shasum -a 256`, then run
 `brew reinstall sd2389/macup/macup` and `brew test sd2389/macup/macup`
 before pushing the tap.
 
+## Building a release
+
+`scripts/package-release.sh` builds everything a GitHub release publishes,
+from a clean working tree, into `build/release`:
+
+- `macup-<version>-macos-universal.tar.gz`: the command-line tool, for Apple
+  silicon and Intel
+- `MacUp-<version>-macos-universal.zip`: the app, with its own copy of the CLI
+- `SHA256SUMS`
+
+It uploads nothing. Publishing is a separate step: tag the release commit
+`vX.Y.Z`, push the tag, then create the GitHub release with those three files
+and the version's section of `CHANGELOG.md` as its notes.
+
+Until MacUp has a Developer ID, the app is signed ad-hoc and not notarized.
+macOS then blocks the first launch of a downloaded copy, and the README tells
+people to approve it once in System Settings → Privacy & Security. Releases
+stay marked as pre-releases until builds are notarized.
+
 ## App distribution
 
 Initial public:

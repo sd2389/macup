@@ -2,18 +2,26 @@
 # Builds build/MacUp.app from the SwiftPM target, for local use until the
 # Xcode project exists. The bundle is ad-hoc signed, so it runs on this Mac only.
 # Release by default; `debug` adds developer tooling such as --snapshot-dir.
+# MACUP_UNIVERSAL=1 builds one bundle for Apple silicon and Intel, as a
+# published release does (scripts/package-release.sh).
 #
 #   scripts/build-app.sh [release|debug]
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 configuration="${1:-release}"
-swift build -c "$configuration" --product MacUpApp --force-resolved-versions
+arch_flags=()
+if [[ "${MACUP_UNIVERSAL:-}" == 1 ]]; then
+    arch_flags=(--arch arm64 --arch x86_64)
+fi
+# macOS's bash 3.2 treats an empty array as unset under `set -u`.
+build() { swift build -c "$configuration" ${arch_flags[@]+"${arch_flags[@]}"} "$@"; }
+build --product MacUpApp --force-resolved-versions
 # The app schedules this copy of the CLI, so the two can never be different
 # versions of MacUp.
-swift build -c "$configuration" --product macup --force-resolved-versions
-binary="$(swift build -c "$configuration" --show-bin-path)/MacUpApp"
-cli="$(swift build -c "$configuration" --show-bin-path)/macup"
+build --product macup --force-resolved-versions
+binary="$(build --show-bin-path)/MacUpApp"
+cli="$(build --show-bin-path)/macup"
 
 app="build/MacUp.app"
 rm -rf "$app"
