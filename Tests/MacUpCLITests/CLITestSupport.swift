@@ -67,6 +67,10 @@ final class CLIHarness: @unchecked Sendable {
     /// What someone at a terminal types when MacUp asks. Empty means nobody
     /// answers, so nothing that needs confirmation runs.
     var answers: [String] = []
+    /// The Mac `macup uninstall` sees. A test gives it a pretend Mac in a
+    /// temporary folder with a fake Trash; left `nil`, the uninstall commands
+    /// would look at this Mac, so every uninstall test sets it.
+    var uninstall: UninstallEnvironment?
 
     static let brewOutdated = """
         {"formulae": [{"name": "git", "installed_versions": ["2.43.0"], "current_version": "2.44.0", "pinned": false, "pinned_version": null},
@@ -238,7 +242,8 @@ final class CLIHarness: @unchecked Sendable {
             schedulerFileSystem: schedulerFileSystem,
             authorizer: authorizer,
             readLine: { scripted.next() },
-            currentDirectory: workingDirectory.path
+            currentDirectory: workingDirectory.path,
+            uninstall: uninstall
         )
         return try await runCLI(arguments, context: context, stdout: stdout, stderr: stderr)
     }

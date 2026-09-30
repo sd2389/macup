@@ -9,9 +9,9 @@ struct MacUpCommand: AsyncParsableCommand {
             MacUp checks Homebrew, npm (global packages), mise, and macOS for updates, \
             shows you exactly what it would run, and applies the ones you allow.
 
-            One command changes packages: `macup update`. It shows the plan first, \
-            asks about anything set to Ask First, runs one item at a time, and records \
-            what happened. A few commands change MacUp's own configuration file and no \
+            Two commands change what is installed: `macup update`, and `macup uninstall` \
+            (with `macup self-uninstall` for MacUp itself). Each shows its plan first, asks \
+            before it changes anything, and records what happened. A few commands change MacUp's own configuration file and no \
             packages: `macup policy set|clear|skip|unskip|note` (and `macup exclude`), \
             `macup provider enable|disable`, `macup schedule enable|disable`, and `macup \
             security require`. `macup diagnostics export` writes one new file, for a bug \
@@ -28,6 +28,7 @@ struct MacUpCommand: AsyncParsableCommand {
               macup exclude brew:postgresql   Never update this one
               macup dependents brew:openssl@3   What an upgrade of it could affect
               macup doctor            What is odd about this Mac
+              macup uninstall ChatGPT --dry-run   What uninstalling an app would remove
               macup diagnostics       A redacted file for a bug report
               macup history           What MacUp has changed
               macup security          Ask for Touch ID before MacUp changes anything
@@ -45,6 +46,8 @@ struct MacUpCommand: AsyncParsableCommand {
             DoctorCommand.self,
             DiagnosticsCommand.self,
             HistoryCommand.self,
+            UninstallCommand.self,
+            SelfUninstallCommand.self,
             ConfigCommand.self,
             ScheduleCommand.self,
             SecurityCommand.self,

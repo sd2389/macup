@@ -50,6 +50,14 @@ struct CLIContext: Sendable {
     /// `macup diagnostics export` writes by default. Injectable so a test
     /// never writes into whatever directory the test runner is in.
     var currentDirectory = FileManager.default.currentDirectoryPath
+    /// Where `macup uninstall` looks and what it removes with. `nil` means
+    /// this Mac; tests give a pretend Mac in a temporary folder, with a fake
+    /// Trash, so no test ever removes a real file.
+    var uninstall: UninstallEnvironment?
+
+    var uninstallEnvironment: UninstallEnvironment {
+        uninstall ?? .live(homeDirectory: homeDirectory)
+    }
 
     /// Asks the device owner to approve a change, when the configuration says
     /// to. Returns the outcome; the caller refuses the change unless it allows
@@ -180,6 +188,18 @@ struct CLIContext: Sendable {
     ///
     /// Anything else — no answer at all, a closed input, a word MacUp does not
     /// recognize — is a no, because a change nobody agreed to must not happen.
+    /// Asks which way to remove leftovers, every time: there is no remembered
+    /// answer that could make a permanent deletion happen unasked. Anything
+    /// but an explicit "delete" is the Trash; nobody to ask is `nil`.
+    func askRemovalMode() -> RemovalMode? {
+        standardOutput.write("Move to Trash or delete permanently? [T]rash / [d]elete: ")
+        guard let answer = readLine()?.trimmingCharacters(in: .whitespaces).lowercased() else {
+            print("")
+            return nil
+        }
+        return answer == "d" || answer == "delete" ? .delete : .trash
+    }
+
     func askToProceed(_ question: String) -> Bool {
         standardOutput.write(question + " [y/N] ")
         guard let answer = readLine()?.trimmingCharacters(in: .whitespaces).lowercased() else {
