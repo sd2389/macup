@@ -182,6 +182,9 @@ extension HomebrewProvider {
     /// The steps that uninstall a formula: stop its service when it has one
     /// registered, then remove every version.
     func uninstallSteps(formula item: ManagedItem, installation: ProviderInstallation) throws -> [ExecutionStep] {
+        guard item.id.namespace == .brew, item.kind == .formula else {
+            throw PlanSupport.cannotPlan("MacUp will not uninstall \(item.id.rawValue) as a Homebrew formula, because it is not one.")
+        }
         let name = try PlanSupport.argument(naming: item.id)
         var steps: [ExecutionStep] = []
         if let status = item.details["serviceStatus"], status != "none" {
@@ -236,6 +239,10 @@ extension HomebrewProvider {
             ownership: nil,
             command: result.invocation.displayString
         )
+        // The inventory lists casks too, as items of their own kind. They are
+        // read below with what uninstalling a cask needs, and a cask must
+        // never reach a formula's `brew uninstall --formula`.
+        formulae.elements = formulae.elements.filter { $0.kind == .formula && $0.id.namespace == .brew }
         if let prefix = installation.fact("prefix") {
             formulae.elements = Self.annotate(formulae.elements, prefix: prefix, fileSystem: context.fileSystem)
         }

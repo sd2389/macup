@@ -284,7 +284,7 @@ struct UninstallScanningTests {
             "brew-cask:codex", "brew-cask:example-pkg", "brew-cask:redis-insight",
             "npm:@anthropic-ai/claude-code", "npm:typescript",
             "mise:node@24.18.0", "mise:node@24.19.0",
-        ])
+        ], "\(catalog.packages.map(\.target))")
         #expect(catalog.packages.first { $0.target == "brew:mysql" }?.note == "2 versions installed: 9.7.1, 26.7.0_2")
         #expect(catalog.packages.first { $0.target == "mise:node@24.19.0" }?.note == "In use")
         #expect(catalog.providers.allSatisfy { $0.state == .available })

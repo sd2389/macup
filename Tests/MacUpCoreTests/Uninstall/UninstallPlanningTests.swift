@@ -105,7 +105,8 @@ struct UninstallPlanningTests {
         #expect(!dotfolder.selectedByDefault)
         #expect(dotfolder.warning != nil)
         #expect(plan.canRun)
-        #expect(try await mac.plan("brew-cask:redis-insight").steps == plan.steps, "the app and its cask are one plan")
+        let byPackage = try await mac.plan("brew-cask:redis-insight")
+        #expect(byPackage.steps == plan.steps, "the app and its cask are one plan: \(byPackage.steps) \(byPackage.blockers)")
         #expect(mac.modifyingRequests.isEmpty)
     }
 
@@ -114,7 +115,7 @@ struct UninstallPlanningTests {
         let mac = try UninstallScenario()
         try mac.withHomebrew(info: try Self.info(mac))
         let plan = try await mac.plan("brew-cask:example-pkg")
-        #expect(plan.blockers.contains { $0.kind == .needsAdministrator })
+        #expect(plan.blockers.contains { $0.kind == .needsAdministrator }, "\(plan.blockers)")
         #expect(plan.blockers.first { $0.kind == .needsAdministrator }?.steps.first?.contains("brew uninstall --cask example-pkg") == true)
     }
 
