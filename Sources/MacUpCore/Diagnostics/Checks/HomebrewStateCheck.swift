@@ -196,11 +196,18 @@ public struct HomebrewStateCheck: DiagnosticCheck {
         }
         guard !affected.isEmpty else { return nil }
 
-        let madeFor = Set(affected.flatMap { ($0.details["bottleCellars"] ?? "").split(separator: "\n").map(String.init) })
-            .filter { $0.hasPrefix("/") }
-            .map { $0.hasSuffix("/Cellar") ? String($0.dropLast("/Cellar".count)) : $0 }
-            .sorted()
-            .map(input.display)
+        // Spelled out step by step: older compilers give up type-checking
+        // this as one chained expression.
+        var cellars = Set<String>()
+        for item in affected {
+            for line in (item.details["bottleCellars"] ?? "").split(separator: "\n") where line.hasPrefix("/") {
+                cellars.insert(String(line))
+            }
+        }
+        let prefixes: [String] = cellars.map { cellar in
+            cellar.hasSuffix("/Cellar") ? String(cellar.dropLast("/Cellar".count)) : cellar
+        }
+        let madeFor: [String] = prefixes.sorted().map { input.display($0) }
         let names = affected.map { input.display($0.displayName) }.sorted()
         let usual = input.environment.system.architecture == "arm64" ? "/opt/homebrew" : "/usr/local"
         let count = affected.count == 1 ? "1 installed formula" : "\(affected.count) installed formulae"
