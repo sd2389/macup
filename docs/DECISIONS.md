@@ -165,3 +165,42 @@ What keeps the trust contract intact:
   no root, no privileged helper, and no process between runs.
 
 The macOS provider is unchanged: it installs nothing, scheduled or not.
+
+## ADR-024 — Doctor may fix what belongs to MacUp, and nothing else
+The spec says Doctor should explain rather than automatically "fix
+everything" (CLAUDE.md §13), and it still does. On 2026-10-07 the owner asked
+for fix actions. The line drawn: a finding may carry **one** fix, and only
+where the thing to change belongs to MacUp.
+
+The four that exist:
+
+- drop rules in MacUp's configuration naming software no provider reports as
+  installed;
+- forget a provider's configured executable path when it cannot be used (the
+  tool itself is untouched, and MacUp resolves it the ordinary way again);
+- install the launchd agent the configuration asks for;
+- remove an installed agent the configuration no longer asks for.
+
+What keeps it honest:
+
+- **A closed list.** `DiagnosticFix.Action` is an enum, so a fix is never an
+  arbitrary command and no check can invent one. No fix runs a package
+  manager, changes a package, or needs an administrator.
+- **Asked for, one at a time.** `macup doctor --fix <finding-id>` and the
+  app's button both show what will change first, ask, and then go through the
+  same approval gate as any other change. `--dry-run` changes nothing.
+- **Re-checked immediately before acting.** A rule MacUp would drop has to
+  still be in the file; a schedule it would install or remove has to still be
+  what the configuration says; a configuration MacUp cannot read fully stops
+  every fix. Anything else is reported, not forced.
+- **Said only after looking.** "Removed" means the agent file is gone, not
+  that MacUp asked for it to be.
+- **Everything else still explains.** Two Homebrew installations, a PATH that
+  differs from the login shell, an npm prefix that does not match its Node:
+  these have no fix and keep saying what to do by hand, because MacUp is not
+  confident enough to decide them for someone.
+
+Doctor fixes are not in the update History, which records what MacUp did to
+packages. A fix changes MacUp's own configuration file or its own launchd
+agent: both are visible where they live, the result is printed or shown, and
+`macup config show` and `macup schedule status` report the state afterwards.

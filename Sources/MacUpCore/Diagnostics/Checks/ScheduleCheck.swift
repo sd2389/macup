@@ -29,7 +29,13 @@ public struct ScheduleCheck: DiagnosticCheck {
                 detail: "The configuration asks for a check \(input.display(schedule.schedule)), "
                     + "and there is no launchd agent at \(input.display(schedule.agentPath)).",
                 recommendation: "Run `macup schedule enable` to install the agent, "
-                    + "or turn scheduling off so the configuration matches the machine."
+                    + "or turn scheduling off so the configuration matches the machine.",
+                fix: DiagnosticFix(
+                    action: .installScheduleAgent,
+                    summary: "Install the scheduled run the configuration asks for",
+                    detail: "Writes \(input.display(schedule.agentPath)) and loads it with launchd. "
+                        + "It will run: \(input.display(schedule.command))."
+                )
             ))
         }
 
@@ -40,7 +46,13 @@ public struct ScheduleCheck: DiagnosticCheck {
                 provider: nil,
                 title: "A scheduled check is installed while the configuration has scheduling off",
                 detail: "The agent at \(input.display(schedule.agentPath)) is still there and launchd may run it.",
-                recommendation: "Run `macup schedule disable` to unload and remove it."
+                recommendation: "Run `macup schedule disable` to unload and remove it.",
+                fix: DiagnosticFix(
+                    action: .removeScheduleAgent,
+                    summary: "Remove the agent the configuration no longer asks for",
+                    detail: "Unloads \(input.display(schedule.label)) from launchd and deletes "
+                        + "\(input.display(schedule.agentPath)). Nothing else is changed."
+                )
             ))
         }
 
@@ -54,7 +66,13 @@ public struct ScheduleCheck: DiagnosticCheck {
                 title: "launchd has not loaded the scheduled check",
                 detail: "The agent exists at \(input.display(schedule.agentPath)), "
                     + "but launchd does not know about \(input.display(schedule.label)), so nothing runs until you log in again.",
-                recommendation: "Run `macup schedule enable` to load it now."
+                recommendation: "Run `macup schedule enable` to load it now.",
+                fix: DiagnosticFix(
+                    action: .installScheduleAgent,
+                    summary: "Load the scheduled run with launchd",
+                    detail: "Writes \(input.display(schedule.agentPath)) again and loads it. "
+                        + "It will run: \(input.display(schedule.command))."
+                )
             ))
         }
         if schedule.agentLoaded == nil {
@@ -76,7 +94,13 @@ public struct ScheduleCheck: DiagnosticCheck {
                 title: "The installed scheduled check does not match the configuration",
                 detail: "The configuration asks for a check \(input.display(schedule.schedule)); "
                     + "the agent at \(input.display(schedule.agentPath)) was installed with different settings.",
-                recommendation: "Run `macup schedule enable` to replace the agent with the current settings."
+                recommendation: "Run `macup schedule enable` to replace the agent with the current settings.",
+                fix: DiagnosticFix(
+                    action: .installScheduleAgent,
+                    summary: "Replace the agent with what the configuration says",
+                    detail: "Writes \(input.display(schedule.agentPath)) from the current settings and loads it. "
+                        + "It will run: \(input.display(schedule.command))."
+                )
             ))
         }
         if !schedule.executableExists {

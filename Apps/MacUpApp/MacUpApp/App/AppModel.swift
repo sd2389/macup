@@ -56,6 +56,8 @@ final class AppModel {
     let tools = ToolScanModel()
     /// What the last scheduled run did (AppModel+Notifications.swift).
     let scheduledRuns = ScheduledRunModel()
+    /// The Doctor fix being reviewed, if any (AppModel+DoctorFix.swift).
+    let doctorFixes = DoctorFixModel()
 
     init(environment: AppEnvironment = .live()) {
         self.environment = environment

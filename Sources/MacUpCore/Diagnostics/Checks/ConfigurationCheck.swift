@@ -99,7 +99,14 @@ public struct StaleItemPolicyCheck: DiagnosticCheck {
                 : "\(stale.count) policies name software that is not installed",
             detail: "No provider reports \(DiagnosticText.list(stale.map { input.display($0.rawValue) })) as installed.",
             recommendation: "The rules do nothing while the software is absent, and apply again if it comes back. "
-                + "Run `macup policy clear <package-id>` to drop one."
+                + "Run `macup policy clear <package-id>` to drop one.",
+            fix: DiagnosticFix(
+                action: .clearItemRules(stale.map(\.rawValue)),
+                summary: stale.count == 1 ? "Drop this rule" : "Drop these \(stale.count) rules",
+                detail: "Removes \(DiagnosticText.list(stale.map { input.display($0.rawValue) })) from "
+                    + "\(input.display(input.configuration.path)). Nothing else in the file changes, and "
+                    + "no package is touched."
+            )
         )]
     }
 }

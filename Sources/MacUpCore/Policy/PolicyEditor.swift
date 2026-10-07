@@ -56,6 +56,9 @@ public struct PolicyChange: Sendable, Hashable, Codable {
         case skipVersion
         /// The user's note on an item.
         case note
+        /// A provider's configured executable path, which Doctor can clear
+        /// when it cannot be used.
+        case executablePath
     }
 
     public var subject: Subject
@@ -288,6 +291,19 @@ public struct PolicyEditor: Sendable {
         }
     }
 
+    /// Forgets a provider's configured executable path, so MacUp resolves the
+    /// tool itself again. The tool is not touched.
+    @discardableResult
+    public func clearProviderExecutablePath(for provider: ProviderID) throws -> PolicyChange {
+        try apply(.provider(provider), .executablePath) { configuration in
+            var settings = configuration.settings(for: provider)
+            let previous = settings.executablePath
+            settings.executablePath = nil
+            configuration.providers[provider.rawValue] = settings
+            return (previous ?? "", "")
+        }
+    }
+
     // MARK: Global default
 
     /// Sets the policy that applies when no provider or item rule does.
@@ -434,6 +450,8 @@ public struct PolicyEditor: Sendable {
             return value == "true" ? "enabled" : "disabled"
         case .skipVersion, .note:
             return TerminalText.sanitize(value)
+        case .executablePath:
+            return value.isEmpty ? "not set" : TerminalText.sanitize(value)
         }
     }
 

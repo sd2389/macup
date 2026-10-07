@@ -69,7 +69,14 @@ public struct ProviderAvailabilityCheck: DiagnosticCheck {
                 title: "The \(report.displayName) path in MacUp's configuration cannot be used",
                 detail: detail(of: error, input: input),
                 recommendation: error?.recoverySuggestion
-                    ?? "Fix or remove providers.\(report.provider.rawValue).executablePath, then run `macup doctor` again."
+                    ?? "Fix or remove providers.\(report.provider.rawValue).executablePath, then run `macup doctor` again.",
+                fix: DiagnosticFix(
+                    action: .clearProviderPath(report.provider),
+                    summary: "Forget the configured path and let MacUp find \(report.displayName) itself",
+                    detail: "Removes providers.\(report.provider.rawValue).executablePath from MacUp's "
+                        + "configuration. \(report.displayName) itself is not touched, and MacUp resolves it "
+                        + "the ordinary way next time."
+                )
             )
         default:
             return DiagnosticFinding(

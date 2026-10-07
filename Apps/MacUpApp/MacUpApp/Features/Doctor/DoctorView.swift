@@ -5,9 +5,14 @@ import SwiftUI
 /// nothing changed.
 ///
 /// Doctor explains. There is no "fix everything" button, and there is not
-/// going to be one: the findings are things MacUp is not confident enough to
+/// going to be one: most findings are things MacUp is not confident enough to
 /// change on someone's behalf, which is exactly why it is telling them
 /// (CLAUDE.md §13).
+///
+/// A few are about MacUp's own things — a rule naming software that is not
+/// installed, a configured path that cannot be used, a scheduled run that is
+/// missing or should not be there — and those offer one change each, shown in
+/// full before anything happens (ADR-024).
 struct DoctorView: View {
     @Environment(AppModel.self) private var model
 
@@ -58,6 +63,13 @@ struct DoctorView: View {
         // screen part-way through — is incomplete, and coming back should
         // finish the job rather than keep showing the half of it that ran.
         .task { if model.doctorReport == nil || model.doctorReport?.cancelled == true { await model.runDoctor() } }
+        .sheet(isPresented: Binding(
+            get: { model.doctorFixes.reviewing != nil },
+            set: { if !$0 { model.cancelFix() } }
+        )) {
+            DoctorFixReviewSheet()
+                .interactiveDismissDisabled(model.doctorFixes.isApplying)
+        }
     }
 
     // MARK: Summary
@@ -111,7 +123,7 @@ struct DoctorView: View {
     @ViewBuilder
     private func findings(_ report: DoctorReport) -> some View {
         let groups: [(DiagnosticFinding.Severity, String, String)] = [
-            (.error, "Needs attention", "MacUp is not confident enough to change any of these for you."),
+            (.error, "Needs attention", "MacUp changes none of these for you, except where one offers a change to its own settings."),
             (.warning, "Worth a look", "None of these stops MacUp working."),
             (.info, "Notes", "Things MacUp noticed that are probably fine."),
         ]
@@ -159,7 +171,7 @@ struct DoctorView: View {
         } header: {
             Text("What MacUp looked at")
         } footer: {
-            Text("Doctor explains what it found. It changes nothing, and it has no button that would.")
+            Text("Doctor explains what it found. It changes nothing by itself; where a finding is about MacUp's own settings, it offers that one change and shows it to you first.")
                 .leadingFooter()
         }
     }
@@ -171,5 +183,47 @@ struct DoctorView: View {
         case .unavailable: "Not found"
         case .failed: "Found but not usable"
         }
+    }
+}
+
+
+/// What a Doctor fix would change, before it changes it: the same shape of
+/// review as an update's, because it is the same kind of promise.
+private struct DoctorFixReviewSheet: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        let finding = model.doctorFixes.reviewing
+        VStack(alignment: .leading, spacing: 16) {
+            Text(finding?.fix?.summary.displaySafe ?? "Fix").font(.title3.weight(.semibold))
+            if let finding {
+                Text(finding.title.displaySafe).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                if let detail = finding.fix?.detail {
+                    Text(detail.displayLines).fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            Text("Nothing else is changed. No package is touched, no package manager runs, and MacUp never asks for an administrator password.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            if let problem = model.doctorFixes.problem {
+                Label(problem.displaySafe, systemImage: "exclamationmark.triangle")
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            HStack {
+                Spacer()
+                Button("Cancel") { model.cancelFix() }
+                    .keyboardShortcut(.cancelAction)
+                    .disabled(model.doctorFixes.isApplying)
+                Button(model.doctorFixes.isApplying ? "Fixing…" : "Make This Change") {
+                    Task { await model.applyReviewedFix() }
+                }
+                .keyboardShortcut(.defaultAction)
+                .disabled(model.doctorFixes.isApplying)
+            }
+        }
+        .padding(20)
+        .frame(minWidth: 420)
     }
 }

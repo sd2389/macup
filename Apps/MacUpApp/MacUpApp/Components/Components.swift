@@ -181,6 +181,7 @@ struct PlanEffectLabel: View {
 
 /// A diagnostic finding with its severity in words and symbol.
 struct FindingRow: View {
+    @Environment(AppModel.self) private var model
     let finding: DiagnosticFinding
 
     var body: some View {
@@ -192,6 +193,23 @@ struct FindingRow: View {
                 }
                 if let recommendation = finding.recommendation {
                     Text(recommendation.displayLines).font(.callout)
+                }
+                // Offered only where the thing to change is MacUp's own, and
+                // only as a review: the sheet says exactly what it will do.
+                if let fix = finding.fix {
+                    Button(fix.summary.displaySafe) { model.reviewFix(for: finding) }
+                        .disabled(model.doctorFixes.isApplying)
+                        .help("Shows exactly what MacUp would change before anything happens.")
+                }
+                if model.doctorFixes.result?.findingID == finding.id, let result = model.doctorFixes.result {
+                    VStack(alignment: .leading, spacing: 2) {
+                        ForEach(result.changes, id: \.self) { change in
+                            Label(change.displaySafe, systemImage: "checkmark.circle").font(.callout)
+                        }
+                        if let problem = result.problem {
+                            Label(problem.displaySafe, systemImage: "exclamationmark.triangle").font(.callout)
+                        }
+                    }
                 }
             }
         } icon: {

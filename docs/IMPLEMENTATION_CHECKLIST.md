@@ -486,17 +486,22 @@ surfaces, with tests and docs, in its own commit (CLAUDE.md §26.13).
       setting is off unless the file says otherwise, and the app notifies
       once per run
 
-### 8.5 — Doctor that can fix what it is sure about
+### 8.5 — Doctor that can fix what it is sure about — done
 
-- [ ] A finding may carry one reviewed fix: the exact executable and
-      arguments, or a configuration edit MacUp makes itself
-- [ ] A fix is always user-initiated, always shows its plan first, and is
-      recorded in History like any other change
-- [ ] Findings with no safe fix keep saying so
-- [ ] CLI: `macup doctor --fix <finding-id>`, with `--dry-run`
-- [ ] App: a Fix button on the findings that have one
-- [ ] Tests: every fixable finding, a refused fix, and a fix whose
-      precondition changed since the finding was made
+- [x] A finding may carry one fix, from a closed list of four actions, each
+      changing only MacUp's own configuration or its own launchd agent
+      (ADR-024)
+- [x] A fix is always user-initiated, always shows what it will change
+      first, asks, and goes through the approval gate
+- [x] Findings with no safe fix keep saying what to do by hand
+- [x] CLI: `macup doctor --fix <finding-id>`, with `--dry-run` and `--yes`
+- [x] App: a button on the findings that have one, with a review sheet
+- [x] Tests: every fixable finding, a refused fix, a dry run, a fix whose
+      precondition changed since the finding was made, and a configuration
+      MacUp cannot read
+- [ ] Not done, and recorded in ADR-024: Doctor fixes are not in the update
+      History, which is about packages. The result is printed or shown, and
+      `macup config show` and `macup schedule status` report the state
 
 ### 8.6 — Developer ID signing and notarization
 

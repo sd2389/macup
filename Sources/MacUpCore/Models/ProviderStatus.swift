@@ -87,6 +87,10 @@ public struct DiagnosticFinding: Sendable, Hashable, Codable, Identifiable {
     public var title: String
     public var detail: String?
     public var recommendation: String?
+    /// The one change MacUp can make for this finding, when there is one it
+    /// is sure about. Most findings have none: Doctor explains, and only
+    /// offers to act where the thing to change is MacUp's own (ADR-024).
+    public var fix: DiagnosticFix?
 
     public init(
         id: String,
@@ -94,7 +98,8 @@ public struct DiagnosticFinding: Sendable, Hashable, Codable, Identifiable {
         provider: ProviderID?,
         title: String,
         detail: String? = nil,
-        recommendation: String? = nil
+        recommendation: String? = nil,
+        fix: DiagnosticFix? = nil
     ) {
         self.id = id
         self.severity = severity
@@ -102,5 +107,40 @@ public struct DiagnosticFinding: Sendable, Hashable, Codable, Identifiable {
         self.title = title
         self.detail = detail
         self.recommendation = recommendation
+        self.fix = fix
+    }
+}
+
+/// Something Doctor can put right, described before it is done.
+///
+/// Every fix changes something that belongs to MacUp — its configuration,
+/// or the launchd agent it installed — and nothing that belongs to a package
+/// manager (ADR-024). There is no general "fix everything": a finding either
+/// carries one of these, or it keeps saying what to do by hand.
+public struct DiagnosticFix: Sendable, Hashable, Codable {
+    /// What a fix does. A closed list, so a fix is never an arbitrary
+    /// command and nothing outside this file can invent one.
+    public enum Action: Sendable, Hashable, Codable {
+        /// Drop rules naming software no provider reports as installed.
+        case clearItemRules([String])
+        /// Forget a provider's configured executable path, so MacUp resolves
+        /// the tool itself again.
+        case clearProviderPath(ProviderID)
+        /// Write and load the launchd agent the configuration asks for.
+        case installScheduleAgent
+        /// Remove an installed agent the configuration no longer asks for.
+        case removeScheduleAgent
+    }
+
+    public var action: Action
+    /// What the fix does, in one line, for a button or a prompt.
+    public var summary: String
+    /// Exactly what it changes: the keys, the file, the command.
+    public var detail: String
+
+    public init(action: Action, summary: String, detail: String) {
+        self.action = action
+        self.summary = summary
+        self.detail = detail
     }
 }

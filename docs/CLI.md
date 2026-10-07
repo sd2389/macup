@@ -98,6 +98,7 @@ macup --generate-completion-script zsh > ~/.zsh/completions/_macup
 | `macup provider disable <id> [--json]` | Stops MacUp checking a provider. Uninstalls nothing. |
 | `macup uninstall --orphans [--json]` | Lists what apps you have already removed left in `~/Library`, biggest first, with why MacUp thinks an app left them. Reads only; nothing is ticked. `macup uninstall leftovers:<bundle-id>` reviews one. |
 | `macup update --scheduled [--json]` | What the launchd agent runs when installing is on: installs only the items whose rule is Auto Update, asks nobody, records every attempt and every skip, and saves the check. Takes no items, no `--yes`, and no `--dry-run`. |
+| `macup doctor --fix <finding-id> [--dry-run] [-y]` | Makes the one change a finding offers, after showing it. Only MacUp's own settings and its launchd agent are ever changed; no package manager runs (ADR-024). |
 | `macup self-update [--dry-run] [-y] [--refresh] [--json]` | Updates MacUp itself through whatever installed it. With Homebrew, an ordinary Homebrew update with the same plan, confirmation, and history. A copy you downloaded is pointed at its releases page and left alone. |
 | `macup config` / `macup config show [--json]` | Shows the configuration in effect and every problem with it. Never creates the file. |
 | `macup config path [--json]` | Prints the configuration file and state directory locations. |

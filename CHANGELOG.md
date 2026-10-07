@@ -24,6 +24,17 @@ belonged to.
   a tool is not managing it: MacUp still updates only Homebrew, npm, mise, and
   macOS, and proposes nothing for the rest.
 
+- **Doctor can now fix what belongs to MacUp** (ADR-024): a rule naming
+  software that is not installed, a configured provider path that cannot be
+  used, and a scheduled run that is missing or should not be there each carry
+  one change you can ask for — `macup doctor --fix <finding-id>`, or the
+  button in the app. Both show exactly what will change first, ask, and go
+  through the same approval gate as any other change; `--dry-run` changes
+  nothing. A fix never runs a package manager, never touches a package, and
+  never needs an administrator, and the fixer re-checks what the finding
+  assumed immediately before acting. Everything else Doctor finds still
+  explains and leaves the decision to you.
+
 - **Scheduled updating, off by default** (ADR-023): `macup schedule enable
   --install-updates` and a switch on the app's Features screen let a scheduled
   run install the updates whose rule is Auto Update. It installs nothing else:
