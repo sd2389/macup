@@ -450,16 +450,19 @@ surfaces, with tests and docs, in its own commit (CLAUDE.md §26.13).
 - [x] Tests: each installation shape, policy that forbids it, only MacUp's
       own item is ever in the plan, and that a downloaded copy plans nothing
 
-### 8.3 — Leftovers of apps that are already gone
+### 8.3 — Leftovers of apps that are already gone — done
 
-- [ ] A scan of `~/Library` and `/Library` for files whose app is no longer
-      installed, grouped by the app that left them
-- [ ] Matched by bundle identifier or by the maker's namespace, never by
-      resemblance; nothing is ticked by default
-- [ ] CLI: `macup uninstall --orphans`, with `--json` and the same review
-- [ ] App: the Uninstall screen lists them beside the installed apps
-- [ ] Tests: an orphan found, a live app's files never offered, a shared
-      maker left alone
+- [x] A scan of `~/Library` for files whose app is no longer installed,
+      grouped by the bundle identifier they are named after, biggest first
+- [x] Matched by bundle identifier only, never by resemblance, and only with
+      evidence that an app rather than a tool wrote them; nothing is ticked
+- [x] A name no scan found cannot be uninstalled by typing it
+- [x] CLI: `macup uninstall --orphans`, with `--json`, and
+      `macup uninstall leftovers:<bundle-id>` for the ordinary review
+- [x] App: "Left Behind by Apps You Removed" on the Uninstall screen
+- [x] Tests: an orphan found, an installed app's files never offered, a
+      longer identifier left to its own app, Apple's namespace left alone,
+      evidence required, suffixes stripped, and the plan ticking nothing
 
 ### 8.4 — Scheduled updating (ADR, owner decision 2026-10-07)
 

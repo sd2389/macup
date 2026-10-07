@@ -96,6 +96,7 @@ macup --generate-completion-script zsh > ~/.zsh/completions/_macup
 | `macup provider scan [--all] [--json]` | Shows every package manager and version manager on this Mac, including the ones MacUp does not manage. Reads only: it resolves each tool and asks the ones it finds for their version. |
 | `macup provider enable <id> [--json]` | Lets MacUp check a provider again and propose its updates. |
 | `macup provider disable <id> [--json]` | Stops MacUp checking a provider. Uninstalls nothing. |
+| `macup uninstall --orphans [--json]` | Lists what apps you have already removed left in `~/Library`, biggest first, with why MacUp thinks an app left them. Reads only; nothing is ticked. `macup uninstall leftovers:<bundle-id>` reviews one. |
 | `macup self-update [--dry-run] [-y] [--refresh] [--json]` | Updates MacUp itself through whatever installed it. With Homebrew, an ordinary Homebrew update with the same plan, confirmation, and history. A copy you downloaded is pointed at its releases page and left alone. |
 | `macup config` / `macup config show [--json]` | Shows the configuration in effect and every problem with it. Never creates the file. |
 | `macup config path [--json]` | Prints the configuration file and state directory locations. |

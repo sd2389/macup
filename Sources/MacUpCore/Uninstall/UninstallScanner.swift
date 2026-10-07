@@ -36,7 +36,8 @@ public struct UninstallScanner: Sendable {
         configuration: LoadedConfiguration,
         environment: CheckEnvironment,
         uninstall: UninstallEnvironment,
-        measureApps: Bool = true
+        measureApps: Bool = true,
+        includeOrphans: Bool = false
     ) async -> UninstallCatalog {
         let log = CommandLog()
         var catalog = UninstallCatalog(createdAt: environment.now())
@@ -64,6 +65,15 @@ public struct UninstallScanner: Sendable {
         catalog.apps = await AppScanner(applicationDirectories: uninstall.applicationDirectories)
             .scan(caskApps: caskApps, measure: measureApps)
         catalog.packages = Self.packages(formulae: brew.formulae, casks: brew.casks, npm: node.items, mise: tools.items)
+        if includeOrphans {
+            // After the apps, because what is installed is what decides
+            // whether a name in ~/Library is an orphan at all.
+            let installed = Set(catalog.apps.compactMap(\.bundleIdentifier)).union([MacUpSelf.bundleIdentifier])
+            catalog.orphans = OrphanScanner(homeDirectory: uninstall.homeDirectory)
+                // Measured even when apps are not: the size is most of what
+                // makes a leftover worth deciding about.
+                .scan(installedIdentifiers: installed, measure: true)
+        }
         catalog.manualInstalls = Self.manualInstalls(uninstall)
         catalog.commands = await log.records.sorted { $0.startedAt < $1.startedAt }
         return catalog

@@ -179,6 +179,9 @@ public struct UninstallCatalog: Sendable, Hashable {
     public var createdAt: Date
     public var apps: [InstalledApp]
     public var packages: [UninstallablePackage]
+    /// What apps that are no longer installed left in `~/Library`, biggest
+    /// group first. Empty unless the scan was asked for them.
+    public var orphans: [OrphanedLeftovers]
     public var manualInstalls: [ManualInstall]
     public var providers: [UninstallProviderState]
     /// Every command MacUp ran to make the list, redacted.
@@ -195,6 +198,7 @@ public struct UninstallCatalog: Sendable, Hashable {
         createdAt: Date,
         apps: [InstalledApp] = [],
         packages: [UninstallablePackage] = [],
+        orphans: [OrphanedLeftovers] = [],
         manualInstalls: [ManualInstall] = [],
         providers: [UninstallProviderState] = [],
         commands: [CommandRecord] = []
@@ -202,6 +206,7 @@ public struct UninstallCatalog: Sendable, Hashable {
         self.createdAt = createdAt
         self.apps = apps
         self.packages = packages
+        self.orphans = orphans
         self.manualInstalls = manualInstalls
         self.providers = providers
         self.commands = commands
@@ -223,7 +228,7 @@ public struct UninstallCatalog: Sendable, Hashable {
 
 extension UninstallCatalog: Encodable {
     private enum CodingKeys: String, CodingKey {
-        case schemaVersion, kind, macupVersion, createdAt, apps, packages, manualInstalls, providers, commands
+        case schemaVersion, kind, macupVersion, createdAt, apps, packages, orphans, manualInstalls, providers, commands
     }
 
     public func encode(to encoder: any Encoder) throws {
@@ -234,6 +239,7 @@ extension UninstallCatalog: Encodable {
         try container.encode(createdAt, forKey: .createdAt)
         try container.encode(apps, forKey: .apps)
         try container.encode(packages, forKey: .packages)
+        try container.encode(orphans, forKey: .orphans)
         try container.encode(manualInstalls, forKey: .manualInstalls)
         try container.encode(providers, forKey: .providers)
         try container.encode(commands, forKey: .commands)

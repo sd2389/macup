@@ -24,7 +24,21 @@ belonged to.
   a tool is not managing it: MacUp still updates only Homebrew, npm, mise, and
   macOS, and proposes nothing for the rest.
 
-- **MacUp updates itself the way it was installed**: `macup self-update` and a
+- **Leftovers of apps that are already gone**: `macup uninstall --orphans` and
+  a "Left Behind by Apps You Removed" section on the app's Uninstall screen
+  find the files in `~/Library` named after an app that is not installed any
+  more — what dragging an app to the Trash leaves behind — grouped by the app
+  that left them, biggest first, with their size. The rules are deliberately
+  narrow: the name must be a bundle identifier of at least three parts outside
+  Apple's namespace, no installed app may claim it, and the files must look
+  like an app's rather than a tool's (a sandbox container or saved window
+  state, or settings together with a data folder). MacUp cannot ask an app
+  that is gone whether these are its files, so nothing is ticked for you:
+  `macup uninstall leftovers:<bundle-id>` opens the ordinary review and you
+  choose what goes.
+
+| `macup uninstall --orphans [--json]` | Lists what apps you have already removed left in `~/Library`, biggest first, with why MacUp thinks an app left them. Reads only; nothing is ticked. `macup uninstall leftovers:<bundle-id>` reviews one. |
+| `macup self-update [--dry-run] [-y] [--refresh] [--json]` |: `macup self-update` and a
   MacUp Updates section in the app's Settings. MacUp opens no connection of its
   own, so it never asks a server for a version: when Homebrew installed MacUp,
   Homebrew's own outdated list — the one every check already reads — is the

@@ -56,6 +56,7 @@ struct UninstallView: View {
             return words.allSatisfy { text.contains($0) }
         }
         let apps = catalog.apps.filter { matches([$0.name, $0.bundleIdentifier, $0.source.displayName]) }
+        let orphans = catalog.orphans.filter { matches([$0.identifier, $0.guessedName]) }
         let providers: [(ProviderID, [UninstallablePackage])] = [ProviderID.homebrew, .npm, .mise].map { provider in
             (provider, catalog.packages(of: provider).filter { matches([$0.name, $0.target, $0.kind.displayName]) })
         }
@@ -77,6 +78,20 @@ struct UninstallView: View {
                     } header: {
                         Text(provider.displayName)
                     }
+                }
+            }
+            if !orphans.isEmpty || words.isEmpty {
+                Section {
+                    if orphans.isEmpty {
+                        Text("MacUp found nothing it is sure enough about to list.")
+                            .foregroundStyle(.secondary)
+                    }
+                    ForEach(orphans) { group in UninstallLeftoversRow(group: group) }
+                } header: {
+                    Text("Left Behind by Apps You Removed")
+                } footer: {
+                    Text("Files named after an app that is not installed any more. MacUp cannot ask an app that is gone whether these are its files, so nothing is ticked for you: you choose what goes. The same list is `macup uninstall --orphans`.")
+                        .leadingFooter()
                 }
             }
             if !catalog.manualInstalls.isEmpty && words.isEmpty {
@@ -128,6 +143,42 @@ private struct UninstallAppRow: View {
                 .help(app.removability.isRemovable
                     ? "See exactly what would be removed. Nothing is removed until you confirm."
                     : "See what MacUp can and cannot remove for \(app.name).")
+        }
+        .padding(.vertical, 2)
+        .accessibilityElement(children: .contain)
+    }
+}
+
+/// One app's leftovers, with how big they are and why MacUp thinks an app
+/// left them.
+private struct UninstallLeftoversRow: View {
+    @Environment(AppModel.self) private var model
+    let group: OrphanedLeftovers
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "shippingbox.and.arrow.backward")
+                .font(.title3)
+                .foregroundStyle(.secondary)
+                .frame(width: 32)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(group.identifier.displaySafe).fontWeight(.medium)
+                Text("\(UninstallSizeText.text(group.sizeBytes, partial: group.sizeIsPartial)) · \(group.files.count == 1 ? "1 item" : "\(group.files.count) items")")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                ForEach(group.evidence, id: \.self) { reason in
+                    Text(reason.displaySafe)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            Spacer(minLength: 8)
+            Button("Review…") { Task { await model.reviewLeftovers(group) } }
+                .disabled(model.uninstaller.isRunning)
+                .accessibilityLabel("Review what \(group.identifier) left behind")
+                .help("See every file, with its size. Nothing is ticked, and nothing is removed until you confirm.")
         }
         .padding(.vertical, 2)
         .accessibilityElement(children: .contain)

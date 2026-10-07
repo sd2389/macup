@@ -4,6 +4,8 @@ import Foundation
 public enum UninstallTarget: Sendable, Hashable {
     case app(InstalledApp)
     case package(UninstallablePackage)
+    /// What an app that is no longer installed left in `~/Library`.
+    case leftovers(OrphanedLeftovers)
     /// MacUp itself: `macup self-uninstall`, or Uninstall MacUp in Settings.
     case macUp
 }
@@ -48,6 +50,9 @@ public enum UninstallTargetResolver {
         if typed.lowercased() == "macup" || typed == "app:" + MacUpSelf.bundleIdentifier {
             return .success(.macUp)
         }
+        if typed.hasPrefix(OrphanScanner.targetPrefix) {
+            return leftovers(identifier: String(typed.dropFirst(OrphanScanner.targetPrefix.count)), in: catalog)
+        }
         if typed.hasPrefix("app:") {
             return app(identifier: String(typed.dropFirst(4)), in: catalog)
         }
@@ -59,6 +64,20 @@ public enum UninstallTargetResolver {
             return package(typed, in: catalog)
         }
         return app(name: typed, in: catalog)
+    }
+
+    /// `leftovers:com.example.app`, which names a group the scan found. It
+    /// resolves only against a scan that looked for them, so a group nobody
+    /// has seen cannot be removed by typing its name.
+    private static func leftovers(identifier: String, in catalog: UninstallCatalog) -> Result<UninstallTarget, UninstallTargetError> {
+        guard let group = catalog.orphans.first(where: { $0.identifier == identifier }) else {
+            return .failure(UninstallTargetError(
+                .notFound,
+                "MacUp found no leftovers named after \(TerminalText.sanitize(identifier)). "
+                    + "`macup uninstall --orphans` lists what it did find."
+            ))
+        }
+        return .success(.leftovers(group))
     }
 
     private static func app(identifier: String, in catalog: UninstallCatalog) -> Result<UninstallTarget, UninstallTargetError> {

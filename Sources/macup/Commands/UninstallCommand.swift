@@ -36,6 +36,9 @@ struct UninstallCommand: AsyncParsableCommand {
     @Flag(name: .long, help: "List what can be uninstalled. Reads only.")
     var list = false
 
+    @Flag(name: .long, help: "List what apps you have already removed left behind in your Library. Reads only.")
+    var orphans = false
+
     @Flag(name: .long, help: "Show what would be removed, and remove nothing.")
     var dryRun = false
 
@@ -59,7 +62,11 @@ struct UninstallCommand: AsyncParsableCommand {
 
     func validate() throws {
         if list && target != nil { throw ValidationError("--list lists everything; leave out the target.") }
-        if !list && target == nil { throw ValidationError("Name what to uninstall, or use --list.") }
+        if orphans && target != nil { throw ValidationError("--orphans lists what was left behind; leave out the target.") }
+        if list && orphans { throw ValidationError("Use --list or --orphans, not both.") }
+        if !list && !orphans && target == nil {
+            throw ValidationError("Name what to uninstall, or use --list or --orphans.")
+        }
     }
 
     func run() async throws {
@@ -70,11 +77,24 @@ struct UninstallCommand: AsyncParsableCommand {
         let uninstall = context.uninstallEnvironment
         let environment = context.checkEnvironment
 
+        // Looking for what an app left behind means measuring folders in
+        // ~/Library, so it happens only when it was asked for.
+        let wantsOrphans = orphans || target?.hasPrefix(OrphanScanner.targetPrefix) == true
         let catalog = await Interruption.run(handlingInterrupts: context.handlesInterrupts) {
-            await UninstallScanner().catalog(configuration: loaded, environment: environment, uninstall: uninstall, measureApps: false)
+            await UninstallScanner().catalog(
+                configuration: loaded,
+                environment: environment,
+                uninstall: uninstall,
+                measureApps: false,
+                includeOrphans: wantsOrphans
+            )
         }
         if list {
             context.print(json ? try JSONOutput.encode(catalog) : UninstallRenderer(style: style).catalog(catalog))
+            return
+        }
+        if orphans {
+            context.print(json ? try JSONOutput.encode(catalog) : UninstallRenderer(style: style).orphans(catalog))
             return
         }
 

@@ -545,7 +545,7 @@ public struct UninstallEngine: Sendable {
                 if let version = plan.subject.version {
                     checks.append(await scanner.mise.confirmUninstalled(tool: item, version: version, context: context))
                 }
-            case .app, .macUp:
+            case .app, .leftovers, .macUp:
                 break
             }
         }

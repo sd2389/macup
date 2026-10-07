@@ -55,6 +55,30 @@ struct UninstallRenderer {
         return lines.joined(separator: "\n")
     }
 
+    /// `macup uninstall --orphans`: what apps that are gone left behind.
+    func orphans(_ catalog: UninstallCatalog) -> String {
+        var lines = [style.bold("Left behind by apps you have removed") + style.dim(" · read-only · nothing was removed"), ""]
+        guard !catalog.orphans.isEmpty else {
+            lines.append("MacUp found none it is sure enough about to list.")
+            lines.append(style.dim("It lists a group only when the files are named after a bundle identifier no "
+                + "installed app claims, and look like an app's rather than a tool's."))
+            return lines.joined(separator: "\n")
+        }
+        for group in catalog.orphans {
+            var headline = style.bold(style.safe(group.identifier))
+            if let size = group.sizeBytes {
+                headline += style.dim("  " + UninstallSizeText.text(size, partial: group.sizeIsPartial))
+            }
+            lines.append(headline)
+            for reason in group.evidence { lines.append("    " + style.dim(style.text(reason))) }
+            for file in group.files { lines.append("    " + style.path(file.path)) }
+            lines.append("")
+        }
+        lines.append(style.dim("`macup uninstall \(catalog.orphans[0].target) --dry-run` shows what would be removed. "
+            + "Nothing is ticked: add what you want with --include <path> or --all."))
+        return lines.joined(separator: "\n")
+    }
+
     // MARK: What an uninstall would do
 
     func plan(_ plan: UninstallPlan, selection: UninstallSelection, dryRun: Bool) -> String {

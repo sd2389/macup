@@ -267,6 +267,8 @@ public struct UninstallSubject: Sendable, Hashable, Codable {
         case cask
         case npmPackage
         case miseRuntime
+        /// What an app that is gone left in `~/Library`.
+        case leftovers
         case macUp
 
         public var displayName: String {
@@ -276,6 +278,7 @@ public struct UninstallSubject: Sendable, Hashable, Codable {
             case .cask: "Homebrew cask"
             case .npmPackage: "npm global package"
             case .miseRuntime: "mise runtime"
+            case .leftovers: "Left behind"
             case .macUp: "MacUp"
             }
         }

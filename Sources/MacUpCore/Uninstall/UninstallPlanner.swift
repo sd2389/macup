@@ -46,9 +46,11 @@ public struct UninstallPlanner: Sendable {
                 plan = planNpm(package, catalog: catalog, environment: environment)
             case .miseRuntime:
                 plan = planMise(package, catalog: catalog, uninstall: uninstall, environment: environment)
-            case .app, .macUp:
+            case .app, .leftovers, .macUp:
                 plan = Self.missing(package, environment: environment)
             }
+        case .leftovers(let group):
+            plan = planLeftovers(group, uninstall: uninstall, environment: environment)
         case .macUp:
             plan = await SelfUninstallPlanner(uninstall: uninstall, paths: paths, homebrew: scanner.homebrew).plan(catalog: catalog, environment: environment)
         }
@@ -67,6 +69,47 @@ public struct UninstallPlanner: Sendable {
                 steps: ["`macup provider enable \(provider.rawValue)` turns it back on."]
             ))
         }
+        return plan
+    }
+
+    // MARK: What an app that is gone left behind
+
+    /// A plan with nothing to run: no package manager owns these files, and
+    /// the app that wrote them is not here to be asked about them.
+    ///
+    /// Nothing is ticked. MacUp matched a name in `~/Library` against an app
+    /// that is not installed, which is good evidence and not proof, so the
+    /// person ticks what goes (CLAUDE.md §1).
+    func planLeftovers(
+        _ group: OrphanedLeftovers,
+        uninstall: UninstallEnvironment,
+        environment: CheckEnvironment
+    ) -> UninstallPlan {
+        var plan = UninstallPlan(
+            createdAt: environment.now(),
+            subject: UninstallSubject(
+                kind: .leftovers,
+                target: group.target,
+                name: group.guessedName,
+                bundleIdentifier: group.identifier,
+                source: "Left behind"
+            ),
+            rationale: "These files in your Library are named after \(group.identifier), and no app with that "
+                + "identifier is installed, so the app that wrote them has been removed and they were left behind. "
+                + "MacUp cannot ask an app that is gone whether these are its files, so nothing is ticked: "
+                + "tick what you want removed."
+        )
+        plan.warnings = group.evidence
+        let boundary = uninstall.boundary(homebrewPrefix: nil, forMacUp: false)
+        Self.add(
+            group.files.map {
+                Leftover(path: $0.path, category: $0.category, selectedByDefault: false, reason: $0.reason)
+            },
+            to: &plan,
+            boundary: boundary,
+            owner: group.identifier
+        )
+        plan.verification = [VerificationStep(summary: "Check that each file you ticked is gone.")]
         return plan
     }
 

@@ -37,8 +37,9 @@ extension AppModel {
         return environment.uninstall ?? .live(homeDirectory: environment.homeDirectory, currentAppBundle: bundle)
     }
 
-    /// Reads what is installed. Reads only: it runs the same read-only
-    /// listings a check does and looks at app bundles; it changes nothing.
+    /// Reads what is installed, and what apps that are gone left behind.
+    /// Reads only: it runs the same read-only listings a check does and looks
+    /// at files; it changes nothing.
     func scanUninstallable() async {
         guard !uninstaller.isScanning else { return }
         uninstaller.isScanning = true
@@ -49,8 +50,18 @@ extension AppModel {
             configuration: configuration,
             environment: environment,
             uninstall: uninstallEnvironment,
-            measureApps: false
+            measureApps: false,
+            includeOrphans: true
         )
+    }
+
+    /// What apps that are no longer installed left in `~/Library`, biggest
+    /// group first.
+    var orphanedLeftovers: [OrphanedLeftovers] { uninstaller.catalog?.orphans ?? [] }
+
+    /// Opens the review for one group of leftovers. Nothing in it is ticked.
+    func reviewLeftovers(_ group: OrphanedLeftovers) async {
+        await reviewUninstall(.leftovers(group))
     }
 
     /// Works out what uninstalling `target` would remove and opens the review.
