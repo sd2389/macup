@@ -84,6 +84,34 @@ struct UninstallHardeningTests {
         #expect(found.isEmpty)
     }
 
+    @Test("A maker's namespace does not claim what another installed app's identifier or name claims")
+    func systemLeftoversLeaveOtherAppsAlone() throws {
+        let mac = try UninstallFixture()
+        let bundle = try mac.app("Word", identifier: "com.microsoft.Word")
+        try mac.app("Excel", identifier: "com.microsoft.Excel")
+        try mac.folder("SystemLibrary/Application Support/com.microsoft.Excel")
+        try mac.folder("SystemLibrary/Application Support/com.microsoft.autoupdate")
+        try mac.folder("SystemLibrary/Application Support/Excel")
+        try mac.file("SystemLibrary/Caches/Word")
+        let found = SystemLeftoverScanner(
+            systemLibrary: mac.root + "/SystemLibrary",
+            receiptsDirectory: mac.root + "/receipts",
+            otherBundleIdentifiers: ["com.microsoft.Excel"],
+            otherNames: ["Excel"],
+            userID: getuid()
+        ).scan(bundleIdentifier: "com.microsoft.Word", bundlePath: bundle, names: ["Word"])
+
+        #expect(found.map(\.path) == [mac.root + "/SystemLibrary/Application Support/com.microsoft.autoupdate"])
+        #expect(found[0].reason.contains("Another installed app has the same maker, so check whose it is"))
+    }
+
+    @Test("A maker's namespace is not read out of an identifier too short, or Apple's")
+    func vendorNamespaceNeedsASpecificIdentifier() {
+        #expect(SystemLeftoverScanner.vendorNamespace(of: "com.teamviewer.TeamViewer") == "com.teamviewer")
+        #expect(SystemLeftoverScanner.vendorNamespace(of: "com.google") == nil)
+        #expect(SystemLeftoverScanner.vendorNamespace(of: "com.apple.iWork.Keynote") == nil)
+    }
+
     @Test("The plan says why an app's bundle identifier was not used, or why nothing it matched is ticked")
     func identifierWarnings() {
         #expect(UninstallPlanner.identifierWarning("com.openai.chat", app: "ChatGPT") == nil)

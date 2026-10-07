@@ -381,7 +381,15 @@ every rule an update carries and a few of its own (ADR-022):
 - **Never into another disk.** A folder with another disk mounted inside it is
   listed as left in place, and a folder deleted permanently is walked again
   first; if MacUp cannot check all of it, or finds a mount, it is skipped.
-- **No administrator.** What needs one is listed with manual steps.
+- **No administrator.** What needs one is listed with manual steps, never
+  removed. Because of that, `/Library` and the installer receipts are read by
+  wider rules than `~/Library`: the bundle identifier, the maker's part of it
+  (`com.teamviewer` in `com.teamviewer.TeamViewer`, how an installer names its
+  own helpers, daemons, and receipts), and a folder named exactly like the
+  app. The plan says which rule found each one, the two weaker rules say to
+  check it first, and anything another installed app's identifier or name
+  claims is left to that app. An app in `/Applications` that an installer put
+  there as root is described as that, not as another person's.
 - **Stops for the obvious reasons.** An open app, a formula others need, or an
   unreadable configuration stops the uninstall; scheduled runs cannot
   uninstall at all.

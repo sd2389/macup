@@ -69,6 +69,14 @@ struct UninstallScanningTests {
         #expect(app.removability.steps.contains { $0.contains("administrator") })
     }
 
+    @Test("An app an installer put there as root is not described as another person's")
+    func rootOwnedAppsAreNotAnotherUsers() {
+        let user = getuid()
+        #expect(AppScanner.ownerPhrase(owner: 0, user: user) == "an installer put it there as root")
+        #expect(AppScanner.ownerPhrase(owner: user, user: user) == "you do not have permission to move it")
+        #expect(AppScanner.ownerPhrase(owner: user + 1, user: user) == "it belongs to another user")
+    }
+
     // MARK: Leftovers in the Library
 
     @Test("Each leftover is found by its rule and ticked by default only when it is not data")
@@ -177,6 +185,38 @@ struct UninstallScanningTests {
         #expect(daemon.reason.contains("MacUp never asks for a password"))
         let receipt = try #require(found.first { $0.path.hasSuffix(".pkg.plist") })
         #expect(receipt.steps == ["In Terminal, run: sudo pkgutil --forget com.docker.docker.pkg"])
+    }
+
+    @Test("What an installer named after the maker, or after the app, is listed too, with which rule found it")
+    func systemLeftoversNamedAfterTheMaker() throws {
+        let mac = try UninstallFixture()
+        let bundle = try mac.app("TeamViewer", identifier: "com.teamviewer.TeamViewer")
+        try mac.file("SystemLibrary/PrivilegedHelperTools/com.teamviewer.Helper")
+        try mac.folder("SystemLibrary/Application Support/TeamViewer")
+        try mac.file("receipts/com.teamviewer.teamviewerPriviledgedHelper.plist")
+        try mac.launchAgent(
+            mac.root + "/SystemLibrary/LaunchDaemons/com.teamviewer.UninstallerWatcher.plist",
+            label: "com.teamviewer.UninstallerWatcher",
+            program: mac.root + "/SystemLibrary/Application Support/TeamViewer/Uninstaller"
+        )
+        let found = SystemLeftoverScanner(
+            systemLibrary: mac.root + "/SystemLibrary",
+            receiptsDirectory: mac.root + "/receipts",
+            otherBundleIdentifiers: [],
+            userID: 501
+        ).scan(bundleIdentifier: "com.teamviewer.TeamViewer", bundlePath: bundle, names: ["TeamViewer"])
+
+        #expect(found.count == 4)
+        let helper = try #require(found.first { $0.path.hasSuffix("PrivilegedHelperTools/com.teamviewer.Helper") })
+        #expect(helper.reason.contains("Named after com.teamviewer, the maker's part"))
+        #expect(helper.reason.contains("Check it is this app's"))
+        let support = try #require(found.first { $0.path.hasSuffix("Application Support/TeamViewer") })
+        #expect(support.reason.contains("Named “TeamViewer”, like the app"))
+        let receipt = try #require(found.first { $0.path.hasSuffix("teamviewerPriviledgedHelper.plist") })
+        #expect(receipt.steps == ["In Terminal, run: sudo pkgutil --forget com.teamviewer.teamviewerPriviledgedHelper"])
+        let watcher = try #require(found.first { $0.path.hasSuffix("com.teamviewer.UninstallerWatcher.plist") })
+        #expect(watcher.steps.first == "In Terminal, stop it: sudo launchctl bootout system/com.teamviewer.UninstallerWatcher")
+        #expect(found.allSatisfy { $0.reason.contains("MacUp never asks for a password") })
     }
 
     // MARK: Homebrew

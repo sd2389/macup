@@ -9,6 +9,23 @@ was first released in 0.4.0. Their sections keep the version
 `docs/ROADMAP.md` assigned them, so each change stays with the work it
 belonged to.
 
+## [Unreleased]
+
+### Fixed
+- **An uninstall now lists what an installer left in `/Library`.** An app
+  whose installer names its helpers, daemons, and package receipts after the
+  maker rather than after the app — `com.teamviewer.Helper` for
+  `com.teamviewer.TeamViewer` — had none of them listed, so an uninstall could
+  look complete while three launchd jobs, two privileged helpers, a
+  `/Library/Application Support` folder, and seven receipts stayed behind.
+  MacUp still removes none of it: each one is listed with the exact steps, and
+  says which rule found it, because the maker's namespace and a folder named
+  like the app are weaker signals than the bundle identifier. What another
+  installed app's identifier or name claims is left to that app, and a shared
+  maker is said so.
+- **An app an installer put in `/Applications` as root** was described as
+  belonging to another user. It now says an installer put it there as root.
+
 ## [0.4.0] — 2026-09-30
 
 The first release that changes anything, and the first with downloads: a

@@ -259,7 +259,7 @@ public struct AppScanner: Sendable {
             : [finder]
         let parent = (path as NSString).deletingLastPathComponent
         if !FileTree.isWritable(parent) || !FileTree.isWritable(path) {
-            let who = status.owner == getuid() ? "you do not have permission to move it" : "it belongs to another user"
+            let who = Self.ownerPhrase(owner: status.owner, user: getuid())
             return InstalledApp.Removability(
                 kind: .needsAdministrator,
                 reason: "Removing \(name) needs an administrator: \(who)"
@@ -275,6 +275,18 @@ public struct AppScanner: Sendable {
             )
         }
         return .removable
+    }
+
+    /// Why the app cannot be moved without an administrator, from who owns
+    /// it. An installer package puts an app in `/Applications` as root, which
+    /// is the common case and not another person's account, so it is not
+    /// described as one.
+    static func ownerPhrase(owner: uid_t, user: uid_t) -> String {
+        switch owner {
+        case user: "you do not have permission to move it"
+        case 0: "an installer put it there as root"
+        default: "it belongs to another user"
+        }
     }
 
     /// A bundle identifier MacUp is willing to use to name folders:

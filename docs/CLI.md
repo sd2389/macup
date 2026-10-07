@@ -701,8 +701,15 @@ What is included by default:
   `--include-data` adds the data folders; `--include <path>` adds one listed
   path; `--all` adds everything MacUp can remove, for no residue.
 - **Listed, never removed by MacUp:** anything that needs an administrator,
-  such as `/Library/LaunchDaemons` jobs or installer receipts, with the exact
-  steps. MacUp never asks for a password.
+  with the exact steps. MacUp never asks for a password. Because it removes
+  none of it, MacUp looks wider in `/Library` and the installer receipts than
+  in your own Library: besides the bundle identifier, it lists what is named
+  after the maker's part of it (`com.teamviewer.Helper` for
+  `com.teamviewer.TeamViewer`), which is how installers name their helpers,
+  `/Library/LaunchDaemons` jobs, and package receipts, and a `/Library` folder
+  named exactly like the app. Each says which rule found it, and the two
+  weaker rules say to check before removing; what another installed app's
+  identifier or name claims is left to that app.
 
 At a terminal MacUp asks "Move to Trash or delete permanently?" every time
 (anything but `d` or `delete` is the Trash) and then asks you to confirm.

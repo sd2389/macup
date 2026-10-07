@@ -169,13 +169,15 @@ public struct UninstallPlanner: Sendable {
         if let identifier = app.bundleIdentifier, let warning = Self.identifierWarning(identifier, app: app.name) {
             plan.warnings.append(warning)
         }
+        let otherNames = Set(catalog.apps.filter { $0.path != app.path }.flatMap(\.names)).subtracting(app.names)
         let system = SystemLeftoverScanner(
             systemLibrary: uninstall.systemLibrary,
             receiptsDirectory: uninstall.receiptsDirectory,
             otherBundleIdentifiers: others,
+            otherNames: otherNames,
             userID: uninstall.userID
         )
-        for manual in system.scan(bundleIdentifier: app.bundleIdentifier, bundlePath: app.path)
+        for manual in system.scan(bundleIdentifier: app.bundleIdentifier, bundlePath: app.path, names: app.names)
         where !plan.cannotRemove.contains(where: { $0.path == manual.path }) {
             var manual = manual
             manual.sizeBytes = FileTree.size(of: manual.path)?.bytes
