@@ -40,6 +40,17 @@ public enum CommandAllowlist {
         CommandRule("softwareupdate", ["--list"], effect: .metadataRefresh),
     ]
 
+    /// The version commands `macup provider scan` may run: one fixed array
+    /// per tool in ``KnownTool/catalog``, and nothing else. The list is
+    /// derived from the catalog so a tool cannot be scanned without its
+    /// command being reviewed here — adding a catalog entry whose arguments
+    /// are not a plain, non-modifying version query is the trust decision,
+    /// and the scan takes no positional arguments at all, so it can never
+    /// name a package.
+    public static let toolScan: [CommandRule] = KnownTool.catalog
+        .filter { !$0.versionArguments.isEmpty }
+        .map { CommandRule($0.executable, $0.versionArguments) }
+
     /// Read-only commands that name one item, run only when someone asks
     /// about that item: `macup dependents`, or Show What Depends on It in the
     /// app. ``DependentsLookup`` adds these to ``readOnlyCheck``, which it

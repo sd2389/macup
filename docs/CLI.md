@@ -93,6 +93,7 @@ macup --generate-completion-script zsh > ~/.zsh/completions/_macup
 | `macup policy note <package-id> "<text>"` / `--clear` `[--json]` | Keeps your own one-line note on an item (at most 200 characters), shown in `policy list`, `check`, `plan`, and the app, and never acted on. |
 | `macup exclude <package-id>… [--json]` | Shorthand for `macup policy set … ignore`; the same rule in the same place. |
 | `macup providers` / `macup provider list [--json]` | Shows which providers were found and exactly which installation MacUp uses. Runs detection only. |
+| `macup provider scan [--all] [--json]` | Shows every package manager and version manager on this Mac, including the ones MacUp does not manage. Reads only: it resolves each tool and asks the ones it finds for their version. |
 | `macup provider enable <id> [--json]` | Lets MacUp check a provider again and propose its updates. |
 | `macup provider disable <id> [--json]` | Stops MacUp checking a provider. Uninstalls nothing. |
 | `macup config` / `macup config show [--json]` | Shows the configuration in effect and every problem with it. Never creates the file. |
@@ -642,6 +643,12 @@ the millisecond.
 
 - `macup provider list --json` → `"kind": "providerList"`: `macupVersion`,
   `providers[]` (as above, detection fields only), `commands[]`.
+- `macup provider scan --json` → `"kind": "toolScan"`: `scannedAt`,
+  `managed[]` and `unmanaged[]` (`id`, `displayName`, `kind`
+  (`packageManager` or `versionManager`), `manages`, `managedBy` when a MacUp
+  provider manages it, `path`, `canonicalPath`, `source`, `version`,
+  `otherPaths[]`, `note`), and `absent[]` (the ids MacUp looked for and did
+  not find).
 - `macup policy list --json` → `"kind": "policyList"`: `defaultPolicy`,
   `confirmMajorUpdates`, `providers[]` (`provider`, `enabled`, `policy` as
   written, `effectivePolicy`, `explicit` — false when the row is MacUp's

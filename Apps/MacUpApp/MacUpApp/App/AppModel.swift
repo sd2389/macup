@@ -52,6 +52,8 @@ final class AppModel {
     let dependents = DependentsModel()
     /// The Uninstall screen and its review sheet (AppModel+Uninstall.swift).
     let uninstaller = UninstallState()
+    /// Every package manager on this Mac, managed or not (AppModel+Tools.swift).
+    let tools = ToolScanModel()
 
     init(environment: AppEnvironment = .live()) {
         self.environment = environment

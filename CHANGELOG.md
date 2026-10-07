@@ -11,6 +11,19 @@ belonged to.
 
 ## [Unreleased]
 
+### Added
+- **Every package manager on this Mac**: `macup provider scan` and an "Also on
+  This Mac" section on the app's Providers screen list the package managers
+  and version managers MacUp finds — MacPorts, Nix, pipx, uv, pip, Poetry,
+  conda, Cargo, rustup, RubyGems, Go, pnpm, Yarn, Bun, Deno, asdf, Volta,
+  pyenv, rbenv, jenv, Composer, mas, and the shell-function ones, nvm and
+  SDKMAN! — with the version of each and where it is installed. Reads only, in
+  two ways: a copy in a location somebody else could write is reported and
+  never run, and the only command the scan can issue is a tool's fixed version
+  query, because its runner is the same read-only guard a check uses. Finding
+  a tool is not managing it: MacUp still updates only Homebrew, npm, mise, and
+  macOS, and proposes nothing for the rest.
+
 ### Fixed
 - **An uninstall now lists what an installer left in `/Library`.** An app
   whose installer names its helpers, daemons, and package receipts after the

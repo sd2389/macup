@@ -1,4 +1,5 @@
 import ArgumentParser
+import Foundation
 import MacUpCore
 
 struct ProviderCommand: AsyncParsableCommand {
@@ -13,7 +14,9 @@ struct ProviderCommand: AsyncParsableCommand {
             disabling one is how you take a whole ecosystem out of MacUp's hands \
             without touching the tool itself.
             """,
-        subcommands: [ProviderListCommand.self, ProviderEnableCommand.self, ProviderDisableCommand.self],
+        subcommands: [
+            ProviderListCommand.self, ProviderScanCommand.self, ProviderEnableCommand.self, ProviderDisableCommand.self,
+        ],
         defaultSubcommand: ProviderListCommand.self,
         aliases: ["providers"]
     )
@@ -86,6 +89,74 @@ struct ProviderListCommand: AsyncParsableCommand {
     }
 }
 
+struct ProviderScanCommand: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "scan",
+        abstract: "Show every package manager and version manager on this Mac, managed or not.",
+        discussion: """
+            Reads only. MacUp looks for each tool where it is usually installed and on             your PATH, and asks the ones it finds for their version. It runs nothing             else: a tool MacUp does not manage is listed so you can see your whole             environment, not so MacUp can change it.
+
+            MacUp updates only what its providers manage — Homebrew, npm, mise, and             macOS. Everything else is listed and left alone.
+            """
+    )
+
+    @Flag(name: .long, help: "Also list the tools MacUp looked for and did not find.")
+    var all = false
+
+    @Flag(name: .long, help: "Print machine-readable JSON (schema version 1).")
+    var json = false
+
+    func run() async throws {
+        let context = CLIContext.current
+        let scan = await Interruption.run(handlingInterrupts: context.handlesInterrupts) {
+            await ToolScanner().scan(environment: context.checkEnvironment)
+        }
+        if json {
+            context.print(try JSONOutput.encode(ToolScanDocument(scan)))
+            return
+        }
+        let style = TextStyle(enabled: context.allowsStyling, homeDirectory: context.homeDirectory)
+        context.print(render(scan, style: style))
+    }
+
+    private func render(_ scan: ToolScan, style: TextStyle) -> String {
+        var lines: [String] = []
+        func section(_ title: String, _ tools: [FoundTool], note: String?) {
+            guard !tools.isEmpty else { return }
+            if !lines.isEmpty { lines.append("") }
+            lines.append(style.bold(title))
+            if let note { lines.append(style.dim(note)) }
+            let width = tools.map(\.tool.displayName.count).max() ?? 0
+            for found in tools {
+                var line = "  " + style.bold(TextStyle.pad(found.tool.displayName, to: width))
+                if let version = found.version { line += "  " + style.safe(version) }
+                lines.append(line)
+                var detail = "\(found.tool.kind.displayName) · \(found.tool.manages)"
+                if let path = found.path { detail += " · " + style.path(path) }
+                lines.append("    " + style.dim(detail))
+                if let note = found.note { lines.append("    " + style.dim(style.text(note))) }
+                for other in found.otherPaths {
+                    lines.append("    " + style.dim("also installed at " + style.path(other)))
+                }
+            }
+        }
+
+        section("Managed by MacUp", scan.managed, note: "MacUp checks these and can update them.")
+        section(
+            "Found, not managed by MacUp",
+            scan.unmanaged,
+            note: "MacUp lists these and leaves them alone: it proposes no update and runs nothing of theirs."
+        )
+        if all, !scan.absent.isEmpty {
+            if !lines.isEmpty { lines.append("") }
+            lines.append(style.bold("Looked for, not on this Mac"))
+            lines.append("  " + scan.absent.map(\.displayName).joined(separator: ", "))
+        }
+        if lines.isEmpty { return "MacUp found none of the package managers it knows about." }
+        return lines.joined(separator: "\n")
+    }
+}
+
 /// `macup provider enable` and `macup provider disable`, which differ only in
 /// the value they write, so they share everything else.
 struct ProviderSwitch {
@@ -153,6 +224,55 @@ struct ProviderDisableCommand: AsyncParsableCommand {
 
     func run() async throws {
         try await ProviderSwitch(enabled: false, provider: provider, json: json).run()
+    }
+}
+
+/// `macup provider scan --json`, flattened: one object per tool, with what
+/// MacUp knows about it and nothing about how MacUp looked for it.
+struct ToolScanDocument: Encodable {
+    struct Tool: Encodable {
+        let id: String
+        let displayName: String
+        let kind: String
+        let manages: String
+        /// The MacUp provider that manages it, or absent when none does.
+        let managedBy: String?
+        let path: String?
+        let canonicalPath: String?
+        let source: String?
+        let version: String?
+        let otherPaths: [String]
+        let note: String?
+
+        init(_ found: FoundTool) {
+            id = found.tool.id
+            displayName = found.tool.displayName
+            kind = found.tool.kind.rawValue
+            manages = found.tool.manages
+            managedBy = found.tool.managedBy?.rawValue
+            path = found.path
+            canonicalPath = found.canonicalPath
+            source = found.source?.rawValue
+            version = found.version
+            otherPaths = found.otherPaths
+            note = found.note
+        }
+    }
+
+    let schemaVersion = 1
+    let kind = "toolScan"
+    let macupVersion = MacUp.version
+    let scannedAt: Date
+    let managed: [Tool]
+    let unmanaged: [Tool]
+    /// The catalog entries this Mac does not have, by id.
+    let absent: [String]
+
+    init(_ scan: ToolScan) {
+        scannedAt = scan.scannedAt
+        managed = scan.managed.map(Tool.init)
+        unmanaged = scan.unmanaged.map(Tool.init)
+        absent = scan.absent.map(\.id)
     }
 }
 

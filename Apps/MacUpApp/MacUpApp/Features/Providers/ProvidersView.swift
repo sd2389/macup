@@ -34,6 +34,8 @@ struct ProvidersView: View {
                 )
             }
 
+            OtherToolsSection()
+
             Section {
                 Text("Auto Update lets `macup update` run that provider's updates without asking; an unknown risk or a macOS update still waits for you, and so does a major version change unless you have turned that off. Ask First shows each update for you to confirm. Ignore leaves them all alone. Turning a provider off means MacUp does not even check it.")
                     .foregroundStyle(.secondary)
@@ -46,7 +48,72 @@ struct ProvidersView: View {
             }
         }
         .formStyle(.grouped)
-        .onAppear { model.loadConfiguration() }
+        .onAppear {
+            model.loadConfiguration()
+            model.scanToolsIfNeeded()
+        }
+    }
+}
+
+/// Everything else on this Mac that installs or updates software: found by
+/// the same read-only scan as `macup provider scan`, listed so the whole
+/// environment is visible, and left alone. MacUp proposes no update for
+/// these and runs nothing of theirs.
+private struct OtherToolsSection: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        Section {
+            if model.isScanningTools && model.unmanagedTools.isEmpty {
+                HStack(spacing: 8) {
+                    ProgressView().controlSize(.small)
+                    Text("Looking for other package managers…")
+                }
+            } else if model.unmanagedTools.isEmpty {
+                Text("MacUp found no other package manager it recognises.")
+                    .foregroundStyle(.secondary)
+            }
+            ForEach(model.unmanagedTools) { found in
+                LabeledContent {
+                    Text(found.version?.displaySafe ?? "")
+                        .font(.callout.monospaced())
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                } label: {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(found.tool.displayName).font(.headline)
+                        Text("\(found.tool.kind.displayName) · \(found.tool.manages)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        if let path = found.path {
+                            Text(path.displayPath)
+                                .font(.caption.monospaced())
+                                .foregroundStyle(.secondary)
+                                .textSelection(.enabled)
+                        }
+                        if let note = found.note {
+                            Text(note.displaySafe).font(.caption).foregroundStyle(.secondary)
+                        }
+                        ForEach(found.otherPaths, id: \.self) { other in
+                            Text("also installed at \(other.displayPath)")
+                                .font(.caption.monospaced())
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+        } header: {
+            HStack {
+                Text("Also on This Mac")
+                Spacer()
+                Button("Scan Again") { model.scanTools() }
+                    .buttonStyle(.link)
+                    .disabled(model.isScanningTools)
+            }
+        } footer: {
+            Text("MacUp lists these so you can see your whole environment. It updates only Homebrew, npm, mise, and macOS: it proposes nothing for these and runs nothing of theirs. The same scan is `macup provider scan`.")
+                .leadingFooter()
+        }
     }
 }
 

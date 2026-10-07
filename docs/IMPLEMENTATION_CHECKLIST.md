@@ -417,20 +417,21 @@ work (CLAUDE.md §26.13).
 Six pieces of work, in the order they are being built. Each ships in both
 surfaces, with tests and docs, in its own commit (CLAUDE.md §26.13).
 
-### 8.1 — Every package manager on this Mac (read-only)
+### 8.1 — Every package manager on this Mac (read-only) — done
 
-- [ ] A catalog of the package managers and version managers MacUp can
+- [x] A catalog of the package managers and version managers MacUp can
       recognise, each with its executable, standard locations, and whether a
-      MacUp provider manages it
-- [ ] A scanner that resolves each through `ExecutableResolver` (so an
+      MacUp provider manages it (`KnownTools.swift`, 26 entries)
+- [x] A scanner that resolves each through `ExecutableResolver` (so an
       untrusted location is reported, never run) and reads its version with
-      one fixed read-only argument array
-- [ ] Tools detected by a directory alone, such as nvm, where there is no
-      executable to resolve
-- [ ] CLI: `macup provider scan`, with `--json`
-- [ ] App: the found-but-unmanaged tools on the Providers screen
-- [ ] Tests: fake file system and runner, every shape (absent, found,
-      several installations, untrusted location, version command fails)
+      one fixed read-only argument array, behind `CommandAllowlist.toolScan`
+- [x] Tools detected by a file alone, such as nvm and SDKMAN!, where there is
+      no executable to resolve
+- [x] CLI: `macup provider scan`, with `--all` and `--json`
+- [x] App: "Also on This Mac" on the Providers screen, with Scan Again
+- [x] Tests: fake file system and runner, every shape (absent, found,
+      several installations, untrusted location, version command fails, a
+      catalog entry whose command the guard refuses)
 
 ### 8.2 — Self-update through whatever installed MacUp
 

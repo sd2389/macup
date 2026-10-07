@@ -50,21 +50,21 @@ struct ContentView: View {
         @Bindable var model = model
         NavigationSplitView {
             List(selection: $model.section) {
-                Label("Dashboard", systemImage: "rectangle.grid.2x2")
+                SidebarLabel("Dashboard", systemImage: "rectangle.grid.2x2")
                     .tag(AppModel.Section.dashboard)
-                Label("Providers", systemImage: "shippingbox")
+                SidebarLabel("Providers", systemImage: "shippingbox")
                     .tag(AppModel.Section.providers)
-                Label("Updates", systemImage: "arrow.down.circle")
+                SidebarLabel("Updates", systemImage: "arrow.down.circle")
                     .badge(model.updateCount)
                     .tag(AppModel.Section.updates)
-                Label("Uninstall", systemImage: "trash")
+                SidebarLabel("Uninstall", systemImage: "trash")
                     .tag(AppModel.Section.uninstall)
-                Label("Features", systemImage: "switch.2")
+                SidebarLabel("Features", systemImage: "switch.2")
                     .tag(AppModel.Section.features)
-                Label("Doctor", systemImage: "stethoscope")
+                SidebarLabel("Doctor", systemImage: "stethoscope")
                     .badge(model.attentionCount)
                     .tag(AppModel.Section.doctor)
-                Label("History", systemImage: "clock.arrow.circlepath")
+                SidebarLabel("History", systemImage: "clock.arrow.circlepath")
                     .tag(AppModel.Section.history)
             }
             .navigationSplitViewColumnWidth(min: 180, ideal: 200)
@@ -135,6 +135,31 @@ struct ContentView: View {
         if model.isChecking { return "Checking…" }
         guard let report = model.report else { return "" }
         return "Checked at \(report.finishedAt.formatted(date: .omitted, time: .shortened))"
+    }
+}
+
+/// A sidebar row's label, with its icon in the text's color: white in dark
+/// mode and black in light, where macOS would otherwise tint it with the
+/// accent color. It takes `Color.primary` rather than `.primary`, because in a
+/// sidebar the hierarchical `.primary` is the first level of that tint and so
+/// stays the accent color; a style set on the whole `Label` does not reach the
+/// icon at all.
+private struct SidebarLabel: View {
+    let title: String
+    let systemImage: String
+
+    init(_ title: String, systemImage: String) {
+        self.title = title
+        self.systemImage = systemImage
+    }
+
+    var body: some View {
+        Label {
+            Text(title)
+        } icon: {
+            Image(systemName: systemImage)
+                .foregroundStyle(Color.primary)
+        }
     }
 }
 
