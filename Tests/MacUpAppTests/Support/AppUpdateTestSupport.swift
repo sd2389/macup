@@ -40,7 +40,8 @@ final class StubPlanningProvider: UpdateProvider, @unchecked Sendable {
     init(
         id: ProviderID = .homebrew,
         candidates: [UpdateCandidate] = [],
-        canApplyUpdates: Bool = true
+        canApplyUpdates: Bool = true,
+        prefix: String? = nil
     ) {
         self.id = id
         var capabilities: Set<ProviderCapability> = [
@@ -57,7 +58,8 @@ final class StubPlanningProvider: UpdateProvider, @unchecked Sendable {
                 canonicalPath: Self.executable,
                 source: .standardLocation
             ),
-            version: "4.0.0"
+            version: "4.0.0",
+            facts: prefix.map { [ProviderFact(key: "prefix", label: "Prefix", value: $0)] } ?? []
         )
     }
 

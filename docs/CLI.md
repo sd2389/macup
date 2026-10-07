@@ -96,6 +96,7 @@ macup --generate-completion-script zsh > ~/.zsh/completions/_macup
 | `macup provider scan [--all] [--json]` | Shows every package manager and version manager on this Mac, including the ones MacUp does not manage. Reads only: it resolves each tool and asks the ones it finds for their version. |
 | `macup provider enable <id> [--json]` | Lets MacUp check a provider again and propose its updates. |
 | `macup provider disable <id> [--json]` | Stops MacUp checking a provider. Uninstalls nothing. |
+| `macup self-update [--dry-run] [-y] [--refresh] [--json]` | Updates MacUp itself through whatever installed it. With Homebrew, an ordinary Homebrew update with the same plan, confirmation, and history. A copy you downloaded is pointed at its releases page and left alone. |
 | `macup config` / `macup config show [--json]` | Shows the configuration in effect and every problem with it. Never creates the file. |
 | `macup config path [--json]` | Prints the configuration file and state directory locations. |
 | `macup schedule` / `macup schedule status [--json]` | Shows whether a check is scheduled, when it next runs, and what the last one found. Read-only. |
@@ -643,6 +644,12 @@ the millisecond.
 
 - `macup provider list --json` → `"kind": "providerList"`: `macupVersion`,
   `providers[]` (as above, detection fields only), `commands[]`.
+- `macup self-update --json` → `"kind": "selfUpdate"` (when there is nothing
+  to run): `runningVersion`, `managedByHomebrew`, `updateAvailable`,
+  `availableVersion`, `installations[]` (`kind` — `homebrewFormula`,
+  `homebrewCask`, or `downloaded` — `item`, `path`), `unknownReason`,
+  `releasesURL`. With an update to run it prints the ordinary execution
+  document instead.
 - `macup provider scan --json` → `"kind": "toolScan"`: `scannedAt`,
   `managed[]` and `unmanaged[]` (`id`, `displayName`, `kind`
   (`packageManager` or `versionManager`), `manages`, `managedBy` when a MacUp

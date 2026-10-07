@@ -433,16 +433,22 @@ surfaces, with tests and docs, in its own commit (CLAUDE.md §26.13).
       several installations, untrusted location, version command fails, a
       catalog entry whose command the guard refuses)
 
-### 8.2 — Self-update through whatever installed MacUp
+### 8.2 — Self-update through whatever installed MacUp — done
 
-- [ ] MacUp knows how it was installed (Homebrew cask, Homebrew formula, or
-      a copy you downloaded)
-- [ ] An update plan for the first two, built from the Homebrew data MacUp
-      already reads — no new network code
-- [ ] A downloaded copy is told where its releases are, and nothing more
-- [ ] CLI: `macup self-update`, with `--dry-run`
-- [ ] App: Settings > a MacUp update row beside Uninstall MacUp
-- [ ] Tests: each installation shape, and that a downloaded copy plans nothing
+- [x] MacUp knows how it was installed (Homebrew cask, Homebrew formula, or
+      a copy you downloaded), from the Cellar and Caskroom under Homebrew's
+      own prefix
+- [x] An update plan for the first two, built from the Homebrew data MacUp
+      already reads — no new network code, and the one shared `UpdateRun`
+      path, so updating MacUp cannot skip a confirmation the ordinary path
+      makes
+- [x] A downloaded copy is told where its releases are, and nothing more
+- [x] Homebrew that could not be used reads as "unknown", never "up to date"
+- [x] CLI: `macup self-update`, with `--dry-run`, `--refresh`, `--json`
+- [x] App: Settings > MacUp Updates, with Update MacUp… (the ordinary review
+      sheet) or Open Releases Page
+- [x] Tests: each installation shape, policy that forbids it, only MacUp's
+      own item is ever in the plan, and that a downloaded copy plans nothing
 
 ### 8.3 — Leftovers of apps that are already gone
 

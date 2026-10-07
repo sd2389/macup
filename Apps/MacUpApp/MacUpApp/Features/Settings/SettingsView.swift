@@ -9,6 +9,48 @@ import SwiftUI
 /// changes a policy, so this screen and `macup policy set` cannot disagree
 /// (CLAUDE.md §12). The feature switches live on the Features screen, where one
 /// row per feature is easier to find than a section part-way down a long form.
+/// Updating MacUp itself. MacUp opens no network connection, so this says
+/// nothing until a check has run: when Homebrew installed MacUp, Homebrew's
+/// own outdated list is the answer, and a copy that was downloaded by hand is
+/// pointed at its releases page and left alone.
+private struct MacUpUpdateSection: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        Section {
+            if let status = model.selfUpdateStatus {
+                Text(status.headline.displaySafe).fixedSize(horizontal: false, vertical: true)
+                ForEach(status.installations) { installation in
+                    LabeledContent(installation.displayName) {
+                        Text(installation.path?.displayPath ?? "")
+                            .font(.caption.monospaced())
+                            .foregroundStyle(.secondary)
+                            .textSelection(.enabled)
+                    }
+                }
+                if status.hasUpdate {
+                    Button("Update MacUp…") { Task { await model.reviewSelfUpdate() } }
+                        .help("Shows the same review as any other update, with the exact command, before anything runs.")
+                } else if !status.isManagedByHomebrew {
+                    Button("Open Releases Page") {
+                        if let url = URL(string: status.releasesURL) { NSWorkspace.shared.open(url) }
+                    }
+                    .help("Opens your browser. MacUp never downloads or replaces itself.")
+                }
+            } else {
+                Text("MacUp checks for its own update with the same check it runs for everything else. Check for updates once, and this says where MacUp came from and whether Homebrew has a newer version.")
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        } header: {
+            Text("MacUp Updates")
+        } footer: {
+            Text("MacUp opens no connection of its own. When Homebrew installed MacUp, updating it is an ordinary Homebrew update with the same plan, confirmation, and history. The same thing is `macup self-update`.")
+                .leadingFooter()
+        }
+    }
+}
+
 struct SettingsView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.openWindow) private var openWindow
@@ -117,6 +159,8 @@ struct SettingsView: View {
                     : "MacUp could not read every rule in this file, so it will not change any of them until that is fixed.")
                     .leadingFooter()
             }
+
+            MacUpUpdateSection()
 
             Section("Privacy") {
                 Text("MacUp has no telemetry and no account. Nothing about your Mac leaves it, except the requests your package managers make themselves.")

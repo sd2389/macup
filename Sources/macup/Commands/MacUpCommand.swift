@@ -47,6 +47,7 @@ struct MacUpCommand: AsyncParsableCommand {
             DiagnosticsCommand.self,
             HistoryCommand.self,
             UninstallCommand.self,
+            SelfUpdateCommand.self,
             SelfUninstallCommand.self,
             ConfigCommand.self,
             ScheduleCommand.self,

@@ -39,9 +39,11 @@ fi
 # each provider's one reviewed place for the commands an uninstall runs.
 planning_files='^Sources/MacUpCore/Execution/ModifyingCommandRules\.swift:|^Sources/MacUpCore/Providers/(Homebrew/Homebrew|Npm/Npm|Mise/Mise)(Update|Uninstall)Plan\.swift:'
 # Uses of the word that are not commands: the uninstall report's document
-# kind, the words History search matches for an uninstall entry, and the name
-# of MacUp's own `macup uninstall` command.
-not_commands='^Sources/MacUpCore/Uninstall/UninstallEngine\.swift:[0-9]+:.*kind|^Sources/MacUpCore/History/HistoryFilter\.swift:[0-9]+:.*fields \+=|^Sources/macup/Commands/UninstallCommand\.swift:[0-9]+: *commandName: "uninstall",$'
+# kind, the words History search matches for an uninstall entry, and the names
+# of MacUp's own `macup uninstall` and `macup self-update` commands. Neither
+# name reaches a provider: `macup self-update` plans an ordinary Homebrew
+# update through the same planning file as any other item.
+not_commands='^Sources/MacUpCore/Uninstall/UninstallEngine\.swift:[0-9]+:.*kind|^Sources/MacUpCore/History/HistoryFilter\.swift:[0-9]+:.*fields \+=|^Sources/macup/Commands/UninstallCommand\.swift:[0-9]+: *commandName: "uninstall",$|^Sources/macup/Commands/SelfUpdateCommand\.swift:[0-9]+: *commandName: "self-update",$'
 verbs=$(grep -rnE '"(upgrade|install|reinstall|uninstall|remove|rm|cleanup|autoremove|prune|self-update|use|--install|--download|--bump|--all)"' Sources Apps \
     | grep -vE "$planning_files" | grep -vE "$not_commands" || true)
 if [[ -n "$verbs" ]]; then

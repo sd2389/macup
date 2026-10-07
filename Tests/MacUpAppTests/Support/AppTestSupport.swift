@@ -76,7 +76,12 @@ final class StubCheckProvider: UpdateProvider, @unchecked Sendable {
     /// Held here so a test can watch a check in progress.
     var detectRendezvous: Rendezvous?
 
-    init(updateNames: [String] = [], outdatedError: MacUpError? = nil, unreadableUpdates: Int = 0) {
+    /// The Homebrew prefix this stub reports, so a test can describe a Mac
+    /// where Homebrew installed something — MacUp itself, for instance.
+    var prefix: String?
+
+    init(updateNames: [String] = [], outdatedError: MacUpError? = nil, unreadableUpdates: Int = 0, prefix: String? = nil) {
+        self.prefix = prefix
         _updates = updateNames.map { name in
             UpdateCandidate(
                 id: try! PackageID(.brew, name),
@@ -105,7 +110,8 @@ final class StubCheckProvider: UpdateProvider, @unchecked Sendable {
                     canonicalPath: "/stub/bin/brew",
                     source: .standardLocation
                 ),
-                version: "4.0.0"
+                version: "4.0.0",
+                facts: lock.withLock { prefix }.map { [ProviderFact(key: "prefix", label: "Prefix", value: $0)] } ?? []
             )
         )
     }

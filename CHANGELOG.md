@@ -24,6 +24,17 @@ belonged to.
   a tool is not managing it: MacUp still updates only Homebrew, npm, mise, and
   macOS, and proposes nothing for the rest.
 
+- **MacUp updates itself the way it was installed**: `macup self-update` and a
+  MacUp Updates section in the app's Settings. MacUp opens no connection of its
+  own, so it never asks a server for a version: when Homebrew installed MacUp,
+  Homebrew's own outdated list — the one every check already reads — is the
+  answer, and updating is an ordinary Homebrew update with the same plan, the
+  same exact command, the same confirmation, the same approval gate, and the
+  same history as any other item. A copy you downloaded and moved into place is
+  told where its releases are and left alone: MacUp never downloads, unpacks,
+  or replaces itself. When Homebrew installed MacUp but could not be used,
+  MacUp says it does not know rather than that it is up to date.
+
 ### Fixed
 - **An uninstall now lists what an installer left in `/Library`.** An app
   whose installer names its helpers, daemons, and package receipts after the
