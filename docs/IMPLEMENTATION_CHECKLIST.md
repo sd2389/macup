@@ -411,3 +411,83 @@ work (CLAUDE.md §26.13).
 - [ ] SwiftUI previews (the preview macros ship with Xcode)
 - [ ] Asset catalog (needs Xcode). The icon itself is drawn from source by
       `scripts/make-icon.swift` rather than committed as a binary.
+
+## Phase 8 — what the owner asked for after v0.4.0
+
+Six pieces of work, in the order they are being built. Each ships in both
+surfaces, with tests and docs, in its own commit (CLAUDE.md §26.13).
+
+### 8.1 — Every package manager on this Mac (read-only)
+
+- [ ] A catalog of the package managers and version managers MacUp can
+      recognise, each with its executable, standard locations, and whether a
+      MacUp provider manages it
+- [ ] A scanner that resolves each through `ExecutableResolver` (so an
+      untrusted location is reported, never run) and reads its version with
+      one fixed read-only argument array
+- [ ] Tools detected by a directory alone, such as nvm, where there is no
+      executable to resolve
+- [ ] CLI: `macup provider scan`, with `--json`
+- [ ] App: the found-but-unmanaged tools on the Providers screen
+- [ ] Tests: fake file system and runner, every shape (absent, found,
+      several installations, untrusted location, version command fails)
+
+### 8.2 — Self-update through whatever installed MacUp
+
+- [ ] MacUp knows how it was installed (Homebrew cask, Homebrew formula, or
+      a copy you downloaded)
+- [ ] An update plan for the first two, built from the Homebrew data MacUp
+      already reads — no new network code
+- [ ] A downloaded copy is told where its releases are, and nothing more
+- [ ] CLI: `macup self-update`, with `--dry-run`
+- [ ] App: Settings > a MacUp update row beside Uninstall MacUp
+- [ ] Tests: each installation shape, and that a downloaded copy plans nothing
+
+### 8.3 — Leftovers of apps that are already gone
+
+- [ ] A scan of `~/Library` and `/Library` for files whose app is no longer
+      installed, grouped by the app that left them
+- [ ] Matched by bundle identifier or by the maker's namespace, never by
+      resemblance; nothing is ticked by default
+- [ ] CLI: `macup uninstall --orphans`, with `--json` and the same review
+- [ ] App: the Uninstall screen lists them beside the installed apps
+- [ ] Tests: an orphan found, a live app's files never offered, a shared
+      maker left alone
+
+### 8.4 — Scheduled updating (ADR, owner decision 2026-10-07)
+
+- [ ] ADR recording that the launchd job may now also run
+      `macup update --scheduled`, and what guards that
+- [ ] `scripts/check-trust-invariants.sh` allows exactly those two command
+      shapes and no other
+- [ ] A scheduled update touches only items that resolve to `auto`, and
+      refuses anything that may need a password or a restart
+- [ ] Notifications from the app bundle: what was updated, what is waiting
+- [ ] CLI: `macup schedule enable --updates`, and `macup update --scheduled`
+- [ ] App: Settings > Scheduling, with the same switch and the exact command
+- [ ] Tests: an `ask` item is never updated, a password-needing plan is
+      refused, the history says a scheduled run did it
+
+### 8.5 — Doctor that can fix what it is sure about
+
+- [ ] A finding may carry one reviewed fix: the exact executable and
+      arguments, or a configuration edit MacUp makes itself
+- [ ] A fix is always user-initiated, always shows its plan first, and is
+      recorded in History like any other change
+- [ ] Findings with no safe fix keep saying so
+- [ ] CLI: `macup doctor --fix <finding-id>`, with `--dry-run`
+- [ ] App: a Fix button on the findings that have one
+- [ ] Tests: every fixable finding, a refused fix, and a fix whose
+      precondition changed since the finding was made
+
+### 8.6 — Developer ID signing and notarization
+
+- [ ] `scripts/package-release.sh` signs with a Developer ID when one is
+      configured and stays ad-hoc when it is not
+- [ ] Notarization and stapling as a separate, documented step
+- [ ] A release workflow that reads the certificate and the App Store Connect
+      key from repository secrets, never from the repository
+- [ ] `docs/RELEASE.md` says exactly which secrets to add
+- [ ] This Mac has no Developer ID certificate today (`security find-identity
+      -v -p codesigning` finds none), so the signed path is unverified until
+      the owner has one
