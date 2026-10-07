@@ -45,12 +45,6 @@ public struct RemovalOutcome: Sendable, Hashable, Codable, Identifiable {
     public var id: String { path }
 }
 
-/// Removes the files of a confirmed uninstall plan, one at a time. Behind a
-/// protocol so the engine can be tested without removing anything.
-public protocol FileRemoving: Sendable {
-    func remove(_ removal: PlannedRemoval, mode: RemovalMode, within boundary: RemovalBoundary) -> RemovalOutcome
-}
-
 /// The two operating-system calls that remove something. Behind a protocol
 /// so no test ever touches the real Trash.
 public protocol FileRemovalBackend: Sendable {
@@ -97,7 +91,7 @@ public struct SystemFileRemovalBackend: FileRemovalBackend {
 /// A link is removed as a link and never followed. Anything that fails a
 /// check is skipped and reported with the reason; nothing is adjusted into a
 /// path that would pass.
-public struct GuardedFileRemover: FileRemoving {
+public struct GuardedFileRemover: Sendable {
     public var backend: any FileRemovalBackend
 
     public init(backend: any FileRemovalBackend = SystemFileRemovalBackend()) {

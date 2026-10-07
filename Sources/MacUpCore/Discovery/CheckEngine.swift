@@ -132,7 +132,7 @@ public struct CheckEngine: Sendable {
                     let start = clock.now
                     let status = await provider.detect(context: context)
                     var report = Self.report(for: provider, status: status)
-                    report.durationSeconds = Self.seconds(clock.now - start)
+                    report.durationSeconds = (clock.now - start).seconds
                     return (index, report)
                 }
             }
@@ -208,7 +208,7 @@ public struct CheckEngine: Sendable {
         // An unavailable provider is not an error: it is simply not installed.
         if status.availability == .unavailable { report.errors = [] }
         guard status.availability == .available, let installation = status.installation else {
-            report.durationSeconds = seconds(clock.now - start)
+            report.durationSeconds = (clock.now - start).seconds
             return ProviderOutcome(report: report, candidates: [])
         }
 
@@ -259,7 +259,7 @@ public struct CheckEngine: Sendable {
             report.errors.append(ProviderOperationError(operation: .outdated, error: error))
         }
 
-        report.durationSeconds = seconds(clock.now - start)
+        report.durationSeconds = (clock.now - start).seconds
         return ProviderOutcome(report: report, candidates: candidates.sorted { $0.id < $1.id })
     }
 
@@ -273,9 +273,5 @@ public struct CheckEngine: Sendable {
         } catch {
             return .failure(MacUpError.wrapping(error, context: "The provider operation"))
         }
-    }
-
-    private static func seconds(_ duration: Duration) -> Double {
-        Double(duration.components.seconds) + Double(duration.components.attoseconds) / 1e18
     }
 }

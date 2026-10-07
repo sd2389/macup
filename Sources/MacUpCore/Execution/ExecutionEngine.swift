@@ -155,31 +155,17 @@ public struct ExecutionEngine: Sendable {
     /// that the command was in the plan. Injected so a test can bound what it
     /// permits without touching the shipping list.
     public var modifyingRules: [ModifyingCommandRule]
-    /// Overrides the environment a plan's commands run with. `nil`, and so
-    /// the owning provider's, everywhere but tests.
-    ///
-    /// A plan carries the exact executable and arguments — that is what the
-    /// user reviewed — but not the environment they need, and only the
-    /// provider knows that. Some of what a plan promises lives there and
-    /// nowhere else: `HOMEBREW_NO_INSTALL_CLEANUP` and
-    /// `HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK` have no command-line flag, so
-    /// an upgrade run without them would clean up after itself and upgrade
-    /// dependents the user never reviewed (CLAUDE.md §2.16, §2.17, §9). The
-    /// engine therefore asks the provider rather than assembling one itself.
-    public var stepEnvironment: (@Sendable (ExecutionPlan, CheckEnvironment) -> [String: String])?
 
     public init(
         providers: [any UpdateProvider],
         history: HistoryStore? = nil,
         configurationStore: ConfigurationStore? = nil,
         modifyingRules: [ModifyingCommandRule] = ModifyingCommandRules.all,
-        stepEnvironment: (@Sendable (ExecutionPlan, CheckEnvironment) -> [String: String])? = nil
     ) {
         self.providers = providers
         self.history = history
         self.configurationStore = configurationStore
         self.modifyingRules = modifyingRules
-        self.stepEnvironment = stepEnvironment
     }
 
     public static func standard(paths: MacUpPaths) -> ExecutionEngine {
@@ -187,25 +173,6 @@ public struct ExecutionEngine: Sendable {
             providers: [HomebrewProvider(), NpmProvider(), MiseProvider(), MacOSProvider()],
             history: HistoryStore(paths: paths),
             configurationStore: ConfigurationStore(paths: paths)
-        )
-    }
-
-    /// The base environment allowlist plus the plan executable's own directory
-    /// at the front of `PATH`, so a tool that shells out to its siblings finds
-    /// the installation MacUp chose rather than another copy.
-    ///
-    /// Used only when no provider is loaded for the plan's item, which is
-    /// also a reason to refuse to run it; it exists so the fallback is
-    /// conservative rather than absent.
-    public static let baseStepEnvironment: @Sendable (ExecutionPlan, CheckEnvironment) -> [String: String] = { plan, environment in
-        let directories = plan.steps.map { ($0.invocation.executable as NSString).deletingLastPathComponent }
-        return EnvironmentPolicy.base.environment(
-            from: environment.processEnvironment,
-            searchPath: SearchPath.combine(
-                directories,
-                SearchPath.parse(environment.processEnvironment["PATH"]),
-                SearchPath.system
-            )
         )
     }
 
@@ -333,8 +300,7 @@ public struct ExecutionEngine: Sendable {
             let result = await perform(
                 planned.plan,
                 environment: environment,
-                commandEnvironment: stepEnvironment?(planned.plan, environment)
-                    ?? provider.executionEnvironment(context: providerContext)
+                commandEnvironment: provider.executionEnvironment(context: providerContext)
             )
             var verification: VerificationResult?
             if Self.readsBack(after: result) {
@@ -487,7 +453,7 @@ public struct ExecutionEngine: Sendable {
                 steps.append(ExecutionResult.StepResult(
                     command: display,
                     exitStatus: failure.exitStatus,
-                    durationSeconds: Self.seconds(clock.now - started),
+                    durationSeconds: (clock.now - started).seconds,
                     errorExcerpt: failure.detail
                 ))
                 switch failure.kind {
@@ -677,9 +643,5 @@ public struct ExecutionEngine: Sendable {
             let failure = MacUpError.wrapping(error, context: "Recording an update in MacUp's history")
             Log.execution.error("Could not record an update in history: \(failure.message, privacy: .public)")
         }
-    }
-
-    private static func seconds(_ duration: Duration) -> Double {
-        Double(duration.components.seconds) + Double(duration.components.attoseconds) / 1e18
     }
 }

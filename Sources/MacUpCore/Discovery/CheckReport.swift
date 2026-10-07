@@ -182,9 +182,4 @@ public struct CheckReport: Sendable, Hashable, Codable {
     public func updates(for provider: ProviderID) -> [UpdateCandidate] {
         updates.filter { $0.provider == provider }
     }
-
-    /// Updates the provider itself holds back (for example `brew pin`).
-    public var pinnedCount: Int {
-        updates.filter { $0.signals.contains(.pinnedByProvider) }.count
-    }
 }

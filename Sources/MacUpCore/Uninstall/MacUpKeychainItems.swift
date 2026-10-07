@@ -50,9 +50,3 @@ public struct SystemMacUpKeychainItems: MacUpKeychainItemStoring {
     }
 }
 
-/// A keychain with nothing in it, for surfaces that have not been given one.
-public struct NoMacUpKeychainItems: MacUpKeychainItemStoring {
-    public init() {}
-    public func hasLeftoverItem() -> Bool { false }
-    public func deleteLeftoverItem() throws -> Bool { false }
-}

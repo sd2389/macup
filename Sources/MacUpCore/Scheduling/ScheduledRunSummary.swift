@@ -74,11 +74,3 @@ public struct ScheduledRunSummary: Sendable, Hashable, Codable {
         )
     }
 }
-
-/// Counting in words, where a sentence has to read correctly for one and for
-/// many. Shared so the CLI's and the app's wording cannot drift apart.
-public enum TextCount {
-    public static func plural(_ count: Int, _ noun: String) -> String {
-        "\(count) \(noun)\(count == 1 ? "" : "s")"
-    }
-}

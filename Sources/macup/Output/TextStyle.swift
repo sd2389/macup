@@ -42,10 +42,10 @@ struct TextStyle {
     }
 
     static func pad(_ text: String, to width: Int) -> String {
-        text.count >= width ? text : text + String(repeating: " ", count: width - text.count)
+        TextCount.pad(text, to: width)
     }
 
     static func plural(_ count: Int, _ singular: String, _ plural: String? = nil) -> String {
-        "\(count) " + (count == 1 ? singular : plural ?? singular + "s")
+        TextCount.plural(count, singular, plural)
     }
 }

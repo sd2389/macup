@@ -118,6 +118,32 @@ struct DashboardView: View {
                         .leadingFooter()
                 }
 
+                // What ran while nobody was looking. The notification may
+                // have been missed, or never allowed, so the run is on the
+                // screen as well.
+                if let run = model.scheduledRun, let notification = run.notification {
+                    Section {
+                        Label {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(notification.title.displaySafe)
+                                Text(notification.body.displaySafe)
+                                    .font(.callout)
+                                    .foregroundStyle(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        } icon: {
+                            Image(systemName: run.failed.isEmpty ? "clock.badge.checkmark" : "clock.badge.exclamationmark")
+                                .accessibilityHidden(true)
+                        }
+                        Button("Open History") { model.section = .history }
+                    } header: {
+                        Text("Last Scheduled Run")
+                    } footer: {
+                        Text("Every attempt and every skip is in History, whether or not you saw a notification.")
+                            .leadingFooter()
+                    }
+                }
+
                 if !attention(report).isEmpty {
                     Section("Needs Attention") {
                         ForEach(attention(report), id: \.self) { line in
@@ -128,7 +154,10 @@ struct DashboardView: View {
                 }
             }
             .formStyle(.grouped)
-            .task { await model.refreshScheduleStatus() }
+            .task {
+                await model.refreshScheduleStatus()
+                await model.reportScheduledRun()
+            }
         } else if model.isChecking {
             ProgressView("Checking your Mac…")
         } else {

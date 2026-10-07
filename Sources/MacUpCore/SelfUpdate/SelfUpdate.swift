@@ -168,8 +168,9 @@ public enum SelfUpdate {
     }
 
     private static func isInside(_ path: String, _ directory: String, fileSystem: any FileSystem) -> Bool {
-        let path = fileSystem.canonicalPath(ofPath: path) ?? path
-        let directory = fileSystem.canonicalPath(ofPath: directory) ?? directory
-        return path.hasPrefix(directory.hasSuffix("/") ? directory : directory + "/")
+        FileTree.isInside(
+            fileSystem.canonicalPath(ofPath: path) ?? path,
+            fileSystem.canonicalPath(ofPath: directory) ?? directory
+        )
     }
 }

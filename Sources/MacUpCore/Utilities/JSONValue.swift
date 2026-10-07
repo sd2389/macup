@@ -60,10 +60,6 @@ public enum JSONValue: Sendable, Hashable, Decodable {
         return nil
     }
 
-    public var isNull: Bool {
-        if case .null = self { return true }
-        return false
-    }
 
     /// A string, or every string in an array of strings (Homebrew reports
     /// installed versions both ways across versions).

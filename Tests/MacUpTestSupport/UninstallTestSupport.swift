@@ -54,7 +54,7 @@ public final class UninstallFixture: @unchecked Sendable {
 
     /// The uninstall environment for this pretend Mac. Nothing in it is the
     /// real one: no real running-apps list, signature, Keychain, or Trash.
-    public func environment(currentAppBundle: String? = nil, remover: (any FileRemoving)? = nil) -> UninstallEnvironment {
+    public func environment(currentAppBundle: String? = nil, remover: GuardedFileRemover? = nil) -> UninstallEnvironment {
         UninstallEnvironment(
             homeDirectory: home,
             applicationDirectories: [applications, userApplications],
@@ -250,19 +250,3 @@ public final class FakeKeychainItems: MacUpKeychainItemStoring, @unchecked Senda
     }
 }
 
-/// A remover that removes nothing and says so, for tests that only care
-/// which paths an engine chose.
-public final class RecordingFileRemover: FileRemoving, @unchecked Sendable {
-    private let lock = NSLock()
-    private var _calls: [(path: String, mode: RemovalMode)] = []
-
-    public init() {}
-
-    public var paths: [String] { lock.withLock { _calls.map(\.path) } }
-    public var modes: [RemovalMode] { lock.withLock { _calls.map(\.mode) } }
-
-    public func remove(_ removal: PlannedRemoval, mode: RemovalMode, within boundary: RemovalBoundary) -> RemovalOutcome {
-        lock.withLock { _calls.append((removal.path, mode)) }
-        return RemovalOutcome(path: removal.path, category: removal.category, status: .removed, mode: mode, sizeBytes: removal.sizeBytes)
-    }
-}

@@ -165,3 +165,11 @@ extension CommandRunning {
         try await run(request, output: nil)
     }
 }
+
+extension Duration {
+    /// Seconds as a `Double`, for a report that records how long something
+    /// took. Both engines worked this out the same way; now there is one.
+    public var seconds: Double {
+        Double(components.seconds) + Double(components.attoseconds) / 1e18
+    }
+}

@@ -135,7 +135,6 @@ struct AppModelPolicyTests {
             candidates: [PlannedUpdateFactory.candidate("brew:git")]
         ))
         await harness.model.checkNow()
-        #expect(!harness.model.capabilities(of: .homebrew).contains(.nativePin))
 
         await harness.model.setPolicy(.pin, for: Self.git)
 

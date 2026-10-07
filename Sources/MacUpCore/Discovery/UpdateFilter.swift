@@ -238,7 +238,6 @@ public struct UpdateListing: Sendable, Hashable {
     }
 
     public var hiddenCount: Int { hidden.count }
-    public var totalCount: Int { shown.count + hidden.count }
 
     /// The shown updates as a list presents them: one group per provider,
     /// in provider order, when sorted by provider; otherwise one group in

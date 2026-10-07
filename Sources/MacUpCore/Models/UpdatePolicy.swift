@@ -39,8 +39,6 @@ public enum ProviderCapability: String, Sendable, Hashable, Codable, CaseIterabl
     case planUpdates
     /// Update one selected item at a time (Phase 3).
     case updateSelectedItems
-    /// Use the provider's own pin mechanism.
-    case nativePin
     /// Verify the installed version after an update (Phase 3).
     case verifyUpdates
     /// Say what installed software depends on an item, when someone asks.

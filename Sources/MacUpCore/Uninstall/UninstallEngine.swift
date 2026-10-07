@@ -175,7 +175,7 @@ public struct UninstallReport: Sendable, Hashable, Codable {
 ///    uninstall shapes in ``ModifyingCommandRules/uninstall``. A command that
 ///    fails stops everything after it: nothing is removed from under a
 ///    package manager that did not finish.
-/// 3. The ticked files, one at a time, through the ``FileRemoving`` it is
+/// 3. The ticked files, one at a time, through the ``GuardedFileRemover`` it is
 ///    given — ``GuardedFileRemover`` everywhere but tests. An app's bundle
 ///    goes first, and if it cannot be removed nothing else is; MacUp's own
 ///    state folder and app go last.

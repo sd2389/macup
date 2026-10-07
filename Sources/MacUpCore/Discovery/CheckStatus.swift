@@ -27,7 +27,7 @@ public enum CheckStatus: Sendable, Hashable {
         }
         for provider in report.providers where !provider.hasErrors && provider.resultsIncomplete {
             reasons.append(provider.unreadableUpdates > 0
-                ? "\(provider.displayName) listed \(Self.plural(provider.unreadableUpdates, "update")) MacUp could not read."
+                ? "\(provider.displayName) listed \(TextCount.plural(provider.unreadableUpdates, "update")) MacUp could not read."
                 : "\(provider.displayName) may be missing results.")
         }
         if environmentProblem != nil {
@@ -48,9 +48,9 @@ public enum CheckStatus: Sendable, Hashable {
         case .notChecked: "Not checked yet"
         case .checking: "Checking…"
         case .upToDate: "Everything is up to date"
-        case .updatesAvailable(let count): Self.plural(count, "update") + " available"
+        case .updatesAvailable(let count): TextCount.plural(count, "update") + " available"
         case .incomplete(0, _): "Check incomplete"
-        case .incomplete(let count, _): Self.plural(count, "update") + " found; check incomplete"
+        case .incomplete(let count, _): TextCount.plural(count, "update") + " found; check incomplete"
         }
     }
 
@@ -68,9 +68,5 @@ public enum CheckStatus: Sendable, Hashable {
     public var reasons: [String] {
         if case .incomplete(_, let reasons) = self { return reasons }
         return []
-    }
-
-    private static func plural(_ count: Int, _ noun: String) -> String {
-        "\(count) \(noun)\(count == 1 ? "" : "s")"
     }
 }

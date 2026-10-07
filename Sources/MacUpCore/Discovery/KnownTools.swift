@@ -1,7 +1,7 @@
 import Foundation
 
 /// What a tool does, which decides how MacUp talks about it.
-public enum ToolKind: String, Sendable, Hashable, Codable, CaseIterable {
+public enum ToolKind: String, Sendable, Hashable, CaseIterable {
     /// Installs and updates software: Homebrew, MacPorts, pipx, Cargo.
     case packageManager
     /// Installs and switches between versions of a language or runtime:
@@ -28,7 +28,7 @@ public enum ToolKind: String, Sendable, Hashable, Codable, CaseIterable {
 /// fixed ``versionArguments`` array, which is also on
 /// ``CommandAllowlist/toolScan``, so the scan is structurally unable to run
 /// anything else.
-public struct KnownTool: Sendable, Hashable, Codable, Identifiable {
+public struct KnownTool: Sendable, Hashable, Identifiable {
     public var id: String
     public var displayName: String
     /// The executable's file name, for example `pipx`.

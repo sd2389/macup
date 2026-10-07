@@ -27,7 +27,7 @@ public struct UninstallEnvironment: Sendable {
     public var runningApplications: any RunningApplicationChecking
     public var signatures: any CodeSignatureReading
     public var keychain: any MacUpKeychainItemStoring
-    public var remover: any FileRemoving
+    public var remover: GuardedFileRemover
 
     public init(
         homeDirectory: String,
@@ -42,7 +42,7 @@ public struct UninstallEnvironment: Sendable {
         runningApplications: any RunningApplicationChecking,
         signatures: any CodeSignatureReading,
         keychain: any MacUpKeychainItemStoring,
-        remover: any FileRemoving
+        remover: GuardedFileRemover
     ) {
         self.homeDirectory = PathDisplay.standardized(homeDirectory)
         self.applicationDirectories = applicationDirectories

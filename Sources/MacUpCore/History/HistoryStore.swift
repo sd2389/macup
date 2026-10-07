@@ -80,7 +80,7 @@ public struct HistoryStore: Sendable {
 
     public init(paths: MacUpPaths, maximumEntries: Int = HistoryStore.maximumEntries) {
         self.init(
-            fileURL: URL(fileURLWithPath: paths.stateDirectory).appendingPathComponent("history.jsonl"),
+            fileURL: URL(fileURLWithPath: paths.historyFile),
             maximumEntries: maximumEntries
         )
     }

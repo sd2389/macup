@@ -156,7 +156,7 @@ struct UpdateFilterTests {
         #expect(Self.ids(listing.shown) == ["brew:a"])
         #expect(Self.ids(listing.hidden) == ["brew:b", "npm:c", "macos:d"], "in the order given")
         #expect(listing.hiddenCount == 3)
-        #expect(listing.totalCount == 4)
+        #expect(listing.shown.count + listing.hidden.count == 4)
         #expect(listing.hiddenCount(for: .homebrew) == 1)
         #expect(listing.hiddenCount(for: .npm) == 1)
         #expect(listing.hiddenCount(for: .mise) == 0)

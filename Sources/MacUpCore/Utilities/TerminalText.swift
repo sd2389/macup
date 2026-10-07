@@ -91,3 +91,19 @@ extension Substring {
         return String(view)
     }
 }
+
+/// Counting and padding in words, where one sentence has to read correctly
+/// for one item and for many.
+///
+/// One implementation, in the one module both surfaces import: the CLI's
+/// renderers, the explanation text, and the app all had their own before,
+/// and four pluralizers is three too many.
+public enum TextCount {
+    public static func plural(_ count: Int, _ singular: String, _ plural: String? = nil) -> String {
+        "\(count) " + (count == 1 ? singular : plural ?? singular + "s")
+    }
+
+    public static func pad(_ text: String, to width: Int) -> String {
+        text.count >= width ? text : text + String(repeating: " ", count: width - text.count)
+    }
+}

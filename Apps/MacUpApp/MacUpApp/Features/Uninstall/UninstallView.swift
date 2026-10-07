@@ -56,7 +56,7 @@ struct UninstallView: View {
             return words.allSatisfy { text.contains($0) }
         }
         let apps = catalog.apps.filter { matches([$0.name, $0.bundleIdentifier, $0.source.displayName]) }
-        let orphans = catalog.orphans.filter { matches([$0.identifier, $0.guessedName]) }
+        let orphans = model.orphanedLeftovers.filter { matches([$0.identifier, $0.guessedName]) }
         let providers: [(ProviderID, [UninstallablePackage])] = [ProviderID.homebrew, .npm, .mise].map { provider in
             (provider, catalog.packages(of: provider).filter { matches([$0.name, $0.target, $0.kind.displayName]) })
         }

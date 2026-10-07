@@ -1,7 +1,7 @@
 import Foundation
 
 /// One tool the scan found, and exactly which copy of it.
-public struct FoundTool: Sendable, Hashable, Codable, Identifiable {
+public struct FoundTool: Sendable, Hashable, Identifiable {
     public var tool: KnownTool
     /// The copy MacUp would use, or `nil` for a tool that is only a shell
     /// function and has no executable.
@@ -40,8 +40,7 @@ public struct FoundTool: Sendable, Hashable, Codable, Identifiable {
 
 /// What the scan found: every package manager and version manager on this
 /// Mac that MacUp can recognise, whether or not MacUp manages it.
-public struct ToolScan: Sendable, Hashable, Codable {
-    public var schemaVersion = 1
+public struct ToolScan: Sendable, Hashable {
     public var scannedAt: Date
     public var found: [FoundTool]
     /// Catalog entries this Mac does not have. Listed so the scan can say
