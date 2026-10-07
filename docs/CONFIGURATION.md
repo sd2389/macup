@@ -37,7 +37,7 @@ configuration error (exit status 3), never a guess.
     "brew:mysql": { "policy": "inherit", "skipVersion": "26.7.0_2" },
     "brew:php": { "policy": "pin", "note": "waiting for PHP 8.4 support" }
   },
-  "schedule": { "enabled": false, "frequency": "daily", "time": "23:00", "refresh": true },
+  "schedule": { "enabled": false, "frequency": "daily", "time": "23:00", "refresh": true, "installsAutoUpdates": false },
   "privacy": { "telemetry": false },
   "security": {
     "requireApproval": false,
@@ -63,7 +63,8 @@ configuration error (exit status 3), never a guess.
 | `schedule.frequency` | `daily`, `weekly` | `daily` |
 | `schedule.time` | `HH:mm`, 24-hour | `23:00` |
 | `schedule.weekday` | `monday` … `sunday` | Sunday, for a weekly schedule |
-| `schedule.refresh` | `true`/`false` — refresh package metadata before a scheduled check | `true` |
+| `schedule.refresh` | `true`/`false` — refresh package metadata before a scheduled run | `true` |
+| `schedule.installsAutoUpdates` | `true`/`false` — a scheduled run also installs the items whose rule is Auto Update (ADR-023). Everything else still waits for you | `false` |
 | `privacy.telemetry` | `true`/`false` (MacUp has no telemetry) | `false` |
 | `security.requireApproval` | `true`/`false` — ask the device owner before MacUp changes anything | `false` |
 | `security.allowPasswordFallback` | `true`/`false` — let the login password or an unlocked Apple Watch stand in for the sensor | `true` |

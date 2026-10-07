@@ -122,6 +122,9 @@ struct ContentView: View {
                 return
             }
             #endif
+            // What a scheduled run did while the app was closed, before the
+            // app's own check starts and overwrites the screen.
+            await model.reportScheduledRun()
             if model.report == nil || model.report?.cancelled == true { await model.checkNow() }
             #if DEBUG
             if let directory = Snapshots.directory {

@@ -55,8 +55,22 @@ struct UpdateCommand: AsyncParsableCommand {
     @Flag(name: .shortAndLong, help: "Show every command MacUp ran, with its exit status and timing.")
     var verbose = false
 
+    @Flag(
+        name: .customLong("scheduled"),
+        help: "What the scheduled job runs: installs only the items whose rule is Auto Update, asks nobody, and saves the result."
+    )
+    var scheduled = false
+
     func validate() throws {
         try PackageSelection.validate(items)
+        if scheduled {
+            // A scheduled run is defined by the configuration, not by
+            // arguments: anything that would narrow or widen it is refused
+            // rather than quietly ignored.
+            guard items.isEmpty else { throw ValidationError("--scheduled runs what your rules allow; it takes no items.") }
+            guard !yes else { throw ValidationError("--scheduled confirms nothing: only Auto Update items run.") }
+            guard !dryRun else { throw ValidationError("--scheduled is what the schedule runs; use `macup update --dry-run` to see a plan.") }
+        }
     }
 
     func run() async throws {
@@ -64,6 +78,12 @@ struct UpdateCommand: AsyncParsableCommand {
         let paths = try context.resolvePaths()
         let loaded = ConfigurationStore(paths: paths).load()
         let style = TextStyle(enabled: context.allowsStyling, homeDirectory: context.homeDirectory)
+
+        if scheduled {
+            try await ScheduledUpdateRun(refresh: refresh, json: json, verbose: verbose)
+                .run(configuration: loaded, paths: paths, context: context, style: style)
+            return
+        }
 
         if refresh && !json {
             context.printError("Refreshing provider metadata first. That refresh changes no packages.")

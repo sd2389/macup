@@ -464,19 +464,27 @@ surfaces, with tests and docs, in its own commit (CLAUDE.md §26.13).
       longer identifier left to its own app, Apple's namespace left alone,
       evidence required, suffixes stripped, and the plan ticking nothing
 
-### 8.4 — Scheduled updating (ADR, owner decision 2026-10-07)
+### 8.4 — Scheduled updating (ADR-023, owner decision 2026-10-07) — done
 
-- [ ] ADR recording that the launchd job may now also run
+- [x] ADR-023 recording that the launchd job may now also run
       `macup update --scheduled`, and what guards that
-- [ ] `scripts/check-trust-invariants.sh` allows exactly those two command
-      shapes and no other
-- [ ] A scheduled update touches only items that resolve to `auto`, and
-      refuses anything that may need a password or a restart
-- [ ] Notifications from the app bundle: what was updated, what is waiting
-- [ ] CLI: `macup schedule enable --updates`, and `macup update --scheduled`
-- [ ] App: Settings > Scheduling, with the same switch and the exact command
-- [ ] Tests: an `ask` item is never updated, a password-needing plan is
-      refused, the history says a scheduled run did it
+- [x] `scripts/check-trust-invariants.sh` allows exactly those two command
+      shapes, and fails if any other argument can be added to the agent
+- [x] A scheduled update touches only items that resolve to `auto`, and
+      refuses anything that may need a password or a restart (the engine's
+      unattended rules, which already existed)
+- [x] Approval that needs the device owner stops a scheduled run outright
+- [x] A scheduled run records what it left alone in History, since nobody is
+      watching the screen it would otherwise be said on
+- [x] Notifications from the app bundle: what was updated, what failed, and
+      what is waiting, once per run
+- [x] CLI: `macup schedule enable --install-updates`, `macup update --scheduled`
+- [x] App: Features > Check automatically, with the switch, the warning when
+      approval is on, and the exact command launchd runs
+- [x] Tests: an `ask` item is never updated, approval refuses the run, the
+      history says a scheduled run did it, the agent's command is fixed, the
+      setting is off unless the file says otherwise, and the app notifies
+      once per run
 
 ### 8.5 — Doctor that can fix what it is sure about
 

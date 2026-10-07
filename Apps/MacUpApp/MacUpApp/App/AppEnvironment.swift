@@ -115,6 +115,9 @@ struct AppEnvironment {
     var doctorEngine: DoctorEngine
     var faceCamera: any FaceEnrolling
     var loginShell: any LoginShellReading
+    /// How the app tells someone what a scheduled run did. A test passes one
+    /// that posts nothing and asks macOS for nothing.
+    var notifier: any ScheduledRunNotifying = SystemNotifier()
     var homeDirectory: String
     /// MacUp's own environment, which is where the `MACUP_*_DIR` overrides are
     /// read from. Deliberately not the login shell's: an app started from
@@ -151,6 +154,7 @@ struct AppEnvironment {
                 homeDirectory: home,
                 baseEnvironment: processEnvironment
             ),
+            notifier: SystemNotifier(),
             homeDirectory: home,
             processEnvironment: processEnvironment,
             system: .current(),

@@ -1,11 +1,20 @@
 import Foundation
 
-/// The launchd user agent that runs MacUp's scheduled check.
+/// The launchd user agent that runs MacUp on a schedule.
 ///
-/// The agent is a per-user LaunchAgent, never a privileged daemon, and the
-/// only thing it runs is `macup check`, which cannot modify a package
-/// (CLAUDE.md §15). Everything about it is derived here so the property list
-/// on disk and what `macup schedule status` reports come from one place.
+/// The agent is a per-user LaunchAgent, never a privileged daemon, and it
+/// runs one of exactly two commands (ADR-023):
+///
+/// - `macup check --save-state`, which cannot modify anything, and is what a
+///   schedule runs unless the person turned installing on;
+/// - `macup update --scheduled`, which installs only the updates whose rule
+///   is Auto Update, refuses anything that may ask for a password or need a
+///   restart, and records every attempt and every skip.
+///
+/// `scripts/check-trust-invariants.sh` fails the build if any other command
+/// shape appears here. Everything about the agent is derived here so the
+/// property list on disk and what `macup schedule status` reports come from
+/// one place.
 public struct LaunchAgent: Sendable, Hashable {
     /// The launchd service label. Stable: `macup schedule disable` and any
     /// manual `launchctl` cleanup depend on it.
@@ -52,7 +61,8 @@ public struct LaunchAgent: Sendable, Hashable {
         self.environmentVariables = environmentVariables
     }
 
-    /// Builds the agent for a scheduled read-only check.
+    /// Builds the agent for a scheduled run: a read-only check, or an
+    /// Auto-Update-only run when the configuration says to install.
     ///
     /// - Parameter executable: absolute path of the `macup` binary to schedule.
     public static func scheduledCheck(
@@ -68,7 +78,7 @@ public struct LaunchAgent: Sendable, Hashable {
             )
         }
         let time = try clockTime(settings.time)
-        var arguments = ["check", "--save-state"]
+        var arguments = settings.installsAutoUpdates ? ["update", "--scheduled"] : ["check", "--save-state"]
         if settings.refresh { arguments.append("--refresh") }
 
         var environment: [String: String] = [:]

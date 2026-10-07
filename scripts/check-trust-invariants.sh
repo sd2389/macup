@@ -78,9 +78,22 @@ if [[ -n "$network" ]]; then
     fail "network code found: MacUp makes no network request of its own"
 fi
 
-# The scheduled job may only ever run a read-only check.
-if ! grep -q 'var arguments = \["check", "--save-state"\]' Sources/MacUpCore/Scheduling/LaunchAgent.swift; then
-    fail "the launchd agent must run only 'macup check --save-state'"
+# The scheduled job may run exactly two commands and no others (ADR-023):
+# the read-only check, and the Auto-Update-only run. Both are MacUp's own
+# subcommands, and neither can be widened by what is in the configuration:
+# the only other argument the agent may add is --refresh.
+if ! grep -q 'var arguments = settings.installsAutoUpdates ? \["update", "--scheduled"\] : \["check", "--save-state"\]' \
+    Sources/MacUpCore/Scheduling/LaunchAgent.swift; then
+    fail "the launchd agent must run only 'macup check --save-state' or 'macup update --scheduled'"
+fi
+if ! grep -q 'if settings.refresh { arguments.append("--refresh") }' Sources/MacUpCore/Scheduling/LaunchAgent.swift; then
+    fail "the launchd agent's only other argument is --refresh"
+fi
+agent_arguments=$(grep -nE 'arguments\.append|arguments \+=|arguments = ' Sources/MacUpCore/Scheduling/LaunchAgent.swift \
+    | grep -vE '"--refresh"|settings\.installsAutoUpdates' || true)
+if [[ -n "$agent_arguments" ]]; then
+    echo "$agent_arguments" >&2
+    fail "the launchd agent's command is fixed: no other argument may be added to it"
 fi
 
 if [[ $status -eq 0 ]]; then

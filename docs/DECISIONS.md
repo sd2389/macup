@@ -127,3 +127,41 @@ residue. It ships with the trust rules intact:
   scheduled or unattended can uninstall.
 - Every uninstall is recorded in History.
 
+
+## ADR-023 — A schedule may install Auto Update items, by the owner's decision
+Until now the launchd agent could run exactly one command,
+`macup check --save-state`, and `scripts/check-trust-invariants.sh` enforced
+that literally. On 2026-10-07 the owner asked for scheduled updating. The
+invariant is loosened to exactly two command shapes and no others:
+
+- `macup check --save-state` — unchanged, and still what a schedule runs
+  unless installing is turned on;
+- `macup update --scheduled` — installs only what was decided in advance.
+
+What keeps the trust contract intact:
+
+- **Only Auto Update items.** The plan is built with the unattended intent,
+  so an item that resolves to Ask First is skipped with its reason rather
+  than confirmed by the schedule; ignored and pinned items are never touched,
+  and a provider that is off is never run. Policy is re-read immediately
+  before each item, as in any run.
+- **Nothing that needs a person.** The execution engine already refuses, per
+  item, a plan that may ask for an administrator password or may need a
+  restart. A scheduled run has nobody to answer either.
+- **Approval wins.** If the person asked MacUp to confirm every change with
+  Touch ID, a scheduled run installs nothing and says so: a schedule cannot
+  ask the device owner for anything.
+- **Fail closed.** A configuration MacUp cannot read fully stops the run
+  before it starts, and the setting itself defaults to off and is never
+  inferred from a file MacUp could not parse.
+- **Off by default, and visible.** `macup schedule enable` still installs a
+  read-only check; installing takes `--install-updates`, or the switch in the
+  app, and `macup schedule status` and the app both show the exact command
+  launchd will run.
+- **Evidence.** Every attempt and every skip is in the history, marked as a
+  scheduled run, and the check is saved where `macup check --save-state`
+  saves it, so the next time the app opens it can say what happened.
+- **Still no daemon.** A per-user LaunchAgent, loaded into `gui/<uid>`, with
+  no root, no privileged helper, and no process between runs.
+
+The macOS provider is unchanged: it installs nothing, scheduled or not.

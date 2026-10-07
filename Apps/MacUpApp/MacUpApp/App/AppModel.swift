@@ -54,6 +54,8 @@ final class AppModel {
     let uninstaller = UninstallState()
     /// Every package manager on this Mac, managed or not (AppModel+Tools.swift).
     let tools = ToolScanModel()
+    /// What the last scheduled run did (AppModel+Notifications.swift).
+    let scheduledRuns = ScheduledRunModel()
 
     init(environment: AppEnvironment = .live()) {
         self.environment = environment

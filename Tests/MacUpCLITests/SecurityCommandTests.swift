@@ -110,7 +110,7 @@ struct SecurityCommandTests {
         let allowed = try await harness.run(["schedule", "enable", "--time", "09:00"])
         #expect(allowed.exitCode == nil)
         #expect(FileManager.default.fileExists(atPath: harness.agentPath))
-        #expect(harness.authorizer.requestedReasons.contains("change MacUp's scheduled check"))
+        #expect(harness.authorizer.requestedReasons.contains("change MacUp's scheduled run"))
     }
 
     @Test("Turning the schedule off is gated too")

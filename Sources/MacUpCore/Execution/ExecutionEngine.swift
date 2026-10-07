@@ -379,6 +379,26 @@ public struct ExecutionEngine: Sendable {
             }
         }
 
+        // Nobody watches a scheduled run, so what it left alone has to be in
+        // the history or nobody ever learns of it. An interactive run has
+        // just shown the same items on screen, so it does not repeat them.
+        if options.intent == .unattended, !options.dryRun {
+            for skipped in report.skipped where skipped.decision != nil {
+                append(HistoryEntry(
+                    timestamp: environment.now(),
+                    origin: options.origin,
+                    item: skipped.item,
+                    versionBefore: skipped.currentVersion,
+                    versionTarget: skipped.proposedVersion,
+                    versionAfter: nil,
+                    command: nil,
+                    outcome: .skipped,
+                    verification: nil,
+                    skipReason: skipped.reason
+                ))
+            }
+        }
+
         return ExecutionReport(
             origin: options.origin,
             dryRun: options.dryRun,

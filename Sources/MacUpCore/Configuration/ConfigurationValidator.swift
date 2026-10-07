@@ -29,7 +29,7 @@ public enum ConfigurationValidator {
     static let globalKeys: Set<String> = ["defaultPolicy", "confirmMajorUpdates"]
     static let providerKeys: Set<String> = ["enabled", "policy", "executablePath"]
     static let itemKeys: Set<String> = ["policy", "skipVersion", "note"]
-    static let scheduleKeys: Set<String> = ["enabled", "frequency", "time", "weekday", "refresh"]
+    static let scheduleKeys: Set<String> = ["enabled", "frequency", "time", "weekday", "refresh", "installsAutoUpdates"]
     static let securityKeys: Set<String> = ["requireApproval", "allowPasswordFallback", "faceUnlock", "faceMatchThreshold"]
     static let privacyKeys: Set<String> = ["telemetry"]
 

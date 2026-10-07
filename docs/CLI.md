@@ -97,10 +97,11 @@ macup --generate-completion-script zsh > ~/.zsh/completions/_macup
 | `macup provider enable <id> [--json]` | Lets MacUp check a provider again and propose its updates. |
 | `macup provider disable <id> [--json]` | Stops MacUp checking a provider. Uninstalls nothing. |
 | `macup uninstall --orphans [--json]` | Lists what apps you have already removed left in `~/Library`, biggest first, with why MacUp thinks an app left them. Reads only; nothing is ticked. `macup uninstall leftovers:<bundle-id>` reviews one. |
+| `macup update --scheduled [--json]` | What the launchd agent runs when installing is on: installs only the items whose rule is Auto Update, asks nobody, records every attempt and every skip, and saves the check. Takes no items, no `--yes`, and no `--dry-run`. |
 | `macup self-update [--dry-run] [-y] [--refresh] [--json]` | Updates MacUp itself through whatever installed it. With Homebrew, an ordinary Homebrew update with the same plan, confirmation, and history. A copy you downloaded is pointed at its releases page and left alone. |
 | `macup config` / `macup config show [--json]` | Shows the configuration in effect and every problem with it. Never creates the file. |
 | `macup config path [--json]` | Prints the configuration file and state directory locations. |
-| `macup schedule` / `macup schedule status [--json]` | Shows whether a check is scheduled, when it next runs, and what the last one found. Read-only. |
+| `macup schedule` / `macup schedule status [--json]` | Shows whether a run is scheduled, when it next runs, the exact command, and what the last one found. Read-only. |
 | `macup schedule enable [--frequency daily\|weekly] [--time HH:mm] [--weekday <day>] [--no-refresh]` | Installs the launchd user agent that runs a read-only check, and records it in the configuration. |
 | `macup schedule disable` | Removes the agent and clears the setting. |
 | `macup security` / `macup security status [--json]` | Shows which sensor this Mac has and whether MacUp asks for approval. Read-only, no prompt. |
@@ -651,6 +652,11 @@ the millisecond.
   `homebrewCask`, or `downloaded` — `item`, `path`), `unknownReason`,
   `releasesURL`. With an update to run it prints the ordinary execution
   document instead.
+- `macup schedule enable --install-updates` turns scheduled installing on
+  (`--no-install-updates` turns it off). It is off unless you ask for it, a
+  configuration MacUp cannot read fully never turns it on, and a Mac that
+  asks the owner to approve every change installs nothing on a schedule
+  (ADR-023).
 - `macup provider scan --json` → `"kind": "toolScan"`: `scannedAt`,
   `managed[]` and `unmanaged[]` (`id`, `displayName`, `kind`
   (`packageManager` or `versionManager`), `manages`, `managedBy` when a MacUp

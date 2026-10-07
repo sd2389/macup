@@ -24,6 +24,23 @@ belonged to.
   a tool is not managing it: MacUp still updates only Homebrew, npm, mise, and
   macOS, and proposes nothing for the rest.
 
+- **Scheduled updating, off by default** (ADR-023): `macup schedule enable
+  --install-updates` and a switch on the app's Features screen let a scheduled
+  run install the updates whose rule is Auto Update. It installs nothing else:
+  an Ask First item is skipped with its reason rather than confirmed by a
+  schedule, ignored and pinned items are never touched, and anything that may
+  ask for an administrator password or need a restart is refused, because
+  nobody is there to answer. A Mac that asks its owner to approve every change
+  installs nothing on a schedule and says so, and a configuration MacUp cannot
+  read fully stops the run before it starts. The launchd agent is still a
+  per-user LaunchAgent with no root and no daemon, and it may now run exactly
+  two commands — the read-only check, or `macup update --scheduled` — which
+  `scripts/check-trust-invariants.sh` enforces.
+- **What happened while you were away**: a scheduled run records every attempt
+  and every skip in History, and the next time the app opens it says what the
+  run did — in a notification, if you allow one. The `macup` command posts no
+  notifications; it writes the history the app reads.
+
 - **Leftovers of apps that are already gone**: `macup uninstall --orphans` and
   a "Left Behind by Apps You Removed" section on the app's Uninstall screen
   find the files in `~/Library` named after an app that is not installed any

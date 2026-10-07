@@ -59,11 +59,17 @@ struct ScheduleStatusCommand: AsyncParsableCommand {
 struct ScheduleEnableCommand: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "enable",
-        abstract: "Install the launchd agent that runs a read-only check on a schedule.",
+        abstract: "Install the launchd agent that runs MacUp on a schedule.",
         discussion: """
             Options you leave out keep their current value. Running this again \
             replaces the installed agent, so changing the time takes effect now \
             rather than at the next login.
+
+            A schedule checks and changes nothing unless you pass --install-updates. \
+            With it, a scheduled run installs the updates whose rule is Auto Update \
+            and nothing else: an Ask First item still waits for you, an ignored or \
+            pinned item is never touched, and anything that may ask for a password or \
+            need a restart is refused, because nobody is there to answer.
             """
     )
 
@@ -81,6 +87,13 @@ struct ScheduleEnableCommand: AsyncParsableCommand {
         help: "Refresh package metadata before checking. Without it a nightly check reads metadata that may be weeks old and reports almost nothing. A refresh never upgrades a package."
     )
     var refresh: Bool?
+
+    @Flag(
+        name: .customLong("install-updates"),
+        inversion: .prefixedNo,
+        help: "Also install the updates whose rule is Auto Update. Off unless you ask for it; everything else still waits for you."
+    )
+    var installUpdates: Bool?
 
     func validate() throws {
         if let time {
@@ -110,7 +123,11 @@ struct ScheduleEnableCommand: AsyncParsableCommand {
             throw MacUpExitCode.configurationInvalid.exitCode
         }
 
-        let approval = await context.approval("change MacUp's scheduled check", loaded.configuration, paths: paths)
+        let approval = await context.approval(
+            installUpdates == true ? "let MacUp install Auto Update items on a schedule" : "change MacUp's scheduled run",
+            loaded.configuration,
+            paths: paths
+        )
         guard approval.allowsChange else {
             context.printError("error: \(TerminalText.sanitize(approval.explanation ?? "MacUp did not get your approval."))")
             context.printError("Nothing was changed.")
@@ -122,6 +139,7 @@ struct ScheduleEnableCommand: AsyncParsableCommand {
         if let time { configuration.schedule.time = time }
         if let weekday { configuration.schedule.weekday = weekday }
         if let refresh { configuration.schedule.refresh = refresh }
+        if let installUpdates { configuration.schedule.installsAutoUpdates = installUpdates }
         configuration.schedule.enabled = true
 
         let scheduler = context.scheduler(paths: paths)
@@ -149,13 +167,22 @@ struct ScheduleEnableCommand: AsyncParsableCommand {
         }
 
         let style = TextStyle(enabled: context.allowsStyling, homeDirectory: context.homeDirectory)
-        var lines = ["Scheduled check: \(configuration.schedule.summary)."]
+        var lines = ["Scheduled \(configuration.schedule.installsAutoUpdates ? "run" : "check"): \(configuration.schedule.summary)."]
         lines.append("  Runs: " + style.path(agent.invocation.displayString))
         if let next = agent.nextRun() {
             lines.append("  Next: " + ScheduleRenderer.dateText(next))
         }
         lines.append("  Agent: " + style.path(scheduler.agentPath))
-        lines.append("This check is read-only. It will not install, upgrade, or remove anything.")
+        if configuration.schedule.installsAutoUpdates {
+            lines.append("It installs only the updates whose rule is Auto Update. Everything else waits for you, and "
+                + "anything that may ask for a password or need a restart is refused.")
+            if configuration.security.requireApproval {
+                lines.append("You ask MacUp to approve every change, and a scheduled run has nobody to ask, so it will "
+                    + "install nothing until you turn approval off.")
+            }
+        } else {
+            lines.append("This check is read-only. It will not install, upgrade, or remove anything.")
+        }
         lines.append("Turn it off with `macup schedule disable`.")
         context.print(lines.joined(separator: "\n"))
     }

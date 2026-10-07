@@ -119,7 +119,7 @@ private struct AutomaticChecksFeature: View {
         FeatureCard(
             symbol: "clock",
             title: "Check automatically",
-            summary: "Look for updates on a schedule. The check only reports; it never installs anything.",
+            summary: "Look for updates on a schedule. It only reports, unless you let it install the ones you set to Auto Update.",
             isOn: enabled,
             isBusy: model.isChangingSchedule,
             hasDetail: hasDetail,
@@ -153,6 +153,26 @@ private struct AutomaticChecksFeature: View {
                         DatePicker("Time", selection: time, displayedComponents: .hourAndMinute)
                             .labelsHidden()
                             .fixedSize()
+                    }
+                }
+                Toggle("Also install updates set to Auto Update", isOn: $draft.installsAutoUpdates)
+                    .disabled(model.isChangingSchedule)
+                Text(draft.installsAutoUpdates
+                    ? "A scheduled run installs only the items whose rule is Auto Update. Ask First items wait for you, ignored and pinned items are never touched, and anything that may ask for a password or need a restart is refused, because nobody is there to answer."
+                    : "A scheduled check reports what is outdated and installs nothing.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                if draft.installsAutoUpdates, model.configuration?.configuration.security.requireApproval == true {
+                    Label(
+                        "You ask MacUp to confirm every change with this Mac's owner check, and a scheduled run has nobody to ask, so it will install nothing until you turn that off.",
+                        systemImage: "exclamationmark.triangle"
+                    )
+                    .fixedSize(horizontal: false, vertical: true)
+                }
+                if let command = model.scheduleStatus?.command {
+                    LabeledContent("Runs") {
+                        Text(command.displaySafe).font(.caption.monospaced()).textSelection(.enabled)
                     }
                 }
                 if hasUnsavedChanges {

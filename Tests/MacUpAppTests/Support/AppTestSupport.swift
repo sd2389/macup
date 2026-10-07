@@ -138,6 +138,15 @@ final class StubCheckProvider: UpdateProvider, @unchecked Sendable {
     }
 }
 
+/// Notifications that go nowhere. Every test gets this unless it asks for
+/// its own, so no test posts to Notification Center or asks macOS for
+/// permission to.
+@MainActor
+struct SilentNotifier: ScheduledRunNotifying {
+    func authorize() async -> Bool { false }
+    func post(title: String, body: String) async {}
+}
+
 /// Face enrolment with no camera behind it.
 ///
 /// Every test uses this. Nothing here touches AVFoundation, so no test can
@@ -275,6 +284,7 @@ final class AppModelHarness {
         capability: BiometricCapability = .touchID,
         camera: FakeFaceCamera = FakeFaceCamera(),
         loginShell: FakeLoginShell = FakeLoginShell(),
+        notifier: (any ScheduledRunNotifying)? = nil,
         uninstall: UninstallEnvironment? = nil
     ) throws {
         home = try TemporaryDirectory(prefix: "macup-app-tests")
@@ -313,6 +323,9 @@ final class AppModelHarness {
             doctorEngine: DoctorEngine(providers: checkProviders, checks: doctorChecks),
             faceCamera: camera,
             loginShell: loginShell,
+            // A notifier that posts nothing and asks macOS for nothing,
+            // unless a test passes its own.
+            notifier: notifier ?? SilentNotifier(),
             homeDirectory: home.canonicalPath,
             // No `MACUP_*_DIR` overrides and no `PATH`: everything resolves
             // under the throwaway home, and nothing is found on the real one.

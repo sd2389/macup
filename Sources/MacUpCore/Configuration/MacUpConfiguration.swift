@@ -117,19 +117,30 @@ public struct MacUpConfiguration: Sendable, Hashable, Codable {
         /// so a nightly check would report almost nothing. A refresh updates
         /// package lists only; it never upgrades an installed package.
         public var refresh: Bool
+        /// Whether a scheduled run also installs the updates whose rule is
+        /// Auto Update.
+        ///
+        /// Off unless the file says otherwise, and never inferred: a
+        /// configuration MacUp cannot read fully must not end up installing
+        /// anything on a timer (CLAUDE.md §14). A scheduled run touches only
+        /// items that resolve to `auto`, and refuses anything that may ask
+        /// for a password or need a restart.
+        public var installsAutoUpdates: Bool
 
         public init(
             enabled: Bool = false,
             frequency: Frequency = .daily,
             time: String = "23:00",
             weekday: Weekday? = nil,
-            refresh: Bool = true
+            refresh: Bool = true,
+            installsAutoUpdates: Bool = false
         ) {
             self.enabled = enabled
             self.frequency = frequency
             self.time = time
             self.weekday = weekday
             self.refresh = refresh
+            self.installsAutoUpdates = installsAutoUpdates
         }
 
         public init(from decoder: any Decoder) throws {
@@ -139,6 +150,7 @@ public struct MacUpConfiguration: Sendable, Hashable, Codable {
             time = try container.decodeIfPresent(String.self, forKey: .time) ?? "23:00"
             weekday = try container.decodeIfPresent(Weekday.self, forKey: .weekday)
             refresh = try container.decodeIfPresent(Bool.self, forKey: .refresh) ?? true
+            installsAutoUpdates = try container.decodeIfPresent(Bool.self, forKey: .installsAutoUpdates) ?? false
         }
 
         /// The day a weekly schedule runs when the configuration does not name
