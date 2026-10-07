@@ -61,10 +61,20 @@ if [[ -z "$identity" ]]; then
         | awk '/"(Apple Development|Developer ID Application): / { print $2; exit }')"
 fi
 if [[ -n "$identity" ]]; then
+    # A Developer ID signature is the one that can be notarized, and Apple
+    # notarizes only hardened, securely timestamped code. An Apple
+    # Development certificate cannot be notarized at all, so it is signed the
+    # plain way: adding the hardened runtime there would only make a local
+    # build harder to debug for no gain.
+    hardening=()
+    if [[ "${MACUP_SIGNING_IDENTITY_IS_DEVELOPER_ID:-}" == "1" ]] \
+        || security find-identity -v -p codesigning 2>/dev/null | grep -q "Developer ID Application"; then
+        hardening=(--options runtime --timestamp)
+    fi
     # The helper first: a bundle's signature covers the code inside it.
-    codesign --force --sign "$identity" --identifier dev.macup.cli "$app/Contents/Helpers/macup"
-    codesign --force --sign "$identity" --identifier dev.macup.MacUp "$app"
-    echo "Signed with identity $identity." >&2
+    codesign --force --sign "$identity" "${hardening[@]+"${hardening[@]}"}" --identifier dev.macup.cli "$app/Contents/Helpers/macup"
+    codesign --force --sign "$identity" "${hardening[@]+"${hardening[@]}"}" --identifier dev.macup.MacUp "$app"
+    echo "Signed with identity $identity${hardening[*]+ (hardened runtime, timestamped)}." >&2
 else
     # The helper first here too: the linker signs an Apple silicon binary on
     # its own, but not the Intel half of a universal one.

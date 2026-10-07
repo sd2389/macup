@@ -1,0 +1,149 @@
+name: Release
+
+# Builds, signs, notarizes, and publishes a tagged release.
+#
+# Signing and notarizing need an Apple Developer Program membership. Until the
+# repository has those secrets, this workflow still builds, tests, and
+# publishes — the app is ad-hoc signed and the release is marked as a
+# pre-release, which is exactly what MacUp has shipped so far. Nothing here
+# pretends a build is notarized when it is not.
+#
+# The secrets, when there are some (docs/RELEASE.md says how to make them):
+#
+#   MACUP_CERTIFICATE_P12        base64 of the Developer ID Application .p12
+#   MACUP_CERTIFICATE_PASSWORD   the password that .p12 was exported with
+#   MACUP_SIGNING_IDENTITY       "Developer ID Application: Name (TEAMID)"
+#   APPLE_API_KEY_P8             base64 of the App Store Connect .p8 key
+#   APPLE_API_KEY_ID             that key's id
+#   APPLE_API_ISSUER_ID          the issuer UUID shown beside it
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build, sign, notarize, publish
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - name: Check out
+        # Pinned to a commit for supply-chain safety.
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Select the newest stable Xcode
+        run: |
+          xcode="$(ls -d /Applications/Xcode_*.app | grep -viE 'beta|release_candidate|_rc' | sort -V | tail -1)"
+          sudo xcode-select --switch "$xcode"
+          swift --version
+
+      - name: Trust invariants
+        run: scripts/check-trust-invariants.sh
+
+      - name: Test
+        run: swift test --force-resolved-versions
+
+      - name: The tag matches MacUp.version
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          version="$(sed -n 's/.*static let version = "\(.*\)".*/\1/p' Sources/MacUpCore/MacUp.swift)"
+          tag="${GITHUB_REF_NAME#v}"
+          if [ "$version" != "$tag" ]; then
+            echo "error: tag $GITHUB_REF_NAME does not match MacUp.version ($version)" >&2
+            exit 1
+          fi
+
+      # Which of the signing secrets exist, without putting any of them in
+      # the environment of every other step.
+      - name: Which signing secrets are set
+        id: secrets
+        env:
+          CERTIFICATE: ${{ secrets.MACUP_CERTIFICATE_P12 }}
+          API_KEY: ${{ secrets.APPLE_API_KEY_P8 }}
+        run: |
+          if [ -n "$CERTIFICATE" ]; then echo "certificate=true" >> "$GITHUB_OUTPUT"; fi
+          if [ -n "$API_KEY" ]; then echo "key=true" >> "$GITHUB_OUTPUT"; fi
+
+      # The certificate lives in a keychain created for this job and deleted
+      # with the runner. It is never written into the repository, never
+      # printed, and never left on a shared machine.
+      - name: Import the Developer ID certificate
+        id: signing
+        if: ${{ steps.secrets.outputs.certificate == 'true' }}
+        env:
+          MACUP_CERTIFICATE_P12: ${{ secrets.MACUP_CERTIFICATE_P12 }}
+          MACUP_CERTIFICATE_PASSWORD: ${{ secrets.MACUP_CERTIFICATE_PASSWORD }}
+        run: |
+          keychain="$RUNNER_TEMP/macup-signing.keychain-db"
+          password="$(uuidgen)"
+          security create-keychain -p "$password" "$keychain"
+          security set-keychain-settings -lut 3600 "$keychain"
+          security unlock-keychain -p "$password" "$keychain"
+          printf '%s' "$MACUP_CERTIFICATE_P12" | base64 --decode > "$RUNNER_TEMP/certificate.p12"
+          security import "$RUNNER_TEMP/certificate.p12" -k "$keychain" \
+            -P "$MACUP_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          rm -f "$RUNNER_TEMP/certificate.p12"
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$password" "$keychain" >/dev/null
+          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
+          echo "signed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Build the release files
+        env:
+          MACUP_SIGNING_IDENTITY: ${{ secrets.MACUP_SIGNING_IDENTITY }}
+          MACUP_SIGNING_IDENTITY_IS_DEVELOPER_ID: ${{ steps.signing.outputs.signed == 'true' && '1' || '' }}
+        run: scripts/package-release.sh
+
+      - name: Notarize and staple
+        if: ${{ steps.signing.outputs.signed == 'true' && steps.secrets.outputs.key == 'true' }}
+        id: notarize
+        env:
+          APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+        run: |
+          printf '%s' "$APPLE_API_KEY_P8" | base64 --decode > "$RUNNER_TEMP/api-key.p8"
+          APPLE_API_KEY_FILE="$RUNNER_TEMP/api-key.p8" scripts/notarize-release.sh
+          rm -f "$RUNNER_TEMP/api-key.p8"
+          echo "notarized=true" >> "$GITHUB_OUTPUT"
+
+      # A release nobody can open without approving it in System Settings is
+      # not a stable release, and saying so is cheaper than an issue asking
+      # why macOS blocked it.
+      - name: Publish the GitHub release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NOTARIZED: ${{ steps.notarize.outputs.notarized }}
+        run: |
+          notes="$RUNNER_TEMP/notes.md"
+          awk '/^## \[/ { if (seen) exit; seen = 1 } seen' CHANGELOG.md > "$notes"
+          if [ "$NOTARIZED" = "true" ]; then
+            echo "" >> "$notes"
+            echo "Signed with a Developer ID and notarized by Apple." >> "$notes"
+            gh release create "$GITHUB_REF_NAME" build/release/* \
+              --title "$GITHUB_REF_NAME" --notes-file "$notes"
+          else
+            echo "" >> "$notes"
+            echo "This build is signed ad-hoc and is **not notarized**: macOS blocks the first launch, and you approve it once in System Settings → Privacy & Security. See the README." >> "$notes"
+            gh release create "$GITHUB_REF_NAME" build/release/* \
+              --title "$GITHUB_REF_NAME" --notes-file "$notes" --prerelease
+          fi
+
+      # A run without a tag (workflow_dispatch) publishes nothing: it is a
+      # rehearsal, and what it proves is that the build, the signature, and
+      # the notarization all work.
+      - name: What this run produced
+        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+        run: |
+          echo "Nothing was published: this run has no v* tag."
+          cat build/release/SHA256SUMS

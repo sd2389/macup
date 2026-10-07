@@ -24,6 +24,20 @@ belonged to.
   a tool is not managing it: MacUp still updates only Homebrew, npm, mise, and
   macOS, and proposes nothing for the rest.
 
+- **A release workflow that signs and notarizes when it can**: a tagged push
+  now builds, tests, checks the tag against `MacUp.version`, packages, and
+  publishes. With a Developer ID certificate in the repository's secrets the
+  app is signed with the hardened runtime and a secure timestamp; with an App
+  Store Connect key as well, the build is notarized, the ticket is stapled so
+  a downloaded copy opens with no network connection, and `SHA256SUMS` is
+  rewritten for the stapled file. Without those secrets nothing pretends
+  otherwise: the build is ad-hoc signed and the release is marked a
+  pre-release whose notes say macOS will block the first launch.
+  `scripts/notarize-release.sh` does the same by hand and refuses before
+  uploading anything that Apple would reject. `docs/RELEASE.md` lists the six
+  secrets. The signed path is unverified so far: the project has no Developer
+  ID certificate yet.
+
 - **Doctor can now fix what belongs to MacUp** (ADR-024): a rule naming
   software that is not installed, a configured provider path that cannot be
   used, and a scheduled run that is missing or should not be there each carry

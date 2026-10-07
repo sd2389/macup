@@ -503,14 +503,21 @@ surfaces, with tests and docs, in its own commit (CLAUDE.md §26.13).
       History, which is about packages. The result is printed or shown, and
       `macup config show` and `macup schedule status` report the state
 
-### 8.6 — Developer ID signing and notarization
+### 8.6 — Developer ID signing and notarization — done, unverified
 
-- [ ] `scripts/package-release.sh` signs with a Developer ID when one is
-      configured and stays ad-hoc when it is not
-- [ ] Notarization and stapling as a separate, documented step
-- [ ] A release workflow that reads the certificate and the App Store Connect
-      key from repository secrets, never from the repository
-- [ ] `docs/RELEASE.md` says exactly which secrets to add
-- [ ] This Mac has no Developer ID certificate today (`security find-identity
-      -v -p codesigning` finds none), so the signed path is unverified until
-      the owner has one
+- [x] `scripts/build-app.sh` signs with a Developer ID when one is present,
+      and adds the hardened runtime and a secure timestamp in that case only,
+      because that is what Apple will notarize
+- [x] `scripts/notarize-release.sh`: a separate step that checks the
+      signature before uploading, submits, staples, repacks, rewrites
+      `SHA256SUMS`, and ends with `spctl --assess`
+- [x] `.github/workflows/release.yml` reads the certificate and the App Store
+      Connect key from repository secrets, into a keychain made for that one
+      job, and publishes a pre-release that says so when they are absent
+- [x] `docs/RELEASE.md` lists exactly which six secrets to add, and how to do
+      the same by hand
+- [ ] **Unverified**: no Mac the project has used has a Developer ID
+      certificate (`security find-identity -v -p codesigning` finds none), so
+      the signed and notarized paths have never run end to end. The first run
+      with the secrets in place should be a `workflow_dispatch` rehearsal,
+      which builds, signs, and notarizes but publishes nothing

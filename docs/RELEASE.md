@@ -43,6 +43,67 @@ macOS then blocks the first launch of a downloaded copy, and the README tells
 people to approve it once in System Settings → Privacy & Security. Releases
 stay marked as pre-releases until builds are notarized.
 
+## Signing and notarizing
+
+`.github/workflows/release.yml` runs on a `v*` tag: it checks the trust
+invariants, runs the tests, checks the tag matches `MacUp.version`, builds the
+release files, and publishes them with that version's `CHANGELOG.md` section
+as the notes. What it does about signing depends entirely on which secrets the
+repository has:
+
+- **No secrets** — the app is ad-hoc signed, the release is published as a
+  **pre-release**, and its notes say macOS will block the first launch. This
+  is what MacUp has shipped so far.
+- **The certificate secrets** — the app is signed with the Developer ID, with
+  the hardened runtime and a secure timestamp, which is what Apple requires of
+  anything it will notarize.
+- **The certificate and the App Store Connect key** — the zip is submitted to
+  Apple, the ticket is stapled into the app so a downloaded copy opens with no
+  network connection, the zip is repacked and `SHA256SUMS` rewritten (the
+  stapled bundle is not the one that was zipped), and the release is published
+  normally rather than as a pre-release.
+
+### The secrets to add
+
+Add these in the repository's Settings → Secrets and variables → Actions.
+Nothing here ever belongs in the repository itself.
+
+| Secret | What it is |
+| --- | --- |
+| `MACUP_CERTIFICATE_P12` | The Developer ID Application certificate and its private key, exported from Keychain Access as a `.p12`, then `base64 -i certificate.p12 \| pbcopy` |
+| `MACUP_CERTIFICATE_PASSWORD` | The password that `.p12` was exported with |
+| `MACUP_SIGNING_IDENTITY` | The identity's full name, for example `Developer ID Application: Your Name (TEAMID)` — `security find-identity -v -p codesigning` prints it |
+| `APPLE_API_KEY_P8` | An App Store Connect API key with the Developer role, downloaded once as `AuthKey_XXXX.p8`, then `base64 -i AuthKey_XXXX.p8 \| pbcopy` |
+| `APPLE_API_KEY_ID` | That key's id, the `XXXX` in its file name |
+| `APPLE_API_ISSUER_ID` | The issuer UUID shown above the keys list |
+
+All six need an Apple Developer Program membership. With the first three, a
+release is signed; with all six, it is notarized as well.
+
+### Doing it by hand
+
+`scripts/package-release.sh` signs with whatever certificate is on the Mac
+that runs it, and `scripts/notarize-release.sh` notarizes and staples what it
+produced:
+
+```bash
+scripts/package-release.sh
+APPLE_API_KEY_ID=XXXX APPLE_API_ISSUER_ID=UUID APPLE_API_KEY_FILE=~/keys/AuthKey_XXXX.p8 \
+  scripts/notarize-release.sh
+```
+
+The notarize script refuses before uploading anything if the app is not signed
+with a Developer ID or was signed without the hardened runtime, because Apple
+would reject it minutes later with a less obvious message. It ends by running
+`spctl --assess`, which is what macOS itself will say about the downloaded
+copy.
+
+**Unverified so far**: no Mac the project has used has a Developer ID
+certificate, so the signed and notarized paths have never been run end to
+end. The first release built with the secrets in place should be treated as a
+rehearsal: run the workflow with `workflow_dispatch` (no tag), which builds,
+signs, and notarizes but publishes nothing.
+
 ## App distribution
 
 Initial public:
@@ -51,9 +112,9 @@ Initial public:
 
 ## Signing
 
-Never commit certificates/private keys.
-
-Use CI secrets and documented Apple notarization workflow.
+Never commit certificates or private keys. They live in the repository's
+Actions secrets, are decoded into a keychain created for that one job, and go
+with the runner; see "Signing and notarizing" above for the list.
 
 ## Artifacts
 
