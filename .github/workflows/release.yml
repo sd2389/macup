@@ -103,6 +103,8 @@ jobs:
           MACUP_SIGNING_IDENTITY_IS_DEVELOPER_ID: ${{ steps.signing.outputs.signed == 'true' && '1' || '' }}
         run: scripts/package-release.sh
 
+      # Both published files: the app, which is stapled, and the command-line
+      # tool, which is a bare executable and so is checked online.
       - name: Notarize and staple
         if: ${{ steps.signing.outputs.signed == 'true' && steps.secrets.outputs.key == 'true' }}
         id: notarize
@@ -129,12 +131,12 @@ jobs:
           awk '/^## \[/ { if (seen) exit; seen = 1 } seen' CHANGELOG.md > "$notes"
           if [ "$NOTARIZED" = "true" ]; then
             echo "" >> "$notes"
-            echo "Signed with a Developer ID and notarized by Apple." >> "$notes"
+            echo "Both downloads are signed with a Developer ID and notarized by Apple. The app carries a stapled ticket, so it opens with no network connection; \`macup\` is a bare executable, which cannot be stapled, so macOS checks its notarization online the first time you run a downloaded copy." >> "$notes"
             gh release create "$GITHUB_REF_NAME" build/release/* \
               --title "$GITHUB_REF_NAME" --notes-file "$notes"
           else
             echo "" >> "$notes"
-            echo "This build is signed ad-hoc and is **not notarized**: macOS blocks the first launch, and you approve it once in System Settings → Privacy & Security. See the README." >> "$notes"
+            echo "Both downloads are signed ad-hoc and are **not notarized**: macOS blocks the first launch of each, and you approve it once in System Settings → Privacy & Security. See the README." >> "$notes"
             gh release create "$GITHUB_REF_NAME" build/release/* \
               --title "$GITHUB_REF_NAME" --notes-file "$notes" --prerelease
           fi

@@ -163,7 +163,10 @@ brew install sd2389/macup/macup
 ```
 
 Or download `macup-<version>-macos-universal.tar.gz` from the release and put
-`macup` somewhere on your `PATH`.
+`macup` somewhere on your `PATH`. It is the same binary the app bundle
+carries, with the same signature, so it is not notarized yet either: the first
+time you run a downloaded copy, macOS asks, and **System Settings → Privacy &
+Security → Open Anyway** allows it once.
 
 ### From source
 

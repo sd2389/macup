@@ -38,10 +38,16 @@ It uploads nothing. Publishing is a separate step: tag the release commit
 `vX.Y.Z`, push the tag, then create the GitHub release with those three files
 and the version's section of `CHANGELOG.md` as its notes.
 
-Until MacUp has a Developer ID, the app is signed ad-hoc and not notarized.
-macOS then blocks the first launch of a downloaded copy, and the README tells
-people to approve it once in System Settings → Privacy & Security. Releases
-stay marked as pre-releases until builds are notarized.
+Until MacUp has a Developer ID, both downloads are signed ad-hoc and not
+notarized. macOS then blocks the first launch of a downloaded copy, and the
+README tells people to approve it once in System Settings → Privacy &
+Security. Releases stay marked as pre-releases until builds are notarized.
+
+The tarball ships the very `macup` binary the app bundle carries
+(`Contents/Helpers/macup`), rather than a second build of the same source, so
+both downloads always have the same signature. `scripts/package-release.sh`
+verifies that binary on its own with `codesign --verify --strict` before it is
+packed: a file that is downloaded on its own has to stand on its own.
 
 ## Signing and notarizing
 
@@ -54,14 +60,20 @@ repository has:
 - **No secrets** — the app is ad-hoc signed, the release is published as a
   **pre-release**, and its notes say macOS will block the first launch. This
   is what MacUp has shipped so far.
-- **The certificate secrets** — the app is signed with the Developer ID, with
-  the hardened runtime and a secure timestamp, which is what Apple requires of
-  anything it will notarize.
-- **The certificate and the App Store Connect key** — the zip is submitted to
-  Apple, the ticket is stapled into the app so a downloaded copy opens with no
-  network connection, the zip is repacked and `SHA256SUMS` rewritten (the
-  stapled bundle is not the one that was zipped), and the release is published
-  normally rather than as a pre-release.
+- **The certificate secrets** — the app and the `macup` binary inside it are
+  signed with the Developer ID, with the hardened runtime and a secure
+  timestamp, which is what Apple requires of anything it will notarize. The
+  tarball ships that same signed binary.
+- **The certificate and the App Store Connect key** — both files are submitted
+  to Apple. The app's ticket is stapled into the bundle so a downloaded copy
+  opens with no network connection, the zip is repacked and `SHA256SUMS`
+  rewritten (the stapled bundle is not the one that was zipped), and the
+  release is published normally rather than as a pre-release. A bare Mach-O
+  cannot carry a stapled ticket, so what the tarball ships is the Developer ID
+  signature and the hardened runtime, and macOS checks the tool's notarization
+  online the first time a downloaded copy runs. The release notes say exactly
+  that, per download, rather than claiming a stapled ticket for a file that
+  cannot hold one.
 
 ### The secrets to add
 
@@ -92,11 +104,15 @@ APPLE_API_KEY_ID=XXXX APPLE_API_ISSUER_ID=UUID APPLE_API_KEY_FILE=~/keys/AuthKey
   scripts/notarize-release.sh
 ```
 
-The notarize script refuses before uploading anything if the app is not signed
-with a Developer ID or was signed without the hardened runtime, because Apple
-would reject it minutes later with a less obvious message. It ends by running
-`spctl --assess`, which is what macOS itself will say about the downloaded
-copy.
+The notarize script refuses before uploading anything if the app **or** the
+`macup` binary is not signed with a Developer ID or was signed without the
+hardened runtime, because Apple would reject it minutes later with a less
+obvious message. It submits the app zip, then the tool in a zip of its own —
+that carrier zip is not published — staples the app, and ends by running
+`spctl --assess` on the app and on the tool extracted from the tarball, which
+is what macOS itself will say about each downloaded copy. The tool's
+assessment needs a network connection, because an unstapled executable's
+notarization is looked up online; a failure there is reported, not fatal.
 
 **Unverified so far**: no Mac the project has used has a Developer ID
 certificate, so the signed and notarized paths have never been run end to
