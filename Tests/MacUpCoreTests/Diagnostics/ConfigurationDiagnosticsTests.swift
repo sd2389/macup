@@ -196,12 +196,14 @@ struct ScheduleCheckTests {
         installed: Bool,
         loaded: Bool? = true,
         matches: Bool? = true,
-        executableExists: Bool = true
+        executableExists: Bool = true,
+        installsAutoUpdates: Bool = false
     ) -> ScheduleStatus {
         ScheduleStatus(
             enabledInConfiguration: enabled,
             schedule: "every day at 23:00",
             refreshesMetadata: true,
+            installsAutoUpdates: installsAutoUpdates,
             label: "com.macup.check",
             agentPath: "/Users/example/Library/LaunchAgents/com.macup.check.plist",
             agentInstalled: installed,

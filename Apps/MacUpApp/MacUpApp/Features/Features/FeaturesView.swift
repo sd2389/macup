@@ -227,7 +227,7 @@ private struct AutomaticChecksFeature: View {
     private var state: String? {
         guard let status = model.scheduleStatus else { return nil }
         if status.isActive, let next = status.nextRun {
-            return "Next check \(next.formatted(date: .abbreviated, time: .shortened))."
+            return "Next \(status.jobNoun) \(next.formatted(date: .abbreviated, time: .shortened))."
         }
         if draft.enabled && !status.agentInstalled { return "Not running yet." }
         return nil

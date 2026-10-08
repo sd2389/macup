@@ -420,11 +420,22 @@ The main process runs as the user.
 Scheduling does not change that. `macup schedule enable` installs a per-user
 LaunchAgent in `~/Library/LaunchAgents`, loaded into the user's own launchd
 domain (`gui/<uid>`). There is no `LaunchDaemon`, no root, no privilege
-helper, no authorization prompt, and no process running between checks. The
-scheduled job runs `macup check --save-state`, which cannot install, upgrade,
-or remove anything. `macup schedule disable` unloads the job and deletes the
-property list, and `macup schedule status` shows the exact command that would
-run, so an installed schedule is never something you have to take on trust.
+helper, no authorization prompt, and no process running between runs. The
+scheduled job runs as you and is removable by you: `macup schedule disable`
+unloads it and deletes the property list, and `macup schedule status` shows
+the exact command that would run, so an installed schedule is never something
+you have to take on trust.
+
+The scheduled job runs one of exactly two commands. By default it is
+`macup check --save-state`, which cannot install, upgrade, or remove anything.
+When you ask for it with `macup schedule enable --install-updates` it is
+`macup update --scheduled` instead, which installs only the items whose rule
+is Auto Update: Ask First items wait for you, ignored and pinned items are
+never touched, a plan that may need a password or a restart is refused, and a
+Mac that asks the owner to approve every change installs nothing on a schedule
+(ADR-023). `scripts/check-trust-invariants.sh` fails the build if the agent
+could be given any other command, or any argument beyond `--refresh`, and
+`macup schedule status` names which of the two is installed.
 
 
 Updates do not change that either. MacUp never uses `sudo` and holds no

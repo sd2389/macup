@@ -171,13 +171,17 @@ struct DashboardView: View {
         }
     }
 
-    /// When the next scheduled check will actually happen. Nil unless one is
-    /// installed and loaded, so the dashboard never promises a check that is
+    /// When the next scheduled run will actually happen. Nil unless one is
+    /// installed and loaded, so the dashboard never promises a run that is
     /// only configured.
     private var scheduledNext: Date? {
         guard let status = model.scheduleStatus, status.isActive else { return nil }
         return status.nextRun
     }
+
+    /// "check" or "run", so the dashboard never calls an installing schedule
+    /// a check.
+    private var scheduledNoun: String { model.scheduleStatus?.jobNoun ?? "check" }
 
     private var statusTint: Color {
         switch model.status {
@@ -222,7 +226,7 @@ struct DashboardView: View {
             value: report.finishedAt.formatted(date: .omitted, time: .shortened)
         ))
         facts.append(Fact(
-            label: "Next check",
+            label: "Next \(scheduledNoun)",
             value: scheduledNext?.formatted(date: .abbreviated, time: .shortened) ?? "Not scheduled"
         ))
         return facts

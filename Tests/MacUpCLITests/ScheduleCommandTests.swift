@@ -23,8 +23,30 @@ struct ScheduleCommandTests {
         #expect(run.exitCode == nil)
         #expect(run.standardOutput.contains("Scheduled check · off"))
         #expect(run.standardOutput.contains("macup schedule enable"))
-        #expect(run.standardOutput.contains("MacUp updates nothing on a schedule."))
+        // Only ever said when the schedule really is read-only.
+        #expect(run.standardOutput.contains("A scheduled check is read-only. MacUp updates nothing on a schedule."))
         #expect(!FileManager.default.fileExists(atPath: harness.agentPath))
+    }
+
+    @Test("A schedule that installs updates is never reported as read-only")
+    func statusWhenInstalling() async throws {
+        let harness = try CLIHarness()
+        harness.useTemporaryDirectories()
+        harness.expectLaunchctl()
+
+        let enable = try await harness.run(["schedule", "enable", "--install-updates", "--time", "23:00"])
+        #expect(enable.exitCode == nil)
+        harness.expectLaunchctl()
+
+        let run = try await harness.run(["schedule"])
+        #expect(run.exitCode == nil)
+        // The report says which of the two jobs is installed, in its title,
+        // in the command it prints, and in its closing line.
+        #expect(run.standardOutput.contains("Scheduled run · on"))
+        #expect(run.standardOutput.contains("update --scheduled"))
+        #expect(run.standardOutput.contains("installs only the items whose rule is Auto Update"))
+        #expect(!run.standardOutput.contains("MacUp updates nothing on a schedule."))
+        #expect(!run.standardOutput.contains("A scheduled check is read-only"))
     }
 
     @Test("Enabling installs the agent and records the schedule")

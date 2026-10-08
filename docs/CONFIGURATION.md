@@ -88,7 +88,9 @@ change if this Mac cannot ask you anything; the command checks that first.
 Editing this file is always possible — it is your file, and MacUp never locks
 you out of it.
 
-The `schedule` section describes the scheduled read-only check. Change it
+The `schedule` section describes the scheduled run: a read-only check, or,
+when `installsAutoUpdates` is true, a run that installs the Auto Update items
+and nothing else. Change it
 with `macup schedule enable` and `macup schedule disable` rather than by
 hand: those commands also install and remove the launchd agent that does the
 work. Editing `schedule.enabled` in the file on its own schedules nothing —

@@ -221,7 +221,7 @@ struct MenuBarContent: View {
         // Only when a check will really happen: an agent that is installed and
         // loaded, not merely a schedule written in the configuration.
         if let status = model.scheduleStatus, status.isActive, let next = status.nextRun {
-            lines.append("Next check \(next.formatted(date: .abbreviated, time: .shortened))")
+            lines.append("Next \(status.jobNoun) \(next.formatted(date: .abbreviated, time: .shortened))")
         }
         return lines
     }

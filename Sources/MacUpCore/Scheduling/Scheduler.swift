@@ -32,6 +32,11 @@ public struct ScheduleStatus: Sendable, Hashable, Codable {
     /// For example "every day at 23:00".
     public var schedule: String
     public var refreshesMetadata: Bool
+    /// Whether the scheduled run installs the items whose rule is Auto
+    /// Update (ADR-023), rather than only reporting what it found. Part of
+    /// the status because the surfaces a person audits the job with have to
+    /// be able to say which of the two jobs is installed.
+    public var installsAutoUpdates: Bool
     public var label: String
     public var agentPath: String
     public var agentInstalled: Bool
@@ -49,8 +54,12 @@ public struct ScheduleStatus: Sendable, Hashable, Codable {
     public var lastCheck: LastCheck?
     public var warnings: [String]
 
-    /// Whether a scheduled check will actually happen.
+    /// Whether a scheduled run will actually happen.
     public var isActive: Bool { enabledInConfiguration && agentInstalled && agentLoaded != false }
+
+    /// What the scheduled job is called in the surfaces that report it:
+    /// "run" when it installs Auto Update items, "check" when it only looks.
+    public var jobNoun: String { installsAutoUpdates ? "run" : "check" }
 }
 
 /// Installs, removes, and reports on the launchd user agent that runs
@@ -195,6 +204,7 @@ public struct Scheduler: Sendable {
             enabledInConfiguration: settings.enabled,
             schedule: settings.summary,
             refreshesMetadata: settings.refresh,
+            installsAutoUpdates: settings.installsAutoUpdates,
             label: LaunchAgent.label,
             agentPath: agentPath,
             agentInstalled: agentInstalled,

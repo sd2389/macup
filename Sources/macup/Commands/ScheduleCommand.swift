@@ -8,19 +8,25 @@ extension MacUpConfiguration.ScheduleSettings.Weekday: ExpressibleByArgument {}
 struct ScheduleCommand: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "schedule",
-        abstract: "Check automatically on a schedule. A scheduled check never updates anything.",
+        abstract: "Check automatically on a schedule, and install only what you set to Auto Update.",
         discussion: """
-            MacUp installs a launchd user agent that runs `macup check --save-state` \
-            at the time you choose. The scheduled run is the same read-only check as \
-            `macup check`: it installs, upgrades, and removes nothing. It writes its \
-            report to ~/.local/state/macup/last-check.json and its diagnostics to \
-            ~/.local/state/macup/scheduler.log.
+            MacUp installs a launchd user agent at the time you choose. By default it \
+            runs `macup check --save-state`, which is the same read-only check as \
+            `macup check`: it installs, upgrades, and removes nothing. With \
+            `macup schedule enable --install-updates` it runs `macup update \
+            --scheduled` instead, which installs the items whose rule is Auto Update \
+            and nothing else: Ask First items wait for you, ignored and pinned items \
+            are never touched, and anything that may ask for a password or need a \
+            restart is refused, because nobody is there to answer. Either way it \
+            writes its report to ~/.local/state/macup/last-check.json and its \
+            diagnostics to ~/.local/state/macup/scheduler.log.
 
-            The agent runs as you, not as root, and `macup schedule disable` removes \
-            it completely. Scheduled updating does not exist: the agent is only ever \
-            allowed to run a check, so nothing MacUp installs can update a package \
-            while you are not there. Run `macup update` yourself when you want a \
-            change.
+            Those two commands are all the agent can ever run: \
+            `scripts/check-trust-invariants.sh` fails the build if the installed \
+            agent could be given any other argument. The agent runs as you, not as \
+            root, and `macup schedule disable` removes it completely. \
+            `macup schedule status` says which of the two is installed. Run \
+            `macup update` yourself when you want a change MacUp will ask you about.
             """,
         subcommands: [ScheduleStatusCommand.self, ScheduleEnableCommand.self, ScheduleDisableCommand.self],
         defaultSubcommand: ScheduleStatusCommand.self
@@ -283,7 +289,7 @@ struct ScheduleRenderer {
 
     func render() -> String {
         var lines: [String] = []
-        lines.append(style.bold("Scheduled check") + " · " + state)
+        lines.append(style.bold(status.installsAutoUpdates ? "Scheduled run" : "Scheduled check") + " · " + state)
         lines.append("  When: \(status.schedule)")
         lines.append("  Runs: " + style.path(status.command))
         if status.agentInstalled, let next = status.nextRun {
@@ -303,7 +309,13 @@ struct ScheduleRenderer {
             lines.append("Turn it on with `macup schedule enable`, or choose a time: `macup schedule enable --time 09:00`.")
         }
         lines.append("")
-        lines.append("A scheduled check is read-only. MacUp updates nothing on a schedule.")
+        if status.installsAutoUpdates {
+            lines.append("A scheduled run installs only the items whose rule is Auto Update. Ask First items wait for "
+                + "you, ignored and pinned items are never touched, and anything that may ask for a password or need "
+                + "a restart is refused, because nobody is there to answer.")
+        } else {
+            lines.append("A scheduled check is read-only. MacUp updates nothing on a schedule.")
+        }
         return lines.joined(separator: "\n")
     }
 

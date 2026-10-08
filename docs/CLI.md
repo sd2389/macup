@@ -103,7 +103,7 @@ macup --generate-completion-script zsh > ~/.zsh/completions/_macup
 | `macup config` / `macup config show [--json]` | Shows the configuration in effect and every problem with it. Never creates the file. |
 | `macup config path [--json]` | Prints the configuration file and state directory locations. |
 | `macup schedule` / `macup schedule status [--json]` | Shows whether a run is scheduled, when it next runs, the exact command, and what the last one found. Read-only. |
-| `macup schedule enable [--frequency daily\|weekly] [--time HH:mm] [--weekday <day>] [--no-refresh]` | Installs the launchd user agent that runs a read-only check, and records it in the configuration. |
+| `macup schedule enable [--frequency daily\|weekly] [--time HH:mm] [--weekday <day>] [--no-refresh] [--install-updates]` | Installs the launchd user agent and records it in the configuration. It runs a read-only check, or, with `--install-updates`, installs the Auto Update items only. |
 | `macup schedule disable` | Removes the agent and clears the setting. |
 | `macup security` / `macup security status [--json]` | Shows which sensor this Mac has and whether MacUp asks for approval. Read-only, no prompt. |
 | `macup security require <on\|off> [--no-password-fallback]` | Turns the approval requirement on or off. |
@@ -342,17 +342,25 @@ daemon: it runs as you, needs no administrator authorization, and there is no
 background process between runs.
 
 The agent runs exactly one command, which you can read in the property list
-and in `macup schedule status`:
+and in `macup schedule status`. It is one of two, and only these two:
 
 ```text
 /path/to/macup check --save-state --refresh
+/path/to/macup update --scheduled
 ```
 
-That is the same read-only check as `macup check`. Scheduled *updating* does
-not exist: the agent is only ever allowed to run a check, and
-`scripts/check-trust-invariants.sh` fails the build if that ever changes.
-Nothing MacUp installs can update a package while you are not there — run
-`macup update` yourself when you want a change.
+The first is the default and is the same read-only check as `macup check`: it
+installs, upgrades, and removes nothing. The second is installed only when you
+ask for it with `macup schedule enable --install-updates`, and it installs the
+items whose rule is Auto Update and nothing else — Ask First items wait for
+you, ignored and pinned items are never touched, and anything that may ask for
+a password or need a restart is refused, because nobody is there to answer
+(ADR-023). `scripts/check-trust-invariants.sh` fails the build if the agent
+could be given any other command, or any argument beyond `--refresh`.
+
+`macup schedule status` says which of the two is installed: its title reads
+`Scheduled check` or `Scheduled run`, the `Runs:` line prints the exact
+command, and its closing line describes that job rather than the other one.
 
 - The report goes to `~/.local/state/macup/last-check.json`; `macup schedule
   status` summarises it.

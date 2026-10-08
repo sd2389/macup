@@ -114,8 +114,9 @@ already have and gives you one careful place to manage them:
   was skipped.
 - **Policies** per item, per provider, and globally: Auto Update, Ask First,
   Ignore, and Pin.
-- **Scheduled checks** through a launchd user agent. They only read, and you
-  can remove them with one switch.
+- **Scheduled checks** through a launchd user agent. They only read, unless
+  you also switch on installing the items you set to Auto Update — and then
+  nothing else is installed. One switch removes the schedule either way.
 - **Menu bar** list of pending updates.
 - **Touch ID confirmation** before MacUp changes anything, if you want it.
 - **Export Diagnostics:** a redacted file for bug reports, with package names
@@ -284,8 +285,9 @@ vulnerability, use private reporting as described in [SECURITY.md](SECURITY.md).
   administrator and usually a restart.
 - **Roll back.** No provider action has a tested rollback, so every plan says
   rollback is unavailable instead of promising one.
-- **Update on a schedule.** Scheduled checks only report. Scheduled updating of
-  items you marked `auto` is next on the [roadmap](docs/ROADMAP.md).
+- **Update anything you did not mark `auto` on a schedule.** A scheduled run
+  installs only Auto Update items. Ask First items wait for you, and a plan
+  needing a password or a restart is refused rather than attempted.
 - **Ship notarized builds.** That's waiting on an Apple Developer ID.
 
 ## Documentation
