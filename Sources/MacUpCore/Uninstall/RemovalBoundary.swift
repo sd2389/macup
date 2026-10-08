@@ -26,6 +26,12 @@ public struct RemovalBoundary: Sendable, Hashable {
     /// Folders whose direct children are never removed: `~/Library`, whose
     /// children are its top-level folders, and iCloud Drive's folder.
     public var protectedChildrenOf: [String]
+    /// Folders holding the person's own documents rather than any app's
+    /// files, where nothing is removed at any depth: iCloud Drive, and the
+    /// folders a third-party cloud service mounts under `~/Library/CloudStorage`.
+    /// An app's own ubiquity container (`~/Library/Mobile Documents/iCloud~…`)
+    /// is not one of these and is judged like anything else.
+    public var protectedTrees: [String]
     /// Nothing inside these is removed, apart from the Homebrew areas and
     /// ``exactFiles``.
     public var systemPrefixes: [String]
@@ -43,6 +49,7 @@ public struct RemovalBoundary: Sendable, Hashable {
         applicationDirectories: [String],
         protectedPaths: Set<String>,
         protectedChildrenOf: [String],
+        protectedTrees: [String] = [],
         systemPrefixes: [String],
         homebrewPrefix: String? = nil,
         exactFiles: Set<String> = []
@@ -52,6 +59,7 @@ public struct RemovalBoundary: Sendable, Hashable {
         self.applicationDirectories = applicationDirectories
         self.protectedPaths = protectedPaths
         self.protectedChildrenOf = protectedChildrenOf
+        self.protectedTrees = protectedTrees
         self.systemPrefixes = systemPrefixes
         self.homebrewPrefix = homebrewPrefix
         self.exactFiles = exactFiles
@@ -90,6 +98,7 @@ public struct RemovalBoundary: Sendable, Hashable {
             applicationDirectories: applicationDirectories,
             protectedPaths: protected,
             protectedChildrenOf: [home + "/Library", home + "/Library/Mobile Documents"],
+            protectedTrees: [home + "/Library/CloudStorage", home + "/Library/Mobile Documents/com~apple~CloudDocs"],
             systemPrefixes: systemPrefixes,
             homebrewPrefix: homebrewPrefix,
             exactFiles: exactFiles
@@ -113,6 +122,12 @@ public struct RemovalBoundary: Sendable, Hashable {
         let parent = (path as NSString).deletingLastPathComponent
         if let folder = protectedChildrenOf.first(where: { $0 == path || $0 == parent }) {
             return "it is a top-level folder of \(PathDisplay.abbreviatingHome(folder, homeDirectory: homeDirectory)), which MacUp never removes"
+        }
+        // Your own documents, however deep. A cask may name a file in its own
+        // ubiquity container; nothing names a file in your iCloud Drive or in
+        // a folder another service syncs for you.
+        if let tree = protectedTrees.first(where: { FileTree.isWithin(path, $0) }) {
+            return "it is in \(PathDisplay.abbreviatingHome(tree, homeDirectory: homeDirectory)), which holds your own files rather than an app's"
         }
         // MacUp's own command, by its exact path: `make install
         // PREFIX=/usr/local` puts it inside Intel Homebrew's prefix.

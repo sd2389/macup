@@ -32,6 +32,12 @@ struct RemovalGuardTests {
         "/opt/homebrew/Cellar/mysql", "/opt/homebrew/var", "/opt/homebrew/etc", "/opt/homebrew/bin/mysql",
         "/Volumes/Backup/file", "/",
         "/Users/example/Library/Mobile Documents", "/Users/example/Library/Mobile Documents/com~apple~CloudDocs",
+        // Your own documents, at any depth: iCloud Drive, and whatever
+        // another service syncs for you.
+        "/Users/example/Library/Mobile Documents/com~apple~CloudDocs/Documents/report.pages",
+        "/Users/example/Library/Mobile Documents/com~apple~CloudDocs/Desktop",
+        "/Users/example/Library/CloudStorage",
+        "/Users/example/Library/CloudStorage/GoogleDrive-person@example.com/My Drive/taxes.numbers",
     ])
     func refusesProtected(_ path: String) {
         #expect(standard.refusal(for: path) != nil, "\(path) must be refused")
@@ -42,6 +48,9 @@ struct RemovalGuardTests {
         "/Users/example/Library/Application Support/Claude", "/Users/example/.codex", "/Users/example/.config/macup",
         "/Applications/ChatGPT.app", "/Applications/Utilities/Helper.app", "/Users/example/Applications/Mine.app",
         "/opt/homebrew/var/mysql", "/opt/homebrew/etc/redis.conf", "/usr/local/bin/macup",
+        // An app's own ubiquity container is the app's, not yours: what is
+        // inside it is judged like anything else.
+        "/Users/example/Library/Mobile Documents/iCloud~com~example~App/Documents/state.json",
     ])
     func allows(_ path: String) {
         #expect(standard.refusal(for: path) == nil, "\(path) should be removable: \(standard.refusal(for: path) ?? "")")

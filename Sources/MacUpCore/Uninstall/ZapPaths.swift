@@ -116,13 +116,15 @@ struct ZapPathExpander: Sendable {
     /// `com.microsoft.VSCode*`. `~/Library/Preferences/*` and
     /// `~/Library/Caches/*.plist` are not tied to anything.
     ///
+    /// A wildcard inside a folder holding the person's own documents —
+    /// iCloud Drive, or a folder a cloud service syncs — is never tied to an
+    /// app, whatever literal folder it is anchored on, so such a pattern is
+    /// refused outright (``personalDataRoots``).
+    ///
     /// Only patterns in the home folder are judged here; the removal
     /// boundary refuses everything outside it anyway.
     func isAnchored(_ pattern: String, owners: [String]) -> Bool {
-        // "Redis Insight" and redis-insight also name RedisInsight.
-        let owners = owners.flatMap { owner in
-            [owner.lowercased(), owner.lowercased().filter { !" -_".contains($0) }]
-        }.filter { $0.count >= 3 }
+        let owners = Self.normalizedOwners(owners)
         for alternative in Self.braces(pattern) {
             let relative: Substring
             if alternative.hasPrefix("~/") {
@@ -131,6 +133,14 @@ struct ZapPathExpander: Sendable {
                 relative = alternative.dropFirst(homeDirectory.count + 1)
             } else {
                 continue
+            }
+            // A wildcard anywhere inside a cloud document folder matches the
+            // person's own files, not the app's, however the pattern is
+            // shaped and whatever literal it anchors on. An exact path there
+            // is left to the removal boundary, which refuses it.
+            if Self.isPattern(String(relative)),
+               Self.personalDataRoots.contains(where: { relative == $0 || relative.hasPrefix($0 + "/") }) {
+                return false
             }
             var shared = ""
             for component in relative.split(separator: "/").map(String.init) {
@@ -149,6 +159,55 @@ struct ZapPathExpander: Sendable {
             }
         }
         return true
+    }
+
+    /// Folders under the home folder that hold the person's own documents
+    /// rather than any app's files. A literal folder inside one of these is a
+    /// cloud container or a synced folder, not an app's folder, so no
+    /// wildcard is expanded inside them however the pattern is shaped. These
+    /// are the trees ``RemovalBoundary/protectedTrees`` refuses as well, so
+    /// both layers agree about them.
+    static let personalDataRoots = [
+        "Library/Mobile Documents/com~apple~CloudDocs",
+        "Library/CloudStorage",
+    ]
+
+    /// Names a cask declares that are the start of many apps' reverse-DNS
+    /// identifiers rather than a name of its own. Homebrew constrains neither
+    /// `name` nor `token`, so a cask calling itself `com` would otherwise
+    /// anchor a wildcard on every app's folder.
+    static let namespaceLabels: Set<String> = [
+        "com", "org", "net", "edu", "gov", "mil", "int", "app", "dev", "cloud", "info", "biz", "www",
+    ]
+
+    /// The owner names a wildcard may be anchored on: lowercased, also
+    /// without spaces and dashes, long enough to mean something, and neither
+    /// a bare namespace label nor a dotted name too broad to identify one app.
+    static func normalizedOwners(_ owners: [String]) -> [String] {
+        // "Redis Insight" and redis-insight also name RedisInsight.
+        owners.flatMap { owner in
+            [owner.lowercased(), owner.lowercased().filter { !" -_".contains($0) }]
+        }.filter { owner in
+            guard owner.count >= 3, !namespaceLabels.contains(owner) else { return false }
+            guard owner.contains(".") else { return true }
+            return AppLeftoverScanner.scope(of: owner) == .specific
+        }
+    }
+
+    /// Whether `path`'s own last component says it is this app's, by the same
+    /// rule the leftover scanner uses: the name is one of `owners`, or starts
+    /// with one and a dot or a dash, as `com.example.App.plist` and
+    /// `com.example.App.savedState` do.
+    static func isOwned(_ path: String, owners: [String]) -> Bool {
+        let name = (path as NSString).lastPathComponent.lowercased()
+        let compact = name.filter { !" -_".contains($0) }
+        return normalizedOwners(owners).contains { owner in
+            for candidate in [name, compact] where candidate == owner
+                || candidate.hasPrefix(owner + ".") || candidate.hasPrefix(owner + "-") {
+                return true
+            }
+            return false
+        }
     }
 
     /// Folders under the home folder that hold many apps' files, by their

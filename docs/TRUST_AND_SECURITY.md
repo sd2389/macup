@@ -373,8 +373,19 @@ every rule an update carries and a few of its own (ADR-022):
   `ByHost` folder, `Logs/DiagnosticReports`, the home folder's standard
   folders, Apple's `com.apple.…` folders), the next name must be literal or
   start with the cask's token, the app's name or bundle identifier, or a
-  three-part reverse-DNS name. `~/Library/Preferences/*` is listed as left in
-  place instead of expanded. A folder the cask removes only when empty
+  three-part reverse-DNS name — and a name that is the start of every app's
+  identifier (`com`, `org`, `com.google`) is not accepted as the cask's own,
+  because Homebrew constrains neither the token nor the name.
+  `~/Library/Preferences/*` is listed as left in place instead of expanded. No
+  wildcard is expanded anywhere inside your own document folders — iCloud
+  Drive (`~/Library/Mobile Documents/com~apple~CloudDocs`) and
+  `~/Library/CloudStorage` — whatever literal folder it is anchored on;
+  nothing is removed inside them at any depth either, so the pattern and the
+  removal boundary agree about them. What a wildcard matched is ticked only
+  when the file's own name says it is the app's: a wildcard's anchor says
+  where MacUp looked, not whose files it found. Anything else is still shown,
+  unticked, with that reason. An exact path the cask wrote out is ticked as
+  before. A folder the cask removes only when empty
   (`rmdir`) is removed only if it is empty — apart from Finder's `.DS_Store` —
   when MacUp reaches it, and one holding files the cask does not list is
   never offered, not even by "include everything".

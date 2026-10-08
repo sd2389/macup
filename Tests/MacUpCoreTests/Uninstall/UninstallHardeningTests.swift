@@ -157,6 +157,11 @@ struct UninstallHardeningTests {
         "~/.local/share/*",
         "~/Library/{Caches/com.example.app,Preferences/*}",
         "/Users/example/Library/Preferences/*",
+        "~/Library/Mobile Documents/com~apple~CloudDocs/*",
+        "~/Library/Mobile Documents/com~apple~CloudDocs/Documents/*",
+        "/Users/example/Library/Mobile Documents/com~apple~CloudDocs/*",
+        "~/Library/CloudStorage/*",
+        "~/Library/CloudStorage/GoogleDrive-person@example.com/My Drive/*",
     ])
     func broadPatterns(_ pattern: String) {
         let expander = ZapPathExpander(homeDirectory: home)
@@ -205,6 +210,45 @@ struct UninstallHardeningTests {
         let own = UninstallPlanner.zapLeftover(home + "/Library/Caches/com.example.app", token: "example", homeDirectory: home)
         #expect(own.selectedByDefault)
         #expect(own.warning == nil)
+    }
+
+    @Test("A cask cannot anchor a wildcard on a name that is the start of every app's identifier")
+    func namespaceNamesAreNotOwners() {
+        let expander = ZapPathExpander(homeDirectory: home)
+        // A cask declaring `name: ["com"]`: Homebrew constrains neither the
+        // token nor the name, so the pattern must be refused on its own.
+        #expect(!expander.isAnchored("~/Library/Caches/com.*", owners: ["com", "Com"]))
+        #expect(!expander.isAnchored("~/Library/Caches/org.*", owners: ["org"]))
+        #expect(!expander.isAnchored("~/Library/Caches/com.google.*", owners: ["com.google"]))
+        #expect(expander.isAnchored("~/Library/Caches/com.example.app*", owners: ["com.example.app"]))
+    }
+
+    @Test("What a zap wildcard matched is ticked only when the file's own name says it is the app's")
+    func wildcardMatchesAreTickedByOwnership() {
+        let owners = ["example", "Example App", "com.example.app"]
+        let mine = UninstallPlanner.zapLeftover(
+            home + "/Library/Caches/com.example.app.helper",
+            token: "example",
+            owners: owners,
+            homeDirectory: home
+        )
+        #expect(mine.selectedByDefault)
+        let theirs = UninstallPlanner.zapLeftover(
+            home + "/Library/Caches/com.other.app",
+            token: "example",
+            owners: owners,
+            homeDirectory: home
+        )
+        #expect(!theirs.selectedByDefault, "a wildcard's anchor says where it looked, not whose files it found")
+        #expect(theirs.reason.contains("does not say it is example's"))
+        // An exact path the cask wrote out is as far as its word goes, and
+        // that has not changed: it is ticked where it always was.
+        let exact = UninstallPlanner.zapLeftover(
+            home + "/Library/Caches/Example Helper",
+            token: "example",
+            homeDirectory: home
+        )
+        #expect(exact.selectedByDefault)
     }
 
     // MARK: Folders a cask removes only when empty

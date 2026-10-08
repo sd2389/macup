@@ -412,11 +412,17 @@ public struct UninstallPlanner: Sendable {
             case .refused(let reason):
                 plan.cannotRemove.append(ManualRemoval(path: directive.pattern, reason: reason, steps: manually))
             case .paths(let paths):
+                let expanded = ZapPathExpander.isPattern(directive.pattern)
                 for path in paths where app.map({ !FileTree.isWithin(path, $0.path) }) ?? true {
                     if directive.action == .rmdir {
                         emptyOnly.append(path)
                     } else {
-                        leftovers.append(Self.zapLeftover(path, token: cask.token, homeDirectory: uninstall.homeDirectory))
+                        leftovers.append(Self.zapLeftover(
+                            path,
+                            token: cask.token,
+                            owners: expanded ? owners : nil,
+                            homeDirectory: uninstall.homeDirectory
+                        ))
                     }
                 }
             }
@@ -431,18 +437,30 @@ public struct UninstallPlanner: Sendable {
         }
     }
 
-    static func zapLeftover(_ path: String, token: String, homeDirectory: String) -> Leftover {
+    /// One path a cask's `zap` named, or that one of its wildcards matched.
+    ///
+    /// `owners` is given for a path a wildcard produced, and withheld for an
+    /// exact path the cask wrote out. The difference decides the tick: an
+    /// exact path is the cask naming one file, which is as far as its word
+    /// goes; a wildcard match is ticked only when the file's own name says it
+    /// is this app's, because a wildcard's anchor says where it looked, not
+    /// whose files it found. Nothing is hidden either way — an unticked path
+    /// is still shown, with the reason it is not ticked.
+    static func zapLeftover(_ path: String, token: String, owners: [String]? = nil, homeDirectory: String) -> Leftover {
         let library = homeDirectory + "/Library/"
         let dataFolders = ["Application Support", "Containers", "Group Containers"].map { library + $0 + "/" }
         let isData = dataFolders.contains(where: path.hasPrefix) || !path.hasPrefix(library)
         // macOS keeps its own settings under com.apple names; a cask listing
         // one is taken at its word only when someone ticks it.
         let isApple = (path as NSString).lastPathComponent.lowercased().hasPrefix("com.apple.")
+        let unowned = owners.map { !ZapPathExpander.isOwned(path, owners: $0) } ?? false
         return Leftover(
             path: path,
             category: .declaredByPackageManager,
-            selectedByDefault: !isData && !isApple,
-            reason: "The \(token) cask lists this for a complete removal.",
+            selectedByDefault: !isData && !isApple && !unowned,
+            reason: unowned
+                ? "A wildcard in the \(token) cask's list matched this. Its name does not say it is \(token)'s, so MacUp leaves it for you to decide."
+                : "The \(token) cask lists this for a complete removal.",
             warning: isData ? AppLeftoverScanner.dataWarning : isApple ? AppLeftoverScanner.appleWarning : nil
         )
     }
