@@ -149,7 +149,24 @@ private enum Sample {
                     severity: .info,
                     provider: nil,
                     title: "A rule names secret-tool, which is not installed",
-                    detail: "items.brew:secret-tool.policy"
+                    detail: "items.brew:secret-tool.policy",
+                    fix: DiagnosticFix(
+                        action: .clearItemRules(["brew:secret-tool", "npm:@acme/private-cli", "not-an-id"]),
+                        summary: "Drop the rule for brew:secret-tool",
+                        detail: "Removes items.brew:secret-tool from " + paths.configFile
+                    )
+                ),
+                DiagnosticFinding(
+                    id: "schedule.agentMissing",
+                    severity: .warning,
+                    provider: nil,
+                    title: "The scheduled check is switched on, but no agent is installed",
+                    detail: "Would write " + paths.launchAgentsDirectory + "/com.macup.check.plist",
+                    fix: DiagnosticFix(
+                        action: .installScheduleAgent,
+                        summary: "Install the scheduled run",
+                        detail: "Writes \(paths.launchAgentsDirectory)/com.macup.check.plist and runs \(home)/.local/bin/macup check --save-state"
+                    )
                 ),
                 DiagnosticFinding(
                     id: "runtime.multipleInstallationsOnPath",
@@ -222,7 +239,7 @@ struct DiagnosticsDocumentTests {
         #expect(document.system.productVersion == "27.0")
         #expect(document.providers.map(\.provider) == [.homebrew, .npm])
         #expect(document.check?.updates.count == 4)
-        #expect(document.doctor?.findings.count == 3)
+        #expect(document.doctor?.findings.count == 4)
         #expect(document.history.entries.count == 1)
         #expect(document.configuration.valid == false)
         #expect(document.leftOut == DiagnosticsDocument.leftOut(packageNames: .placeholders))
@@ -234,6 +251,37 @@ struct DiagnosticsDocumentTests {
             #expect(!(try Sample.text(includingNames: includingNames)).contains(secret))
         }
         #expect(try Sample.text().contains("<redacted>"))
+    }
+
+    @Test("A finding's fix is scrubbed too: its keys are placeholders and its prose carries no home path")
+    func findingFixesAreScrubbed() throws {
+        let document = try Sample.document()
+        let stale = try #require(document.doctor?.findings.first { $0.id == "configuration.staleItemPolicy" })
+        let fix = try #require(stale.fix)
+        guard case .clearItemRules(let keys) = fix.action else {
+            Issue.record("the stale-rule fix should still name the keys it would drop")
+            return
+        }
+        #expect(keys.count == 3)
+        #expect(keys.allSatisfy { !$0.contains("secret-tool") && !$0.contains("private-cli") })
+        #expect(keys.contains { $0.hasPrefix("brew:package-") })
+        #expect(keys.contains { $0.hasPrefix("npm:package-") })
+        // A key that is not a package ID goes through the same text path as
+        // any other string, so the mask catches it too.
+        #expect(keys.allSatisfy { !$0.contains("not-an-id") })
+        #expect(!fix.summary.contains("secret-tool"))
+        #expect(fix.summary.contains("package-1"))
+        #expect(!fix.detail.contains("/Users/"))
+
+        let schedule = try #require(document.doctor?.findings.first { $0.id == "schedule.agentMissing" })
+        #expect(try #require(schedule.fix).detail.hasPrefix("Writes ~/Library/LaunchAgents/"))
+        #expect(try #require(schedule.fix).detail.contains("~/.local/bin/macup check --save-state"))
+
+        // And with names kept, the same field says the real thing.
+        let withNames = try Sample.document(includingNames: true)
+        let keptKeys = try #require(withNames.doctor?.findings.first { $0.id == "configuration.staleItemPolicy" }?.fix)
+        guard case .clearItemRules(let real) = keptKeys.action else { return }
+        #expect(real.contains("brew:secret-tool"))
     }
 
     @Test("The home folder is written as ~, and the user name on its own as <user>")

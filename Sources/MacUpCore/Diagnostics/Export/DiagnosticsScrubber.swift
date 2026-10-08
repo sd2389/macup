@@ -52,12 +52,37 @@ final class DiagnosticsScrubber {
         return copy
     }
 
+    /// Rebuilt rather than copied and patched: a string property added to
+    /// ``DiagnosticFinding`` later must fail to compile here instead of
+    /// riding into the file unscrubbed on the synthesized `Codable`.
     func finding(_ finding: DiagnosticFinding) -> DiagnosticFinding {
-        var copy = finding
-        copy.title = text(finding.title)
-        copy.recommendation = text(finding.recommendation)
-        copy.detail = text(Self.withoutUnreadableName(finding, masking: names != nil))
-        return copy
+        DiagnosticFinding(
+            id: finding.id,
+            severity: finding.severity,
+            provider: finding.provider,
+            title: text(finding.title),
+            detail: text(Self.withoutUnreadableName(finding, masking: names != nil)),
+            recommendation: text(finding.recommendation),
+            fix: finding.fix.map(fix)
+        )
+    }
+
+    /// A fix as the file may carry it: its prose scrubbed like any other
+    /// string, and the configuration keys its action names masked like any
+    /// other package ID — which is what the file's own note about
+    /// placeholders promises the reader.
+    func fix(_ fix: DiagnosticFix) -> DiagnosticFix {
+        var action = fix.action
+        if case .clearItemRules(let keys) = fix.action {
+            action = .clearItemRules(keys.map { key in
+                (try? PackageID(parsing: key)).map(item) ?? text(key)
+            })
+        }
+        return DiagnosticFix(
+            action: action,
+            summary: text(fix.summary),
+            detail: text(fix.detail)
+        )
     }
 
     /// A finding about an entry MacUp could not read names the entry first,

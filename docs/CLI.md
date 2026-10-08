@@ -631,7 +631,8 @@ The same document is what `export` writes. `packageNames` (`placeholders` or
 `summary`, `updates[]` — `item`, `kind`, `installedVersion`,
 `availableVersion`, `versionChange`, `risk`, `signals[]`, `ownership` — and
 `commands[]`), `doctor` (`startedAt`, `finishedAt`, `cancelled`, `summary`,
-`findings[]`), `configuration` (`path`, `source`, `valid`,
+`findings[]` — each with its `fix`, when it has one, whose keys are masked
+like any other package name), `configuration` (`path`, `source`, `valid`,
 `automaticModificationsAllowed`, `migratedFromSchemaVersion`, `issues[]`,
 `schedule`, `security`), `policies` (`defaultPolicy`, `confirmMajorUpdates`,
 `providers[]`, `items[]` — `item`, `policy`, `effectivePolicy`,
