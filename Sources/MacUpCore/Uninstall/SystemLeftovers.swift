@@ -70,8 +70,9 @@ struct SystemLeftoverScanner: Sendable {
                     names: names,
                     isDirectory: { FileTree.isDirectory(path) }
                 ) else { continue }
-                add(Self.file(path, reason: reason))
-                if FileTree.isDirectory(path), let canonical = FileTree.canonicalPath(path) { folders.append(canonical) }
+                let isDirectory = FileTree.isDirectory(path)
+                add(Self.file(path, reason: reason, isDirectory: isDirectory))
+                if isDirectory, let canonical = FileTree.canonicalPath(path) { folders.append(canonical) }
             }
         }
         for name in FileTree.names(in: receiptsDirectory) ?? [] where name.hasSuffix(".plist") {
@@ -176,11 +177,12 @@ struct SystemLeftoverScanner: Sendable {
         "Named “\(name)”, like the app. Matched by name only; check it is this app's. " + administratorReason
     }
 
-    static func file(_ path: String, reason: String = administratorReason) -> ManualRemoval {
+    static func file(_ path: String, reason: String = administratorReason, isDirectory: Bool = true) -> ManualRemoval {
         ManualRemoval(
             path: path,
             reason: reason,
-            steps: ["In Finder, choose Go → Go to Folder, enter \(quoted(path)), move it to the Trash, and enter an administrator's password when macOS asks."]
+            steps: ["In Finder, choose Go → Go to Folder, enter \(quoted(path)), move it to the Trash, and enter an administrator's password when macOS asks."],
+            commands: [.remove(path, isDirectory: isDirectory)]
         )
     }
 
@@ -188,7 +190,8 @@ struct SystemLeftoverScanner: Sendable {
         ManualRemoval(
             path: path,
             reason: "macOS keeps this record of the app's installer package. " + (reason ?? administratorReason),
-            steps: ["In Terminal, run: sudo pkgutil --forget \(quoted(identifier))"]
+            steps: ["In Terminal, run: sudo pkgutil --forget \(quoted(identifier))"],
+            commands: [AdminCommand.forget(identifier)].compactMap { $0 }
         )
     }
 
@@ -199,10 +202,14 @@ struct SystemLeftoverScanner: Sendable {
             steps.append("In Terminal, stop it: \(prefix)launchctl bootout \(quoted(domain + "/" + label))")
         }
         steps.append("Then remove the file: sudo rm \(quoted(path))")
+        var commands: [AdminCommand] = []
+        if let label { commands.append(.bootout(domain: domain, label: label)) }
+        commands.append(.remove(path, isDirectory: false))
         return ManualRemoval(
             path: path,
             reason: "A launchd job for the whole Mac, \(detail) " + administratorReason,
-            steps: steps
+            steps: steps,
+            commands: commands
         )
     }
 

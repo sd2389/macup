@@ -204,3 +204,52 @@ Doctor fixes are not in the update History, which records what MacUp did to
 packages. A fix changes MacUp's own configuration file or its own launchd
 agent: both are visible where they live, the result is printed or shown, and
 `macup config show` and `macup schedule status` report the state afterwards.
+
+
+## ADR-025 — A reviewed root script, written by MacUp and run by the person
+An app whose installer ran as root — TeamViewer is the case that prompted
+this — leaves a root-owned bundle, privileged helpers, system launchd jobs and
+installer receipts. MacUp listed all of it with manual steps and refused to
+act, which is correct and, on its own, a dead end: the owner reported on
+2026-10-08 that they still could not delete the app.
+
+The trust contract already says what is allowed here: explain why, let macOS
+present standard authorization, never collect the password in MacUp UI, and
+avoid custom privilege helpers until a separately reviewed need exists
+(docs/TRUST_AND_SECURITY.md, "Privilege"). On 2026-10-08 the owner chose the
+first of those over a privileged helper. MacUp now writes the
+administrator-only part of a reviewed plan as a script:
+
+- **MacUp never escalates.** It writes one file of its own, `0600`, inside
+  its state directory, and never makes it executable, hands it to a runner,
+  or launches a shell on it. `scripts/check-trust-invariants.sh` fails the
+  build if `AdminRemovalScript.swift` names a runner, `chmod`, or
+  `NSWorkspace`, or if any other file under `Sources/` or `Apps/` names the
+  script at all.
+- **The person runs it.** `sudo bash <path>` asks them for their own
+  password, in their own terminal. MacUp never sees it, stores it, or runs as
+  root. The app can copy that command and open Terminal; it cannot run it.
+- **Nothing is in it that was not in the plan.** Each line comes from one
+  `ManualRemoval` the person already reviewed, in the same order, and the
+  script's own header says how many items there are and that the removals are
+  permanent, because root does not use the Trash.
+- **Three tools, and no others.** A command the script may contain names
+  `rm`, `launchctl`, or `pkgutil`. Anything else is left out with its reason,
+  whatever built it, so a reader can check the whole file against that list.
+- **Quoted once, and refused when it cannot be.** Every argument is
+  single-quoted, a path operand is preceded by `--` so a leading hyphen stays
+  a path, a receipt identifier is checked character by character because
+  `pkgutil` takes no `--`, and a path holding a control character, a newline
+  or a bidirectional override is left out rather than written into a file that
+  runs as root.
+- **The maker's own uninstaller comes first.** When a leftover folder holds
+  one (`TeamViewerUninstaller.app`), MacUp names it, says who signed it —
+  after checking the signature verifies, not by reading a claim — and keeps
+  that folder out of the script, because the usual advice would delete the
+  uninstaller unused. MacUp does not run it: what it removes would not be in
+  MacUp's plan, boundary, or history.
+
+What stays out of scope: a privileged helper, `SMJobBless`, Authorization
+Services, and anything that would make MacUp itself able to act as root. That
+needs a Developer ID, which the project does not yet have, and its own
+security review.

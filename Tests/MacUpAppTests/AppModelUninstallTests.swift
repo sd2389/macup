@@ -120,3 +120,60 @@ struct AppModelUninstallTests {
         #expect(harness.authorizer.requestedReasons == ["uninstall Chatter from this Mac"])
     }
 }
+
+/// The way past "MacUp will not uninstall this now": MacUp writes the
+/// administrator-only part of the plan as a script, and the person runs it
+/// with their own password. MacUp never escalates, so no test here does
+/// either — what is checked is the file MacUp wrote.
+@Suite("App: the administrator script for what MacUp will not remove")
+@MainActor
+struct AppModelAdminScriptTests {
+    /// An app whose installer also put a folder in the pretend `/Library`,
+    /// where everything needs an administrator.
+    private func mac() throws -> (AppModelHarness, UninstallFixture) {
+        let fixture = try UninstallFixture()
+        _ = try fixture.app("Chatter", identifier: "com.example.chatter", version: "2.1")
+        _ = try fixture.folder("SystemLibrary/Application Support/com.example.chatter")
+        _ = try fixture.folder("SystemLibrary/PrivilegedHelperTools/com.example.chatter.Helper")
+        let harness = try AppModelHarness(uninstall: fixture.environment())
+        return (harness, fixture)
+    }
+
+    private func review(_ harness: AppModelHarness) async throws {
+        await harness.model.scanUninstallable()
+        let app = try #require(harness.model.uninstaller.catalog?.apps.first { $0.name == "Chatter" })
+        await harness.model.reviewUninstall(.app(app))
+    }
+
+    @Test("Asking writes a script of exactly what the plan says, and removes nothing")
+    func writesTheScript() async throws {
+        let (harness, fixture) = try mac()
+        try await review(harness)
+        let plan = try #require(harness.model.uninstaller.plan)
+        #expect(plan.cannotRemove.contains { !$0.commands.isEmpty })
+
+        harness.model.writeAdminScript()
+        let script = try #require(harness.model.uninstaller.adminScript)
+        #expect(harness.model.uninstaller.adminScriptProblem == nil)
+        #expect(script.items.map(\.path).contains(fixture.root + "/SystemLibrary/Application Support/com.example.chatter"))
+        #expect(script.command.hasPrefix("sudo bash "))
+        #expect(script.text.contains("set -euo pipefail"))
+        // The file is MacUp's own and the Mac is untouched: no real removal,
+        // and nothing was run.
+        #expect(FileManager.default.fileExists(atPath: script.path))
+        #expect(fixture.backend.trashed.isEmpty && fixture.backend.deleted.isEmpty)
+        #expect(harness.runner.recordedRequests.isEmpty, "writing a script runs nothing")
+    }
+
+    @Test("An uninstall with nothing for an administrator says so instead of writing a script")
+    func nothingToScript() async throws {
+        let fixture = try UninstallFixture()
+        _ = try fixture.app("Chatter", identifier: "com.example.chatter")
+        let harness = try AppModelHarness(uninstall: fixture.environment())
+        try await review(harness)
+
+        harness.model.writeAdminScript()
+        #expect(harness.model.uninstaller.adminScript == nil)
+        #expect(harness.model.uninstaller.adminScriptProblem?.contains("the steps above are the only way") == true)
+    }
+}

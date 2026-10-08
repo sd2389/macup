@@ -57,11 +57,15 @@ struct UninstallCommand: AsyncParsableCommand {
     @Flag(name: [.customShort("y"), .long], help: "Confirm without asking.")
     var yes = false
 
+    @Flag(name: .long, help: "Write the administrator-only part as a script you can read and run with sudo. Removes nothing itself.")
+    var adminScript = false
+
     @Flag(name: .long, help: "Print machine-readable JSON. Never asks anything; a real uninstall needs --mode and --yes.")
     var json = false
 
     func validate() throws {
         if list && target != nil { throw ValidationError("--list lists everything; leave out the target.") }
+        if adminScript && (list || orphans) { throw ValidationError("--admin-script needs a target.") }
         if orphans && target != nil { throw ValidationError("--orphans lists what was left behind; leave out the target.") }
         if list && orphans { throw ValidationError("Use --list or --orphans, not both.") }
         if !list && !orphans && target == nil {
@@ -120,7 +124,8 @@ struct UninstallCommand: AsyncParsableCommand {
             includeData: includeData,
             all: all,
             yes: yes,
-            json: json
+            json: json,
+            adminScript: adminScript
         ).run(context: context, paths: paths, configuration: loaded, style: style)
     }
 }
@@ -187,6 +192,9 @@ struct UninstallWorkflow {
     var all: Bool
     var yes: Bool
     var json: Bool
+    /// Write the administrator-only part as a script and stop. Nothing on the
+    /// Mac is changed: the only thing written is MacUp's own file.
+    var adminScript = false
 
     func run(context: CLIContext, paths: MacUpPaths, configuration loaded: LoadedConfiguration, style: TextStyle) async throws {
         let uninstall = context.uninstallEnvironment
@@ -206,6 +214,10 @@ struct UninstallWorkflow {
             throw MacUpExitCode.usage.exitCode
         }
 
+        if adminScript {
+            try writeAdminScript(plan, context: context, paths: paths, style: style)
+            return
+        }
         if json && (dryRun || !plan.canRun) {
             context.print(try JSONOutput.encode(plan))
             if !plan.canRun { throw MacUpExitCode.failure.exitCode }
@@ -290,5 +302,85 @@ struct UninstallWorkflow {
         case .refused: throw MacUpExitCode.failure.exitCode
         case .incomplete, .failed: throw MacUpExitCode.updateFailed.exitCode
         }
+    }
+
+    /// Writes the administrator-only part of the plan as a script, and says
+    /// what to do with it. MacUp changes nothing on the Mac here: it writes
+    /// one file of its own, and `sudo` asks the person for their password
+    /// when they run it (docs/TRUST_AND_SECURITY.md, "Privilege").
+    private func writeAdminScript(
+        _ plan: UninstallPlan,
+        context: CLIContext,
+        paths: MacUpPaths,
+        style: TextStyle
+    ) throws {
+        guard plan.cannotRemove.contains(where: { !$0.commands.isEmpty }) else {
+            context.printError("error: nothing in this uninstall needs an administrator, so there is no script to write.")
+            if let vendor = plan.vendorUninstaller {
+                context.printError(TerminalText.sanitize(vendor.summary))
+            }
+            throw MacUpExitCode.usage.exitCode
+        }
+        let script: AdminRemovalScript
+        do {
+            script = try AdminRemovalScriptWriter.write(plan, paths: paths)
+        } catch {
+            let message = (error as? MacUpError)?.message ?? "The script could not be written."
+            context.printError("error: " + TerminalText.sanitize(message))
+            throw MacUpExitCode.failure.exitCode
+        }
+
+        if json {
+            context.print(try JSONOutput.encode(AdminScriptDocument(script, plan: plan)))
+            return
+        }
+        context.print(style.bold("Wrote the administrator-only part of this uninstall"))
+        context.print("  " + style.path(script.path))
+        context.print("  " + TextStyle.plural(script.items.count, "item") + ", removed permanently. Root does not use the Trash.")
+        context.print("")
+        for item in script.items {
+            context.print("  " + style.path(item.path))
+        }
+        if !script.refused.isEmpty {
+            context.print("")
+            context.print(style.bold("Not in the script; the written steps are the only way"))
+            for (item, reason) in script.refused {
+                context.print("  " + style.path(item.path) + style.dim("  " + style.text(reason)))
+            }
+        }
+        if let vendor = plan.vendorUninstaller {
+            context.print("")
+            context.print(style.text(vendor.summary))
+            context.print(style.dim("  " + vendor.path))
+        }
+        context.print("")
+        context.print("Read it, then run it. sudo asks for your password; MacUp never sees it:")
+        context.print("  " + style.path(script.command))
+    }
+}
+
+/// `macup uninstall <target> --admin-script --json`.
+private struct AdminScriptDocument: Encodable {
+    let kind = "adminRemovalScript"
+    let macupVersion = MacUp.version
+    let target: String
+    let path: String
+    let command: String
+    let items: [String]
+    let refused: [Refused]
+    let vendorUninstaller: VendorUninstaller?
+
+    struct Refused: Encodable {
+        let path: String
+        let reason: String
+    }
+
+    init(_ script: AdminRemovalScript, plan: UninstallPlan) {
+        target = plan.subject.target
+        path = script.path
+        command = script.command
+        items = script.items.map(\.path)
+        refused = script.refused.map { Refused(path: $0.item.path, reason: $0.reason) }
+        vendorUninstaller = plan.vendorUninstaller
     }
 }

@@ -37,13 +37,16 @@ fi
 # other file — the CLI, the app, discovery, scheduling — must not.
 # The uninstall plan files are the same kind of file as the update plan files:
 # each provider's one reviewed place for the commands an uninstall runs.
-planning_files='^Sources/MacUpCore/Execution/ModifyingCommandRules\.swift:|^Sources/MacUpCore/Providers/(Homebrew/Homebrew|Npm/Npm|Mise/Mise)(Update|Uninstall)Plan\.swift:'
+# AdminRemovalScript.swift is the one reviewed place that *writes* root
+# commands into a file for the person to run with sudo. MacUp never runs them
+# itself, which the next check enforces.
+planning_files='^Sources/MacUpCore/Execution/ModifyingCommandRules\.swift:|^Sources/MacUpCore/Providers/(Homebrew/Homebrew|Npm/Npm|Mise/Mise)(Update|Uninstall)Plan\.swift:|^Sources/MacUpCore/Uninstall/AdminRemovalScript\.swift:'
 # Uses of the word that are not commands: the uninstall report's document
 # kind, the words History search matches for an uninstall entry, and the names
 # of MacUp's own `macup uninstall` and `macup self-update` commands. Neither
 # name reaches a provider: `macup self-update` plans an ordinary Homebrew
 # update through the same planning file as any other item.
-not_commands='^Sources/MacUpCore/Uninstall/UninstallEngine\.swift:[0-9]+:.*kind|^Sources/MacUpCore/History/HistoryFilter\.swift:[0-9]+:.*fields \+=|^Sources/macup/Commands/UninstallCommand\.swift:[0-9]+: *commandName: "uninstall",$|^Sources/macup/Commands/SelfUpdateCommand\.swift:[0-9]+: *commandName: "self-update",$'
+not_commands='^Sources/MacUpCore/Uninstall/UninstallEngine\.swift:[0-9]+:.*kind|^Sources/MacUpCore/History/HistoryFilter\.swift:[0-9]+:.*fields \+=|^Sources/macup/Commands/UninstallCommand\.swift:[0-9]+: *commandName: "uninstall",$|^Sources/macup/Commands/SelfUpdateCommand\.swift:[0-9]+: *commandName: "self-update",$|^Sources/MacUpCore/Uninstall/VendorUninstaller\.swift:[0-9]+: *static let markers = '
 verbs=$(grep -rnE '"(upgrade|install|reinstall|uninstall|remove|rm|cleanup|autoremove|prune|self-update|use|--install|--download|--bump|--all)"' Sources Apps \
     | grep -vE "$planning_files" | grep -vE "$not_commands" || true)
 if [[ -n "$verbs" ]]; then
@@ -67,6 +70,21 @@ fi
 if [[ -n "$daemons" ]]; then
     echo "$daemons" >&2
     fail "scheduling must stay a per-user LaunchAgent; MacUp installs no system daemon"
+fi
+
+# The root script MacUp writes is for the person to run, never for MacUp.
+# Nothing may hand it to a runner, make it executable, or launch a shell on
+# it: the only mention of its name outside the file that writes it is the
+# documentation.
+script_runners=$(grep -rnE 'admin-removal\.sh|AdminRemovalScriptWriter\.fileName' Sources Apps \
+    | grep -vE '^Sources/MacUpCore/Uninstall/AdminRemovalScript\.swift:' || true)
+if [[ -n "$script_runners" ]]; then
+    echo "$script_runners" >&2
+    fail "only AdminRemovalScript.swift may name the root script it writes"
+fi
+if grep -nE 'CommandRunning|CommandRequest|runner|chmod|S_IXUSR|openApplication|NSWorkspace' \
+    Sources/MacUpCore/Uninstall/AdminRemovalScript.swift; then
+    fail "AdminRemovalScript.swift writes a file and nothing else: it must not run it or make it executable"
 fi
 
 # MacUp itself opens no network connection (CLAUDE.md §18): only the package

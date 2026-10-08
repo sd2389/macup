@@ -138,12 +138,31 @@ struct UninstallRenderer {
             }
         }
 
+        // The maker's own remover comes first: it is the one thing here that
+        // removes the whole app properly, and the usual advice - drag the
+        // folder to the Trash - would delete it unused.
+        if let vendor = plan.vendorUninstaller {
+            lines.append("")
+            lines.append(style.bold("This app ships its own uninstaller"))
+            lines.append("  " + style.path(vendor.path))
+            lines.append("  " + style.text(vendor.summary))
+            lines += vendor.steps.enumerated().map { index, step in "      \(index + 1). " + style.text(step) }
+            lines.append(style.dim("  MacUp does not run it: what it removes would not be in this plan."))
+        }
+
         if !plan.cannotRemove.isEmpty {
             lines.append("")
             lines.append(style.bold("MacUp cannot remove these; here is how to do it yourself"))
             for manual in plan.cannotRemove {
                 lines.append("  " + style.path(manual.path) + style.dim("  " + style.text(manual.reason)))
                 lines += manual.steps.enumerated().map { index, step in "      \(index + 1). " + style.text(step) }
+            }
+            if plan.cannotRemove.contains(where: { !$0.commands.isEmpty }) {
+                lines.append("")
+                lines.append(style.text(
+                    "`macup uninstall \(plan.subject.target) --admin-script` writes these as one script you can read, "
+                        + "then run with sudo. MacUp never asks for your password."
+                ))
             }
         }
 

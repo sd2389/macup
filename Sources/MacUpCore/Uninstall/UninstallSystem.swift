@@ -53,6 +53,19 @@ public protocol CodeSignatureReading: Sendable {
     /// The Apple team identifier in the bundle's signature, or `nil` when it
     /// names none (unsigned, ad-hoc, or unreadable).
     func teamIdentifier(ofBundleAt path: String) -> String?
+
+    /// Who signed the bundle, **after checking that the signature is valid**
+    /// — `nil` when it is unsigned, ad-hoc, broken, or unreadable. Used where
+    /// MacUp tells somebody about a program it found and will not run, so the
+    /// name it prints is one Apple's check stands behind rather than a claim
+    /// copied out of a bundle.
+    func verifiedSigner(ofBundleAt path: String) -> String?
+}
+
+public extension CodeSignatureReading {
+    /// Nothing, unless a reader implements it: a signer MacUp has not
+    /// verified is never reported as one.
+    func verifiedSigner(ofBundleAt path: String) -> String? { nil }
 }
 
 /// The signature on disk, read with the Security framework. Reading checks
@@ -72,6 +85,27 @@ public struct SystemCodeSignatures: CodeSignatureReading {
               Self.isTeamIdentifier(team)
         else { return nil }
         return team
+    }
+
+    /// Who signed it, once Apple's own check has passed. The order matters:
+    /// `SecStaticCodeCheckValidity` first, and only then the leaf
+    /// certificate's name, so an edited bundle whose signature no longer
+    /// verifies reports nobody.
+    public func verifiedSigner(ofBundleAt path: String) -> String? {
+        var code: SecStaticCode?
+        guard SecStaticCodeCreateWithPath(URL(fileURLWithPath: path) as CFURL, [], &code) == errSecSuccess,
+              let code,
+              SecStaticCodeCheckValidity(code, SecCSFlags(rawValue: kSecCSCheckAllArchitectures), nil) == errSecSuccess
+        else { return nil }
+        var information: CFDictionary?
+        guard SecCodeCopySigningInformation(code, SecCSFlags(rawValue: kSecCSSigningInformation), &information) == errSecSuccess,
+              let dictionary = information as? [String: Any],
+              let certificates = dictionary[kSecCodeInfoCertificates as String] as? [SecCertificate],
+              let leaf = certificates.first,
+              let summary = SecCertificateCopySubjectSummary(leaf) as String?
+        else { return nil }
+        let name = TerminalText.sanitize(summary)
+        return name.isEmpty ? nil : name
     }
 
     /// Ten upper-case letters and digits, which is every team identifier

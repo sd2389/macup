@@ -676,6 +676,11 @@ the millisecond.
   configuration MacUp cannot read fully never turns it on, and a Mac that
   asks the owner to approve every change installs nothing on a schedule
   (ADR-023).
+- `macup uninstall <target> --admin-script --json` → `"kind":
+  "adminRemovalScript"`: `target`, `path`, `command`, `items[]` (the paths the
+  script removes, in order), `refused[]` (`path`, `reason` — in the plan but
+  not in the script), and `vendorUninstaller` (`path`, `foundIn`, `signedBy`,
+  `steps[]`) when one was found.
 - `macup provider scan --json` → `"kind": "toolScan"`: `scannedAt`,
   `managed[]` and `unmanaged[]` (`id`, `displayName`, `kind`
   (`packageManager` or `versionManager`), `manages`, `managedBy` when a MacUp
@@ -725,6 +730,7 @@ the millisecond.
 | `macup uninstall --list [--json]` | What can be uninstalled: apps (name, version, where it came from, and whether MacUp can remove it) and packages by provider, plus installs only you can remove. Reads only. |
 | `macup uninstall <target> --dry-run [--json]` | The plan: what the package manager will run, every file with its size and whether it is included, and what MacUp cannot remove with the steps to do it yourself. Removes nothing. |
 | `macup uninstall <target> [--mode trash\|delete] [--include <path>]… [--include-data] [--all] [--yes] [--json]` | Uninstalls. |
+| `macup uninstall <target> --admin-script [--json]` | Writes the administrator-only part of the plan as a script you read and then run with `sudo`. Removes nothing itself, and MacUp never runs it. |
 | `macup self-uninstall [--dry-run] [--mode trash\|delete] [--yes] [--json]` | Removes MacUp itself: the app, every installed `macup`, its settings, history and state, its scheduled check, its Keychain items, and its files in `~/Library`. |
 
 A target is a package ID (`brew:mysql`, `brew-cask:firefox`, `npm:typescript`,
@@ -750,6 +756,46 @@ What is included by default:
   named exactly like the app. Each says which rule found it, and the two
   weaker rules say to check before removing; what another installed app's
   identifier or name claims is left to that app.
+
+### What needs an administrator
+
+MacUp never becomes one: it does not run as root, hold a password, install a
+privileged helper, or hide an escalation. What it can do is write down exactly
+what it would have done (ADR-025):
+
+```bash
+macup uninstall TeamViewer --admin-script
+```
+
+That writes `~/.local/state/macup/admin-removal.sh`, `0600` and not
+executable, prints the items it covers and the command to run, and changes
+nothing else. Read the file, then run it:
+
+```bash
+sudo bash ~/.local/state/macup/admin-removal.sh
+```
+
+`sudo` asks you for your own password. The script sets `set -euo pipefail`,
+refuses to run as anybody but root, and contains one line per item from the
+plan — nothing else. It can only ever call `rm`, `launchctl`, or `pkgutil`;
+every argument is single-quoted, a path operand is preceded by `--` so a name
+beginning with a hyphen stays a path, and an item whose path holds a control
+character, a newline, or a bidirectional override is left out of the script
+with its reason rather than written into a file that runs as root. These
+removals are permanent: root does not use the Trash.
+
+In the app, the same thing is a **Write Administrator Script…** button in the
+review sheet's "MacUp Cannot Remove These" section, with Review Script, Copy
+Command, Show in Finder, and Open Terminal. The app can copy the command and
+open Terminal; it cannot run it.
+
+If the app ships its own uninstaller — `TeamViewerUninstaller.app` in
+`/Library/Application Support/TeamViewer`, say — MacUp names it first, says
+who signed it after checking that the signature verifies, and keeps that
+folder out of the script, because trashing the folder would delete the
+uninstaller unused. Running it is the better way to remove such an app, and
+MacUp leaves that to you: what it removes would not be in MacUp's plan or
+history.
 
 At a terminal MacUp asks "Move to Trash or delete permanently?" every time
 (anything but `d` or `delete` is the Trash) and then asks you to confirm.

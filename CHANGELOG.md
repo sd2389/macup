@@ -12,6 +12,32 @@ belonged to.
 ## [Unreleased]
 
 ### Added
+- **An uninstall can now be finished when an installer ran as root**:
+  `macup uninstall <target> --admin-script`, and **Write Administrator
+  Script…** in the app's review sheet, write the administrator-only part of
+  the reviewed plan as a script you read and then run with
+  `sudo bash <path>`. MacUp still never becomes an administrator: the file is
+  its own, `0600` and not executable, it is never run, made executable or
+  handed to a shell by MacUp, and `sudo` asks you for your password in your
+  own terminal. The script sets `set -euo pipefail`, refuses to run as anybody
+  but root, carries one line per item in the plan's order, and can only ever
+  call `rm`, `launchctl` or `pkgutil` — anything else is left out with its
+  reason. Arguments are single-quoted, path operands follow `--`, receipt
+  identifiers are checked character by character, and a path holding a control
+  character, a newline or a bidirectional override is left out rather than
+  written into a file that runs as root. The root-owned app bundle is on the
+  list too, so the script finishes the job and not only the leftovers. The
+  removals are permanent, and the script says so: root does not use the Trash
+  (ADR-025).
+
+- **The maker's own uninstaller is named first**: when an app left one behind
+  — `TeamViewerUninstaller.app` in `/Library/Application Support/TeamViewer`,
+  for instance — both surfaces name it, say who signed it after checking that
+  the signature verifies rather than reading a claim, and keep that folder out
+  of the script, because the usual advice would have deleted the uninstaller
+  unused. MacUp does not run it: what another maker's program removes would
+  not be in MacUp's plan, boundary or history.
+
 - **Every package manager on this Mac**: `macup provider scan` and an "Also on
   This Mac" section on the app's Providers screen list the package managers
   and version managers MacUp finds — MacPorts, Nix, pipx, uv, pip, Poetry,

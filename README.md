@@ -42,7 +42,10 @@ already have and gives you one careful place to manage them:
   rules are read again right before each command.
 - **Uninstall without leftovers.** Remove apps and packages along with the
   files they leave in `~/Library`. Items go to the Trash by default, and your
-  data stays unticked unless you tick it.
+  data stays unticked unless you tick it. What an installer put in place as
+  root — helpers, system launchd jobs, receipts — MacUp writes down as a
+  script you read and run with `sudo`, because MacUp never becomes an
+  administrator itself.
 - **Stay local.** No account, no cloud, no telemetry, and no background daemon.
   MacUp never runs as root and never asks for your password.
 
@@ -268,8 +271,10 @@ below is enforced in code and covered by tests, not just promised:
 - **No shell.** Programs run with an executable path and an argument array, so
   a hostile package name is just an inert argument.
 - **No root and no passwords.** MacUp never uses `sudo` and never captures an
-  administrator password. When a step needs one, MacUp tells you so and leaves
-  that step to you.
+  administrator password. When a step needs one, MacUp writes it down — the
+  exact commands, in a file you read first — and you run that file with
+  `sudo`, which asks you rather than MacUp. The app can copy the command and
+  open Terminal; it cannot run it.
 - **Nothing deletes on its own.** There's no automatic `brew cleanup`, and no
   pruning. Uninstalling only happens when you ask, from a reviewed plan.
 - **Private by design.** MacUp makes no network requests of its own, collects

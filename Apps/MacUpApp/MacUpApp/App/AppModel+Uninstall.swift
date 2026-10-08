@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import MacUpCore
 import Observation
@@ -28,9 +29,62 @@ final class UninstallState {
     fileprivate(set) var problem: String?
     fileprivate(set) var task: Task<Void, Never>?
     var search = ""
+    /// The script MacUp wrote for the administrator-only part, once asked
+    /// for. MacUp writes it and shows it; the person runs it.
+    fileprivate(set) var adminScript: AdminRemovalScript?
+    /// Why that script could not be written, when it could not.
+    fileprivate(set) var adminScriptProblem: String?
+    /// Whether the script's text is on screen.
+    var isReadingAdminScript = false
 }
 
 extension AppModel {
+    /// Writes the administrator-only part of the reviewed plan as a script
+    /// the person can read and then run with `sudo`.
+    ///
+    /// MacUp stays out of it after that: it does not run the script, make it
+    /// executable, or ask for a password (docs/TRUST_AND_SECURITY.md,
+    /// "Privilege"). The only thing written is MacUp's own file, which is why
+    /// this needs no approval of its own — nothing on the Mac changes.
+    func writeAdminScript() {
+        uninstaller.adminScript = nil
+        uninstaller.adminScriptProblem = nil
+        guard let plan = uninstaller.plan else { return }
+        guard plan.cannotRemove.contains(where: { !$0.commands.isEmpty }) else {
+            uninstaller.adminScriptProblem = "Nothing here has an exact command MacUp can write down, so the steps above are the only way."
+            return
+        }
+        do {
+            let paths = try resolvedPaths()
+            uninstaller.adminScript = try AdminRemovalScriptWriter.write(plan, paths: paths)
+        } catch {
+            uninstaller.adminScriptProblem = (error as? MacUpError)?.message
+                ?? "MacUp could not write the script, so there is nothing to run."
+        }
+    }
+
+    /// Puts the command on the clipboard. The password is typed into the
+    /// terminal, never into MacUp.
+    func copyAdminScriptCommand() {
+        guard let command = uninstaller.adminScript?.command else { return }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(command, forType: .string)
+    }
+
+    /// Opens Terminal, with the command already copied, so the person pastes
+    /// it and `sudo` asks them for their password. MacUp runs nothing.
+    func openTerminalForAdminScript() {
+        copyAdminScriptCommand()
+        guard let terminal = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.Terminal") else { return }
+        NSWorkspace.shared.openApplication(at: terminal, configuration: NSWorkspace.OpenConfiguration())
+    }
+
+    /// Shows the script in Finder, so it can be opened in any editor first.
+    func revealAdminScript() {
+        guard let path = uninstaller.adminScript?.path else { return }
+        NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)])
+    }
+
     /// This Mac, or the pretend one a test gives.
     var uninstallEnvironment: UninstallEnvironment {
         let bundle = Bundle.main.bundleURL.pathExtension == "app" ? Bundle.main.bundlePath : nil

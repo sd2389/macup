@@ -148,3 +148,74 @@ struct UninstallCommandTests {
         #expect(fixture.backend.trashed.isEmpty && fixture.backend.deleted.isEmpty)
     }
 }
+
+/// `macup uninstall <target> --admin-script`: the written-down version of
+/// what MacUp refuses to do itself. It writes one file of MacUp's own and
+/// changes nothing else, and it never runs the file.
+@Suite("macup uninstall --admin-script")
+struct AdminScriptCommandTests {
+    private func mac() throws -> (CLIHarness, UninstallFixture) {
+        let harness = try CLIHarness()
+        harness.useTemporaryDirectories()
+        let fixture = try UninstallFixture()
+        _ = try fixture.app("Chatter", identifier: "com.example.chatter", version: "2.1")
+        _ = try fixture.folder("SystemLibrary/Application Support/com.example.chatter")
+        _ = try fixture.launchAgent(
+            fixture.root + "/SystemLibrary/LaunchDaemons/com.example.chatter.Helper.plist",
+            label: "com.example.chatter.Helper",
+            program: fixture.root + "/Applications/Chatter.app/Contents/MacOS/Chatter"
+        )
+        harness.uninstall = fixture.environment()
+        return (harness, fixture)
+    }
+
+    @Test("It writes the script, prints what to run, and removes nothing")
+    func writesTheScript() async throws {
+        let (harness, fixture) = try mac()
+        let run = try await harness.run(["uninstall", "Chatter", "--admin-script"])
+        #expect(run.exitCode == nil)
+        let output = run.standardOutput
+        #expect(output.contains("Wrote the administrator-only part of this uninstall"))
+        #expect(output.contains("admin-removal.sh"))
+        #expect(output.contains("sudo bash "))
+        #expect(output.contains("Root does not use the Trash"))
+
+        let path = harness.stateDirectory.path + "/admin-removal.sh"
+        let text = try String(contentsOfFile: path, encoding: .utf8)
+        #expect(text.contains("rm '-rf' '--' '" + fixture.root + "/SystemLibrary/Application Support/com.example.chatter'"))
+        #expect(text.contains(#"if [[ "$(id -u)" != 0 ]]; then"#))
+        // Nothing was removed and nothing was run: MacUp wrote a file.
+        #expect(fixture.backend.trashed.isEmpty && fixture.backend.deleted.isEmpty)
+        #expect(harness.modifyingRequests.isEmpty)
+    }
+
+    @Test("With nothing for an administrator it writes no script and says why")
+    func nothingToScript() async throws {
+        let harness = try CLIHarness()
+        harness.useTemporaryDirectories()
+        let fixture = try UninstallFixture()
+        _ = try fixture.app("Chatter", identifier: "com.example.chatter")
+        harness.uninstall = fixture.environment()
+
+        let run = try await harness.run(["uninstall", "Chatter", "--admin-script"])
+        #expect(run.exitCode == MacUpExitCode.usage.rawValue)
+        #expect(run.standardError.contains("nothing in this uninstall needs an administrator"))
+        #expect(!FileManager.default.fileExists(atPath: harness.stateDirectory.path + "/admin-removal.sh"))
+    }
+
+    @Test("--json names the script, the items, and what was left out of it")
+    func jsonDocument() async throws {
+        // The fixture is held to the end: releasing it deletes the pretend Mac.
+        let (harness, fixture) = try mac()
+        let run = try await harness.run(["uninstall", "Chatter", "--admin-script", "--json"])
+        #expect(run.exitCode == nil, "\(run.standardError)")
+        let json = try #require(
+            try JSONSerialization.jsonObject(with: Data(run.standardOutput.utf8)) as? [String: Any]
+        )
+        #expect(json["kind"] as? String == "adminRemovalScript")
+        #expect((json["command"] as? String)?.hasPrefix("sudo bash ") == true)
+        #expect((json["items"] as? [String])?.isEmpty == false)
+        #expect(json["refused"] != nil)
+        #expect(fixture.backend.trashed.isEmpty && fixture.backend.deleted.isEmpty)
+    }
+}

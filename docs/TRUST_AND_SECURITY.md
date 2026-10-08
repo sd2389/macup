@@ -457,6 +457,38 @@ When an operation legitimately needs authorization:
 - never collect the password in MacUp UI
 - avoid custom privilege helpers until a separately reviewed need exists
 
+An uninstall is where this becomes concrete, because an installer that ran as
+root leaves a root-owned bundle, privileged helpers, system launchd jobs and
+receipts that MacUp will not touch. Listing them and stopping there is a dead
+end, so MacUp writes the administrator-only part of the reviewed plan as a
+script and leaves the running to the person (ADR-025):
+
+- The file is MacUp's own, `0600`, inside its state directory, and never made
+  executable. MacUp does not run it, hand it to a runner, or launch a shell on
+  it; `scripts/check-trust-invariants.sh` fails the build if that file names a
+  runner, `chmod`, or `NSWorkspace`, or if any other file under `Sources/` or
+  `Apps/` names the script at all.
+- `sudo bash <path>` is what the person types, in their own terminal. MacUp
+  never sees the password, stores it, or runs as root. The app can copy that
+  command and open Terminal; it cannot run it.
+- Every line comes from one item of the plan they reviewed, in the same order.
+  The script may call `rm`, `launchctl`, or `pkgutil` and nothing else, so the
+  whole file can be checked against that list. Arguments are single-quoted, a
+  path operand follows `--`, a receipt identifier is checked character by
+  character because `pkgutil` takes no `--`, and a path holding a control
+  character, a newline, or a bidirectional override is left out with its
+  reason rather than written into a file that runs as root.
+- The removals are permanent, and the script's own header says so: root does
+  not use the Trash.
+- When the app ships its own uninstaller, MacUp names it, says who signed it
+  after checking that the signature verifies, and keeps the folder holding it
+  out of the script. MacUp does not run another maker's program: what it
+  removes would not be in MacUp's plan, boundary, or history.
+
+A privileged helper, `SMJobBless`, and Authorization Services remain out of
+scope: they would make MacUp itself able to act as root, and that needs a
+Developer ID the project does not have and a security review of its own.
+
 ## Approval, and what it is not
 
 MacUp can require the device owner's approval before it changes anything

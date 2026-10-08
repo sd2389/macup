@@ -204,12 +204,24 @@ public struct ManualRemoval: Sendable, Hashable, Codable, Identifiable {
     /// are never run by MacUp.
     public var steps: [String]
     public var sizeBytes: Int64?
+    /// The same steps as argument arrays, for the script MacUp writes for a
+    /// person to run with `sudo` (``AdminRemovalScript``). Empty when there
+    /// is no exact command — a Finder step, say — and then the written steps
+    /// above are the only way. MacUp never runs these itself.
+    public var commands: [AdminCommand]
 
-    public init(path: String, reason: String, steps: [String], sizeBytes: Int64? = nil) {
+    public init(
+        path: String,
+        reason: String,
+        steps: [String],
+        sizeBytes: Int64? = nil,
+        commands: [AdminCommand] = []
+    ) {
         self.path = path
         self.reason = reason
         self.steps = steps
         self.sizeBytes = sizeBytes
+        self.commands = commands
     }
 
     public var id: String { path }
@@ -401,6 +413,9 @@ public struct UninstallPlan: Sendable, Hashable, Codable, Identifiable {
     /// Which package manager runs ``steps``, when it is not the subject's
     /// own: Homebrew, when MacUp itself was installed with it.
     public var stepsProvider: ProviderID?
+    /// The maker's own uninstaller, when one was found beside what the app
+    /// left behind. MacUp names it and never runs it.
+    public var vendorUninstaller: VendorUninstaller?
 
     /// The package manager whose environment ``steps`` run with.
     public var runner: ProviderID? { stepsProvider ?? subject.provider }

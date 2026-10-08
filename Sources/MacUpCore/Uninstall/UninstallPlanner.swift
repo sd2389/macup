@@ -147,6 +147,20 @@ public struct UninstallPlanner: Sendable {
                     : ["Check `macup provider list`, or remove \(app.name) yourself in Finder."]
             ))
         }
+        // An app an installer put there as root is not MacUp's to move, but it
+        // is the person's: it goes on the list of what only an administrator
+        // can remove, with the exact command, so the script MacUp writes for
+        // them covers the app and not only what it left behind.
+        if app.removability.kind == .needsAdministrator {
+            plan.cannotRemove.append(ManualRemoval(
+                path: app.path,
+                reason: app.removability.reason
+                    ?? "Removing \(app.name) needs an administrator, and MacUp never asks for a password.",
+                steps: app.removability.steps,
+                sizeBytes: app.sizeBytes,
+                commands: [.remove(app.path, isDirectory: true)]
+            ))
+        }
         if app.removability.isRemovable {
             var bundle = PlannedRemoval(
                 path: app.path,
@@ -220,11 +234,30 @@ public struct UninstallPlanner: Sendable {
             otherNames: otherNames,
             userID: uninstall.userID
         )
+        var found: [ManualRemoval] = []
         for manual in system.scan(bundleIdentifier: app.bundleIdentifier, bundlePath: app.path, names: app.names)
         where !plan.cannotRemove.contains(where: { $0.path == manual.path }) {
             var manual = manual
             manual.sizeBytes = FileTree.size(of: manual.path)?.bytes
+            found.append(manual)
             plan.cannotRemove.append(manual)
+        }
+
+        // The maker's own uninstaller, if it left one in any of those
+        // folders. It is named first and never run, and the folder holding it
+        // is kept out of the script MacUp writes, so the uninstaller is still
+        // there when the person goes to use it.
+        plan.vendorUninstaller = VendorUninstallerScanner.find(
+            in: found.map(\.path),
+            signatures: uninstall.signatures
+        )
+        if let vendor = plan.vendorUninstaller {
+            plan.warnings.append(vendor.summary)
+            for index in plan.cannotRemove.indices where plan.cannotRemove[index].path == vendor.foundIn {
+                plan.cannotRemove[index].commands = []
+                plan.cannotRemove[index].reason += " \((vendor.path as NSString).lastPathComponent) is inside it, so remove this folder only after running that."
+                plan.cannotRemove[index].steps = vendor.steps
+            }
         }
     }
 

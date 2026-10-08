@@ -523,3 +523,36 @@ surfaces, with tests and docs, in its own commit (CLAUDE.md §26.13).
       the signed and notarized paths have never run end to end. The first run
       with the secrets in place should be a `workflow_dispatch` rehearsal,
       which builds, signs, and notarizes but publishes nothing
+
+
+### 8.4 — What needs an administrator, written down rather than refused — done
+
+The owner asked on 2026-10-08 for an uninstall to be finishable when an
+installer put its files in place as root, with the authority asked for rather
+than assumed (ADR-025). MacUp still never escalates.
+
+- [x] `AdminRemovalScript` turns the administrator-only part of a reviewed
+      plan into a `0600`, non-executable script in MacUp's state directory:
+      `set -euo pipefail`, a root check, one line per item in the plan's
+      order, and a header saying how many items and that the removals are
+      permanent
+- [x] Only `rm`, `launchctl`, and `pkgutil` may appear in it; anything else is
+      left out with its reason, whatever built it
+- [x] Arguments single-quoted, path operands behind `--`, receipt identifiers
+      checked character by character, and a path holding a control character,
+      a newline, or a bidirectional override left out rather than written
+- [x] `macup uninstall <target> --admin-script [--json]` writes it, prints
+      what it covers and the command, and removes nothing
+- [x] The app's review sheet offers **Write Administrator Script…**, then
+      Review Script, Copy Command, Show in Finder, and Open Terminal — it can
+      copy and open, never run
+- [x] The root-owned app bundle itself is on the list, so the script finishes
+      the job rather than only the leftovers
+- [x] The maker's own uninstaller is found, named, and its signer reported
+      only after `SecStaticCodeCheckValidity` passes; the folder holding it is
+      kept out of the script
+- [x] `scripts/check-trust-invariants.sh` fails the build if
+      `AdminRemovalScript.swift` names a runner, `chmod`, or `NSWorkspace`, or
+      if any other file under `Sources/` or `Apps/` names the script
+- [x] Tests: ordering, quoting, dash guards, refusals, the three-tool rule,
+      file mode, the CLI's text and JSON, and the app's view model

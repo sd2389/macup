@@ -249,6 +249,26 @@ private struct UninstallPlanSections: View {
             }
         }
 
+        // The maker's own remover, when it left one: the one thing in this
+        // sheet that removes the whole app properly.
+        if let vendor = plan.vendorUninstaller {
+            Section {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(vendor.path.displayPath).font(.callout.monospaced()).textSelection(.enabled)
+                    Text(vendor.summary.displaySafe).font(.callout).foregroundStyle(.secondary)
+                    ForEach(Array(vendor.steps.enumerated()), id: \.offset) { index, step in
+                        Text("\(index + 1). \(step.displaySafe)").font(.callout).textSelection(.enabled)
+                    }
+                }
+                .padding(.vertical, 2)
+            } header: {
+                Text("This App Ships Its Own Uninstaller")
+            } footer: {
+                Text("MacUp does not run it: what it removes would not be in this plan or in MacUp's history.")
+                    .leadingFooter()
+            }
+        }
+
         if !plan.cannotRemove.isEmpty {
             Section {
                 ForEach(plan.cannotRemove) { manual in
@@ -260,6 +280,9 @@ private struct UninstallPlanSections: View {
                         }
                     }
                     .padding(.vertical, 2)
+                }
+                if plan.cannotRemove.contains(where: { !$0.commands.isEmpty }) {
+                    AdminScriptRow()
                 }
             } header: {
                 Text("MacUp Cannot Remove These")
@@ -377,5 +400,93 @@ private struct UninstallResultSections: View {
         if let rollback, report.outcome != .refused {
             Section { Text(rollback.explanation.displaySafe).foregroundStyle(.secondary) }
         }
+    }
+}
+
+/// The way out of the dead end: MacUp writes the administrator-only part of
+/// the plan as a script, shows it, and leaves the running to the person.
+///
+/// Nothing here escalates. MacUp writes one file of its own, puts a command
+/// on the clipboard, and can open Terminal — `sudo` asks for the password
+/// there, and MacUp never sees it, stores it, or runs as root
+/// (docs/TRUST_AND_SECURITY.md, "Privilege").
+private struct AdminScriptRow: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if let script = model.uninstaller.adminScript {
+                Text("MacUp wrote these as one script, \(script.items.count == 1 ? "1 item" : "\(script.items.count) items"):")
+                    .font(.callout)
+                Text(script.path.displayPath)
+                    .font(.callout.monospaced())
+                    .textSelection(.enabled)
+                Text("Read it first. Running it removes those items permanently — root does not use the Trash.")
+                    .font(.callout)
+                    .foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(script.command)
+                    .font(.caption.monospaced())
+                    .textSelection(.enabled)
+                HStack {
+                    Button("Review Script…") { model.uninstaller.isReadingAdminScript = true }
+                    Button("Copy Command") { model.copyAdminScriptCommand() }
+                    Button("Show in Finder") { model.revealAdminScript() }
+                    Button("Open Terminal") { model.openTerminalForAdminScript() }
+                        .help("Opens Terminal with the command copied. sudo asks you for your password; MacUp never sees it.")
+                }
+                if !script.refused.isEmpty {
+                    Text("Not in the script, so the steps above are the only way for \(script.refused.count == 1 ? "1 item" : "\(script.refused.count) items").")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            } else {
+                Text("MacUp can write these as one script you read and then run with sudo. It never asks for your password.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Button("Write Administrator Script…") { model.writeAdminScript() }
+            }
+            if let problem = model.uninstaller.adminScriptProblem {
+                Label(problem.displaySafe, systemImage: "exclamationmark.triangle")
+                    .font(.callout)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(.vertical, 4)
+        .sheet(isPresented: Binding(
+            get: { model.uninstaller.isReadingAdminScript },
+            set: { model.uninstaller.isReadingAdminScript = $0 }
+        )) {
+            AdminScriptReader(text: model.uninstaller.adminScript?.text ?? "")
+        }
+    }
+}
+
+/// The script itself, to read before running it. Text only: this window has
+/// no button that runs anything.
+private struct AdminScriptReader: View {
+    @Environment(\.dismiss) private var dismiss
+    let text: String
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text("Administrator Script").font(.headline)
+                Spacer()
+                Button("Done") { dismiss() }
+            }
+            .padding()
+            Divider()
+            ScrollView {
+                Text(text)
+                    .font(.caption.monospaced())
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding()
+            }
+        }
+        .frame(minWidth: 620, minHeight: 480)
     }
 }
