@@ -30,20 +30,22 @@ struct AppModelSelfUpdateTests {
         #expect(harness.model.selfUpdateItem == nil)
     }
 
-    @Test("When Homebrew installed MacUp and has a newer one, Update MacUp reviews that one item")
-    func reviewsTheUpdate() async throws {
+    @Test("A folder in the Caskroom does not make this copy Homebrew's, and offers no update")
+    func caskroomFolderIsNotProvenance() async throws {
         let harness = try AppModelHarness(
             provider: StubCheckProvider(updateNames: ["macup", "git"], prefix: "/opt/homebrew"),
             planning: nil
         )
+        // A folder anyone can create. Homebrew reports no MacUp cask, so
+        // nothing here says Homebrew installed the copy that is running.
         harness.fileSystem.addDirectory("/opt/homebrew/Caskroom/macup")
         await harness.model.checkNow()
 
         let status = try #require(harness.model.selfUpdateStatus)
-        #expect(status.isManagedByHomebrew)
-        #expect(status.installations.map(\MacUpInstallation.kind) == [MacUpInstallation.Kind.homebrewCask])
-        // The cask is what is installed, so a formula update is not MacUp's.
-        #expect(!status.hasUpdate)
+        #expect(!status.isRunningCopyManagedByHomebrew)
+        #expect(status.installations.map(\MacUpInstallation.kind) == [MacUpInstallation.Kind.downloaded])
+        #expect(!status.hasUpdate, "a formula update is not this copy's either")
+        #expect(status.headline.contains("not installed by a package manager"))
     }
 
     @Test("A cask update MacUp itself is offered, and reviewing it selects only MacUp")
@@ -64,11 +66,17 @@ struct AppModelSelfUpdateTests {
                 availableVersion: "2.44.0"
             ),
         ], prefix: "/opt/homebrew")
-        let harness = try AppModelHarness(planning: planning)
-        harness.fileSystem.addDirectory("/opt/homebrew/Caskroom/macup")
+        // The app is where a cask puts one, and the cask update Homebrew
+        // reports is what ties it to Homebrew.
+        let fixture = try UninstallFixture()
+        let harness = try AppModelHarness(
+            planning: planning,
+            uninstall: fixture.environment(currentAppBundle: fixture.applications + "/MacUp.app")
+        )
         await harness.model.checkNow()
 
         let status = try #require(harness.model.selfUpdateStatus)
+        #expect(status.isRunningCopyManagedByHomebrew)
         #expect(status.hasUpdate)
         #expect(status.headline == "MacUp \(MacUp.version) can be updated to 0.5.0.")
         #expect(harness.model.selfUpdateItem?.rawValue == "brew-cask:macup")

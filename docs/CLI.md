@@ -662,6 +662,15 @@ the millisecond.
   `homebrewCask`, or `downloaded` — `item`, `path`), `unknownReason`,
   `releasesURL`. With an update to run it prints the ordinary execution
   document instead.
+
+  `installations[0]` is always the copy that is running, and
+  `managedByHomebrew` and `updateAvailable` are about that copy alone:
+  another copy on the same Mac is listed after it but never answers for it.
+  A formula copy is recognised by the running command being inside Homebrew's
+  Cellar; a cask copy by Homebrew itself reporting the cask, plus the running
+  app being where a cask puts one. A folder in the Caskroom is not evidence
+  of anything. When Homebrew could not be used, `unknownReason` says so
+  rather than either claim being made.
 - `macup schedule enable --install-updates` turns scheduled installing on
   (`--no-install-updates` turns it off). It is off unless you ask for it, a
   configuration MacUp cannot read fully never turns it on, and a Mac that

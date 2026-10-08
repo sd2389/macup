@@ -10,6 +10,7 @@ struct SelfUpdateTests {
         homebrew: ProviderStatus.Availability = .available,
         prefix: String? = "/opt/homebrew",
         updates: [UpdateCandidate] = [],
+        items: [ManagedItem] = [],
         error: MacUpError? = nil
     ) -> CheckReport {
         CheckReport(
@@ -28,6 +29,7 @@ struct SelfUpdateTests {
                 availability: homebrew,
                 capabilities: [.detect],
                 facts: prefix.map { [ProviderFact(key: "prefix", label: "Prefix", value: $0)] } ?? [],
+                items: items,
                 errors: error.map { [ProviderOperationError(operation: .detect, error: $0)] } ?? []
             )],
             updates: updates,
@@ -60,7 +62,7 @@ struct SelfUpdateTests {
         )
 
         #expect(status.installations.map(\MacUpInstallation.kind) == [MacUpInstallation.Kind.homebrewFormula])
-        #expect(status.isManagedByHomebrew)
+        #expect(status.isRunningCopyManagedByHomebrew)
         #expect(status.hasUpdate)
         #expect(status.updates.map(\UpdateCandidate.id.rawValue) == ["brew:sd2389/macup/macup"], "a tapped formula is still MacUp's own")
         #expect(status.headline == "MacUp 0.4.0 can be updated to 0.5.0.")
@@ -77,14 +79,40 @@ struct SelfUpdateTests {
         )
 
         #expect(status.installations.map(\MacUpInstallation.kind) == [MacUpInstallation.Kind.downloaded])
-        #expect(!status.isManagedByHomebrew)
+        #expect(!status.isRunningCopyManagedByHomebrew)
         #expect(!status.hasUpdate)
         #expect(status.releasesURL == "https://github.com/sd2389/macup/releases")
         #expect(status.headline.contains("not installed by a package manager"))
     }
 
-    @Test("A cask is found by Homebrew's Caskroom, not by where the app happens to be")
-    func homebrewCask() {
+    private func caskItem() throws -> ManagedItem {
+        ManagedItem(
+            id: try PackageID(.brewCask, "macup"),
+            kind: .cask,
+            displayName: "MacUp",
+            installedVersions: ["0.4.0"]
+        )
+    }
+
+    @Test("A cask is what Homebrew says it installed, and the app where a cask puts one")
+    func homebrewCask() throws {
+        let status = SelfUpdate.status(
+            check: report(items: [try caskItem()]),
+            executablePath: "/Applications/MacUp.app/Contents/Helpers/macup",
+            appBundlePath: "/Applications/MacUp.app",
+            fileSystem: FakeFileSystem(),
+            runningVersion: "0.4.0"
+        )
+
+        #expect(status.installations.map(\MacUpInstallation.kind) == [MacUpInstallation.Kind.homebrewCask])
+        #expect(status.installations.first?.path == "/Applications/MacUp.app")
+        #expect(status.installations.first?.item?.rawValue == "brew-cask:macup")
+        #expect(status.isRunningCopyManagedByHomebrew)
+        #expect(status.headline == "MacUp 0.4.0 is up to date, according to Homebrew.")
+    }
+
+    @Test("A directory in the Caskroom proves nothing: anyone can make one")
+    func caskroomDirectoryIsNotProvenance() {
         let fileSystem = FakeFileSystem()
         fileSystem.addDirectory("/opt/homebrew/Caskroom/macup")
 
@@ -96,10 +124,27 @@ struct SelfUpdateTests {
             runningVersion: "0.4.0"
         )
 
-        #expect(status.installations.map(\MacUpInstallation.kind) == [MacUpInstallation.Kind.homebrewCask])
-        #expect(status.installations.first?.path == "/Applications/MacUp.app")
-        #expect(status.installations.first?.item?.rawValue == "brew-cask:macup")
-        #expect(status.headline == "MacUp 0.4.0 is up to date, according to Homebrew.")
+        #expect(status.installations.map(\MacUpInstallation.kind) == [MacUpInstallation.Kind.downloaded])
+        #expect(!status.isRunningCopyManagedByHomebrew)
+        #expect(status.headline.contains("not installed by a package manager"))
+    }
+
+    @Test("A cask Homebrew manages does not answer for a copy running from somewhere else")
+    func caskElsewhereDoesNotClaimTheRunningCopy() throws {
+        let update = try candidate("brew-cask:macup", from: "0.4.0", to: "0.5.0")
+        let status = SelfUpdate.status(
+            check: report(updates: [update], items: [try caskItem()]),
+            executablePath: "/Users/example/Downloads/MacUp.app/Contents/Helpers/macup",
+            appBundlePath: "/Users/example/Downloads/MacUp.app",
+            fileSystem: FakeFileSystem(),
+            runningVersion: "0.4.0"
+        )
+
+        #expect(status.installations.map(\MacUpInstallation.kind) == [.downloaded, .homebrewCask])
+        #expect(status.installations.first?.path == "/Users/example/Downloads/MacUp.app")
+        #expect(!status.isRunningCopyManagedByHomebrew)
+        #expect(!status.hasUpdate, "updating the other copy would not make this one newer")
+        #expect(status.headline.contains("not installed by a package manager"))
     }
 
     @Test("An update for something else is never mistaken for MacUp's own")
@@ -122,11 +167,10 @@ struct SelfUpdateTests {
         #expect(!status.hasUpdate, "only the formula is installed, so only a formula update counts")
     }
 
-    @Test("When Homebrew could not be used, MacUp says it does not know instead of saying it is up to date")
+    @Test("When Homebrew could not be used, MacUp says it does not know instead of guessing either way")
     func unknownWhenHomebrewFailed() {
-        let fileSystem = FakeFileSystem()
-        fileSystem.addDirectory("/opt/homebrew/Caskroom/macup")
-
+        // An app where a cask would put one: only Homebrew could say whether
+        // a cask put it there, and Homebrew cannot be asked.
         for (availability, expected) in [
             (ProviderStatus.Availability.failed, "could not be used"),
             (.disabled, "turned off"),
@@ -136,10 +180,11 @@ struct SelfUpdateTests {
                 check: report(homebrew: availability, error: MacUpError(.commandFailed, "brew could not be used.")),
                 executablePath: nil,
                 appBundlePath: "/Applications/MacUp.app",
-                fileSystem: fileSystem
+                fileSystem: FakeFileSystem()
             )
             #expect(status.unknownReason?.contains(expected) == true)
             #expect(status.headline.contains("unknown"))
+            #expect(!status.headline.contains("up to date"), "not knowing is not the same as being up to date")
         }
     }
 

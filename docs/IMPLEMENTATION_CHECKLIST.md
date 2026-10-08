@@ -436,8 +436,10 @@ surfaces, with tests and docs, in its own commit (CLAUDE.md §26.13).
 ### 8.2 — Self-update through whatever installed MacUp — done
 
 - [x] MacUp knows how it was installed (Homebrew cask, Homebrew formula, or
-      a copy you downloaded), from the Cellar and Caskroom under Homebrew's
-      own prefix
+      a copy you downloaded): a formula from the running command being inside
+      Homebrew's own Cellar, a cask from Homebrew reporting that cask plus the
+      running app being where a cask puts one. A folder in the Caskroom is not
+      evidence, and when Homebrew cannot be asked MacUp says it does not know
 - [x] An update plan for the first two, built from the Homebrew data MacUp
       already reads — no new network code, and the one shared `UpdateRun`
       path, so updating MacUp cannot skip a confirmation the ordinary path

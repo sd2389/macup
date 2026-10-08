@@ -75,7 +75,7 @@ struct SelfUpdateCommand: AsyncParsableCommand {
         }
 
         guard status.hasUpdate else {
-            if !status.isManagedByHomebrew, !json {
+            if !status.isRunningCopyManagedByHomebrew, !json {
                 context.print("")
                 context.print("Download the next version yourself: " + style.path(status.releasesURL))
                 context.print(style.dim("MacUp never downloads or replaces itself."))
@@ -134,7 +134,7 @@ struct SelfUpdateDocument: Encodable {
 
     init(_ status: SelfUpdateStatus) {
         runningVersion = status.runningVersion
-        managedByHomebrew = status.isManagedByHomebrew
+        managedByHomebrew = status.isRunningCopyManagedByHomebrew
         updateAvailable = status.hasUpdate
         availableVersion = status.updates.first?.availableVersion.raw
         installations = status.installations.map { installation -> Installation in

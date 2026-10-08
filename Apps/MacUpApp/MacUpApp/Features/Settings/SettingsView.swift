@@ -31,7 +31,7 @@ private struct MacUpUpdateSection: View {
                 if status.hasUpdate {
                     Button("Update MacUp…") { Task { await model.reviewSelfUpdate() } }
                         .help("Shows the same review as any other update, with the exact command, before anything runs.")
-                } else if !status.isManagedByHomebrew {
+                } else if !status.isRunningCopyManagedByHomebrew {
                     Button("Open Releases Page") {
                         if let url = URL(string: status.releasesURL) { NSWorkspace.shared.open(url) }
                     }
