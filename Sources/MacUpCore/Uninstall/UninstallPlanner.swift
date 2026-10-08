@@ -251,8 +251,9 @@ public struct UninstallPlanner: Sendable {
             in: found.map(\.path),
             signatures: uninstall.signatures
         )
+        // Not also a warning: both surfaces give it a section of its own, and
+        // saying it twice reads like two different findings.
         if let vendor = plan.vendorUninstaller {
-            plan.warnings.append(vendor.summary)
             for index in plan.cannotRemove.indices where plan.cannotRemove[index].path == vendor.foundIn {
                 plan.cannotRemove[index].commands = []
                 plan.cannotRemove[index].reason += " \((vendor.path as NSString).lastPathComponent) is inside it, so remove this folder only after running that."
